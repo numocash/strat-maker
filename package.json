@@ -1,0 +1,22 @@
+{
+  "name": "revelation",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "format": "rome format . --write",
+    "clean": "rm -rf cache out",
+    "lint": "pnpm lint:sol && rome check .",
+    "lint:sol": "forge fmt --check && pnpm solhint \"{script,src,test}/**/*.sol\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "rome": "^12.1.2"
+  },
+  "devDependencies": {
+    "husky": "^8.0.3",
+    "solhint": "^3.4.1"
+  }
+}
