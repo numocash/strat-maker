@@ -4,10 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "format": "rome format . --write",
+    "format": "rome format . --write && forge fmt --check",
     "clean": "rm -rf cache out",
-    "lint": "pnpm lint:sol && rome check .",
-    "lint:sol": "forge fmt --check && pnpm solhint \"{script,src,test}/**/*.sol\""
+    "lint": "pnpm solhint \"{script,src,test}/**/*.sol\" && rome check ."
   },
   "keywords": [],
   "author": "",
