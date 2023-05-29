@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
-import {Tick} from "./Tick.sol";
-import {Tier} from "./Tier.sol";
-import {Position} from "./Position.sol";
+import { Tick } from "./Tick.sol";
+import { Tier } from "./Tier.sol";
+import { Position } from "./Position.sol";
 
 contract Pair {
     using Tick for mapping(bytes32 => Tick.Info);
@@ -32,7 +32,12 @@ contract Pair {
         token1 = _token1;
     }
 
-    function mint(address to, int24 tickLower, int24 tickUpper, uint256 amountLiquidity)
+    function mint(
+        address to,
+        int24 tickLower,
+        int24 tickUpper,
+        uint256 amountLiquidity
+    )
         external
         returns (uint256 amount0, uint256 amount1)
     {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
-import {priceSpacingDenominator, priceSpacingNumerator} from "./TickMath.sol";
+import { priceSpacingDenominator, priceSpacingNumerator } from "./TickMath.sol";
 
 // amount0Series > 0
 // amount0Series < 0

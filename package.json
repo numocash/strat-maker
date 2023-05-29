@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "format": "rome format . --write && forge fmt --check",
+    "format": "rome format . --write && forge fmt",
     "clean": "rm -rf cache out",
     "lint": "pnpm solhint \"{script,src,test}/**/*.sol\" && rome check ."
   },
