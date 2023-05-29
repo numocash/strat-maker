@@ -7,7 +7,9 @@
       "dist",
       "tsconfig.json",
       "tsconfig.*.json",
-      "pnpm-lock.yaml"
+      "pnpm-lock.yaml",
+      "cache",
+      "out"
     ]
   },
   "organizeImports": {
