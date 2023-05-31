@@ -5,7 +5,7 @@ import { Script } from "forge-std/Script.sol";
 /* solhint-disable-next-line no-console */
 import { console2 } from "forge-std/console2.sol";
 
-import { FullMath } from "src/core/FullMath.sol";
+import { mulDiv } from "src/core/FullMath.sol";
 import { MAX_TICK, Q128 } from "src/core/TickMath.sol";
 
 contract TickMathScript is Script {
@@ -18,7 +18,7 @@ contract TickMathScript is Script {
         console2.log("if (x & %x > 0) ratioX128 = (ratioX128 * %x) >> 128;", 1 << 0, type(uint256).max / u_i);
 
         for (uint8 i = 1; (1 << i) < uint24(MAX_TICK); i++) {
-            u_i = FullMath.mulDivRoundingUp(u_i, u_i, Q128);
+            u_i = mulDiv(u_i, u_i, Q128);
 
             /* solhint-disable-next-line no-console */
             console2.log("if (x & %x > 0) ratioX128 = (ratioX128 * %x) >> 128;", 1 << i, type(uint256).max / u_i);
