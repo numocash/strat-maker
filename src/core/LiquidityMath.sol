@@ -25,9 +25,9 @@ function finiteGeoSeriesSumNeg(uint256 a1, int24 n) pure returns (uint256 sum) {
 /// i.e. x = ∑ L/Pi
 /// @custom:team Rouding needs to be checked
 function getAmount0Delta(int24 tickLower, int24 tickUpper, uint256 liquidity) pure returns (uint256 amount0) {
-    if (tickLower > 0) {
+    if (tickLower >= 0) {
         return finiteGeoSeriesSumPos(mulDiv(liquidity, getRatioAtTick(tickLower), Q128), (tickUpper - tickLower) + 1);
-    } else if (tickUpper < 0) {
+    } else if (tickUpper <= 0) {
         return finiteGeoSeriesSumNeg(mulDiv(liquidity, getRatioAtTick(tickLower), Q128), (tickUpper - tickLower) + 1);
     } else {
         return finiteGeoSeriesSumPos(liquidity, tickUpper + 1) + finiteGeoSeriesSumNeg(liquidity, -tickLower + 1)

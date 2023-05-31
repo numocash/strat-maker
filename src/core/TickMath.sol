@@ -52,6 +52,6 @@ function getRatioAtTick(int24 tick) pure returns (uint256 ratioX128) {
         // Stop computation here since |tick| < 2**20
 
         // Inverse r since base = 1/1.0001
-        if (tick >= 0) ratioX128 = type(uint256).max / ratioX128;
+        if (tick > 0) ratioX128 = type(uint256).max / ratioX128;
     }
 }
