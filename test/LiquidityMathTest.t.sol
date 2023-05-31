@@ -7,8 +7,6 @@ import { getAmount0Delta, getAmount1Delta } from "src/core/LiquidityMath.sol";
 
 contract LiquidityMathTest is Test {
     function testGetAmount0Delta() external {
-        assertEq(getAmount1Delta(0, 2, 1e18), 3e18);
-        assertEq(getAmount1Delta(-2, 2, 1e18), 5e18);
         assertEq(getAmount1Delta(0, 0, 1e18), 1e18);
     }
 

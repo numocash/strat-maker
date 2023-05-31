@@ -3,15 +3,25 @@ pragma solidity ^0.8.19;
 
 uint256 constant Q128 = 0x100000000000000000000000000000000;
 
-uint16 constant priceSpacingNumerator = 1;
-uint16 constant priceSpacingDenominator = 10_000;
-
 int24 constant MIN_TICK = -887_272;
 int24 constant MAX_TICK = 887_272;
 
 error InvalidTick();
 
 /// @notice Calculates 1.0001^tick * 2^128
+/**
+ * @dev Uses binary decomposition of |tick|
+ *
+ * Let b_i = the i-th bit of x and b_i ∈ {0, 1}
+ * Then  x = (b0 * 2^0) + (b1 * 2^1) + (b2 * 2^2) + ...
+ * Thus, r = u^x
+ *         = u^(b0 * 2^0) * u^(b1 * 2^1) * u^(b2 * 2^2) * ...
+ *         = k0^b0 * k1^b1 * k2^b2 * ... (where k_i = u^(2^i))
+ * We pre-compute k_i in script/TickMathScript.s.sol since u is a known constant. In practice, we use u = 1/1.0001 to
+ * prevent overflow during the computation, then inverse the result at the end.
+ */
+/// @dev Modified from Uniswap (), and Muffin ()
+/// @custom:team I believe these constants do not round correctly
 function getRatioAtTick(int24 tick) pure returns (uint256 ratioX128) {
     unchecked {
         if (tick < MIN_TICK || tick > MAX_TICK) revert InvalidTick();
@@ -39,6 +49,7 @@ function getRatioAtTick(int24 tick) pure returns (uint256 ratioX128) {
         if (x & 0x20000 > 0) ratioX128 = (ratioX128 * 0x2216e584f5fa1ea90bf2722b93a1) >> 128;
         if (x & 0x40000 > 0) ratioX128 = (ratioX128 * 0x48a170391f7dc423d5d34c2) >> 128;
         if (x & 0x80000 > 0) ratioX128 = (ratioX128 * 0x149b34ee7ac262) >> 128;
+        // Stop computation here since |tick| < 2**20
 
         // Inverse r since base = 1/1.0001
         if (tick >= 0) ratioX128 = type(uint256).max / ratioX128;
