@@ -8,7 +8,8 @@ contract Factory {
                         EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    event PairCreated(address indexed tokenA, address indexed tokenB, int24 indexed tick, address pair);
+    event PairCreated(address indexed tokenA, address indexed tokenB, 
+                        int24 indexed tick, address pair);
 
     /*//////////////////////////////////////////////////////////////
                         ERRORS
@@ -46,8 +47,8 @@ contract Factory {
 
         parameters = Parameters(tokenA, tokenB, 0);
 
-        //Error 
-        pair = address(new Pair{salt: keccak256(abi.encode(token0, token1, 0)) }(token0, token1, 0));
+        pair = address(new Pair{salt: keccak256(abi.encode(token0, 
+                        token1, 0)) });
         delete parameters;
 
         getPair[token0][token1][0] = pair;
