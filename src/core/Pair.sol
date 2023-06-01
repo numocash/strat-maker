@@ -32,7 +32,12 @@ contract Pair {
         (token0, token1) = Factory(msg.sender).paramters();
     }
 
-    function mint(address to, int24 tickLower, int24 tickUpper, uint256 amountLiquidity)
+    function mint(
+        address to,
+        int24 tickLower,
+        int24 tickUpper,
+        uint256 amountLiquidity
+    )
         external
         returns (uint256 amount0, uint256 amount1)
     {
