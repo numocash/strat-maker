@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
-import { getRatioAtTick, Q128 } from "./TickMath.sol";
+import { getRatioAtTick, Q96, Q128 } from "./TickMath.sol";
 import { mulDiv } from "./FullMath.sol";
+
+uint256 constant Q32 = Q128 / Q96;
 
 /// @notice Calculates the sum of a geometric series for positive ticks
 /// @dev Use r = 1/1.0001
@@ -42,3 +44,43 @@ function getAmount0Delta(int24 tickLower, int24 tickUpper, uint256 liquidity) pu
 function getAmount1Delta(int24 tickLower, int24 tickUpper, uint256 liquidity) pure returns (uint256 amount1) {
     return liquidity * (uint24(tickUpper - tickLower) + 1);
 }
+
+/// @notice Calculate amount{0,1} needed for the given liquidity change
+/// @custom:team check for overflow on amount0
+function calcAmountsForLiquidity(
+    int24 tickCurrent,
+    uint96 composition,
+    int24 tickLower,
+    int24 tickUpper,
+    uint256 liquidity
+)
+    pure
+    returns (uint256 amount0, uint256 amount1)
+{
+    if (tickUpper < tickCurrent) {
+        return (0, getAmount1Delta(tickLower, tickUpper, liquidity));
+    } else if (tickLower > tickCurrent) {
+        return (getAmount0Delta(tickLower, tickUpper, liquidity), 0);
+    } else {
+        amount0 = tickLower != tickCurrent ? getAmount0Delta(tickLower, tickCurrent - 1, liquidity) : 0;
+        amount1 = tickUpper != tickCurrent ? getAmount1Delta(tickCurrent + 1, tickUpper, liquidity) : 0;
+
+        amount0 += mulDiv(liquidity, (Q96 - composition) * Q32, getRatioAtTick(tickCurrent));
+        amount1 += mulDiv(liquidity, composition, Q96);
+
+        return (amount0, amount1);
+    }
+}
+
+/// @notice Calculate max liquidity received if adding the given token amounts
+function calcLiquidityForAmounts(
+    int24 tickCurrent,
+    uint96 composition,
+    int24 tickLower,
+    int24 tickUpper,
+    uint256 amount0,
+    uint256 amount1
+)
+    pure
+    returns (uint256 liquidity)
+{ }

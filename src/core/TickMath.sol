@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
+uint256 constant Q96 = 0x1000000000000000000;
 uint256 constant Q128 = 0x100000000000000000000000000000000;
 
 int24 constant MIN_TICK = -887_272;
@@ -55,3 +56,7 @@ function getRatioAtTick(int24 tick) pure returns (uint256 ratioX128) {
         if (tick > 0) ratioX128 = type(uint256).max / ratioX128;
     }
 }
+
+/// @notice Calculates the greatest tick value such that getRatioAtTick(tick) <= ratio
+/// @dev Find tick = floor(log_1.0001(ratioX128))
+function getTickAtRatio(uint256 ratioX128) pure returns (int24 tick) { }

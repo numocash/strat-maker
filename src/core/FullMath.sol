@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 /**
  * @dev https://github.com/Uniswap/uniswap-v3-core/blob/v1.0.0/contracts/libraries/FullMath.sol
- * Added `unchecked` and changed line 76 for being compatible in solidity 0.8
+ * Added `unchecked` and changed line 67 for being compatible in solidity 0.8
  */
 
 /// @notice Calculates floor(a×b÷denominator) with full precision. Throws if result overflows a uint256 or
