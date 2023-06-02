@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import { Tick } from "./Tick.sol";
 import { Tier } from "./Tier.sol";
 import { Position } from "./Position.sol";
+import { Factory } from "./Factory.sol";
 
 contract Pair {
     using Tick for mapping(bytes32 => Tick.Info);
@@ -29,10 +30,9 @@ contract Pair {
     mapping(uint8 tierID => Tier.Info) public tiers;
     mapping(bytes32 positionID => Position.Info) public positions;
 
-    constructor(address _factory, address _token0, address _token1) {
-        factory = _factory;
-        token0 = _token0;
-        token1 = _token1;
+    constructor() {
+        factory = msg.sender;
+        (token0, token1) = Factory(msg.sender).parameters();
     }
 
     function mint(
