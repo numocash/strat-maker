@@ -4,9 +4,6 @@
     "ignore": [
       "**/node_modules",
       "CHANGELOG.md",
-      "dist",
-      "tsconfig.json",
-      "tsconfig.*.json",
       "pnpm-lock.yaml",
       "cache",
       "out"
