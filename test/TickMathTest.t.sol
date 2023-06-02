@@ -3,11 +3,14 @@ pragma solidity ^0.8.19;
 
 import { Test } from "forge-std/Test.sol";
 
-import { MIN_TICK, MAX_TICK, getRatioAtTick } from "src/core/TickMath.sol";
+import { getAmount0Delta, getAmount1Delta } from "src/core/LiquidityMath.sol";
+import { getRatioAtTick, Q128 } from "src/core/TickMath.sol";
+import { mulDiv } from "src/core/FullMath.sol";
 
-contract TickMathTest is Test {
-    function testTickMath() external {
-        assertEq(getRatioAtTick(MIN_TICK), 0);
-        assertEq(getRatioAtTick(MAX_TICK), 0);
+contract LiquidityMathTest is Test {
+    function testGetRatioAtTickBasic() external {
+        assertEq(getRatioAtTick(0), Q128);
+        assertGe(getRatioAtTick(1), Q128, "positive tick greater than one");
+        assertGe(Q128, getRatioAtTick(-1), "positive tick greater than one");
     }
 }

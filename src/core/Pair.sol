@@ -15,11 +15,14 @@ contract Pair {
     address public immutable token0;
     address public immutable token1;
 
+    /**
+     * @custom:team This is where we should add the offsets of each tier, i.e. an int8 that shows how far each the
+     * current tick of a tier is away from the global current tick
+     */
     struct Slot0 {
         uint96 composition;
         uint24 tick;
     }
-    // tickOffsets for each tier
 
     Slot0 public slot0;
 
@@ -50,7 +53,6 @@ contract Pair {
         // recieve amounts
     }
 
-    // mint
     // burn
     // swap
 }
