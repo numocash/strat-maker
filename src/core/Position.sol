@@ -10,11 +10,16 @@ library Position {
         uint256 settlementSnapshotID;
     }
 
-    function get(mapping(bytes32 => Position) storage positions,
-                    uint8 tierId,
-                    int24 tickLower,
-                    int24 tickUpper
-                    ) internal view returns (Position storage position) {
+    function get(
+        mapping(bytes32 => Position.Info) storage positions,
+        uint8 tierId,
+        int24 tickLower,
+        int24 tickUpper
+    )
+        internal
+        view
+        returns (Position.Info storage position)
+    {
         position = positions[keccak256(abi.encodePacked(tierId, tickLower, tickUpper))];
     }
 }

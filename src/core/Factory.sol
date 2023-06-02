@@ -1,31 +1,32 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
-import {Pair} from "./Pair.sol";
+import { Pair } from "./Pair.sol";
 
 contract Factory {
     /*//////////////////////////////////////////////////////////////
                         EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    event PairCreated(address indexed tokenA, address indexed tokenB, 
-                        int24 indexed tick, address pair);
+    event PairCreated(address indexed token0, address indexed token1, address pair);
 
     /*//////////////////////////////////////////////////////////////
                         ERRORS
     //////////////////////////////////////////////////////////////*/
 
     error SameTokenError();
+
     error ZeroAddressError();
+
     error DeployedError();
 
     /*//////////////////////////////////////////////////////////////
                         STORAGE
     //////////////////////////////////////////////////////////////*/
 
-    // Three-level mapping
-    mapping(address => mapping(address => mapping(int24 => address))) public getPair;
-    mapping(uint8 => int24) public tierAmountTick;
+    /// @custom:team Potentially replace this with an address estimated and then check if deployed with
+    /// estimatedAddress.code.length == 0
+    mapping(address tokenA => mapping(address tokenB => address pair)) public getPair;
 
     /*//////////////////////////////////////////////////////////////
                         DEPLOYER STORAGE
@@ -34,7 +35,6 @@ contract Factory {
     struct Parameters {
         address token0;
         address token1;
-        int24 tick;
     }
 
     Parameters public parameters;
@@ -42,18 +42,18 @@ contract Factory {
     function createPair(address tokenA, address tokenB) external returns (address pair) {
         if (tokenA == tokenB) revert SameTokenError();
         (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
-        if (tokenA == address(0) || tokenB == address(0)) revert ZeroAddressError();
-        if (getPair[token0][token1][0] != address(0)) revert DeployedError();
 
-        parameters = Parameters(tokenA, tokenB, 0);
+        if (token0 == address(0)) revert ZeroAddressError();
+        if (getPair[token0][token1] != address(0)) revert DeployedError();
 
-        pair = address(new Pair{salt: keccak256(abi.encode(token0, 
-                        token1, 0)) });
+        parameters = Parameters({ token0: token0, token1: token1 });
+        pair = address(new Pair{salt: keccak256(abi.encode(token0, token1)) }());
+
         delete parameters;
 
-        getPair[token0][token1][0] = pair;
-        getPair[token1][token0][0] = pair;
+        getPair[token0][token1] = pair;
+        getPair[token1][token0] = pair;
 
-        emit PairCreated(tokenA, tokenB, 0, pair);
+        emit PairCreated(token0, token1, pair);
     }
 }

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
-import {Tick} from "./Tick.sol";
-import {Tier} from "./Tier.sol";
-import {Position} from "./Position.sol";
-import {Factory} from "./Factory.sol";
+import { Tick } from "./Tick.sol";
+import { Tier } from "./Tier.sol";
+import { Position } from "./Position.sol";
+import { Factory } from "./Factory.sol";
 
 contract Pair {
     using Tick for mapping(bytes32 => Tick.Info);
@@ -32,7 +32,7 @@ contract Pair {
 
     constructor() {
         factory = msg.sender;
-        (token0, token1) = Factory(msg.sender).paramters();
+        (token0, token1) = Factory(msg.sender).parameters();
     }
 
     function mint(
