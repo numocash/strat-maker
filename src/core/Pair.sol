@@ -7,8 +7,8 @@ import {Position} from "./Position.sol";
 import {Factory} from "./Factory.sol";
 import {MIN_TICK, MAX_TICK} from "./TickMath.sol";
 import {addDelta, calcAmountsForLiquidity} from "./LiquidityMath.sol";
-import {SafeTransferLib} from "src/SafeTransferLib.sol";
-import {BalanceLib} from "src/BalaneLib.sol";
+import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
+import {BalanceLib} from "src/libraries/BalaneLib.sol";
 import {IMintCallback} from "./interfaces/IMintCallback.sol";
 
 contract Pair {

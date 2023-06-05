@@ -82,29 +82,6 @@ library SafeTransferLib {
         if (!didLastOptionalReturnCallSucceed(callStatus)) revert FailedTransfer();
     }
 
-    function safeApprove(address token, address to, uint256 amount) internal {
-        bool callStatus;
-
-        assembly {
-            // Get a pointer to some free memory.
-            let freeMemoryPointer := mload(0x40)
-
-            // Write the abi-encoded calldata to memory piece by piece:
-            mstore(freeMemoryPointer, 0x095ea7b300000000000000000000000000000000000000000000000000000000) // Begin with
-                // the function selector.
-            mstore(add(freeMemoryPointer, 4), and(to, 0xffffffffffffffffffffffffffffffffffffffff)) // Mask and append
-                // the "to" argument.
-            mstore(add(freeMemoryPointer, 36), amount) // Finally append the "amount" argument. No mask as it's a full
-                // 32 byte value.
-
-            // Call the token and store if it succeeded or not.
-            // We use 68 because the calldata length is 4 + 32 * 2.
-            callStatus := call(gas(), token, 0, freeMemoryPointer, 68, 0, 0)
-        }
-
-        if (!didLastOptionalReturnCallSucceed(callStatus)) revert FailedApprove();
-    }
-
     /*///////////////////////////////////////////////////////////////
                          INTERNAL HELPER LOGIC
     //////////////////////////////////////////////////////////////*/
