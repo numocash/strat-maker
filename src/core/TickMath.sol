@@ -59,4 +59,4 @@ function getRatioAtTick(int24 tick) pure returns (uint256 ratioX128) {
 
 /// @notice Calculates the greatest tick value such that getRatioAtTick(tick) <= ratio
 /// @dev Find tick = floor(log_1.0001(ratioX128))
-function getTickAtRatio(uint256 ratioX128) pure returns (int24 tick) { }
+function getTickAtRatio(uint256 ratioX128) pure returns (int24 tick) {}

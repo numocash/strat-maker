@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
-import { Pair } from "./Pair.sol";
+import {Pair} from "./Pair.sol";
 
 contract Factory {
     /*//////////////////////////////////////////////////////////////
@@ -46,7 +46,7 @@ contract Factory {
         if (token0 == address(0)) revert ZeroAddressError();
         if (getPair[token0][token1] != address(0)) revert DeployedError();
 
-        parameters = Parameters({ token0: token0, token1: token1 });
+        parameters = Parameters({token0: token0, token1: token1});
         pair = address(new Pair{salt: keccak256(abi.encode(token0, token1)) }());
 
         delete parameters;

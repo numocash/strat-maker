@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
-import { Tick } from "./Tick.sol";
-import { Tier } from "./Tier.sol";
-import { Position } from "./Position.sol";
-import { Factory } from "./Factory.sol";
-import { MIN_TICK, MAX_TICK } from "./TickMath.sol";
-import { addDelta, calcAmountsForLiquidity } from "./LiquidityMath.sol";
-import { SafeTransferLib } from "src/SafeTransferLib.sol";
-import { BalanceLib } from "src/BalaneLib.sol";
-import { IMintCallback } from "./interfaces/IMintCallback.sol";
+import {Tick} from "./Tick.sol";
+import {Tier} from "./Tier.sol";
+import {Position} from "./Position.sol";
+import {Factory} from "./Factory.sol";
+import {MIN_TICK, MAX_TICK} from "./TickMath.sol";
+import {addDelta, calcAmountsForLiquidity} from "./LiquidityMath.sol";
+import {SafeTransferLib} from "src/SafeTransferLib.sol";
+import {BalanceLib} from "src/BalaneLib.sol";
+import {IMintCallback} from "./interfaces/IMintCallback.sol";
 
 contract Pair {
     using Tick for mapping(bytes32 => Tick.Info);
@@ -86,7 +86,7 @@ contract Pair {
     // swap
 
     function checkTickInputs(int24 tickLower, int24 tickUpper) internal pure {
-        if (tickLower >= tickUpper || MIN_TICK > tickLower || tickUpper > MAX_TICK) {
+        if (tickLower > tickUpper || MIN_TICK > tickLower || tickUpper > MAX_TICK) {
             revert InvalidTick();
         }
     }
@@ -110,7 +110,7 @@ contract Pair {
 
         // update current liquidity if in-range
         Tier.Info storage tier = tiers.get(tierID);
-        if (tickLower <= slot0.tick && slot0.tick < tickUpper) {
+        if (tickLower <= slot0.tick && slot0.tick <= tickUpper) {
             tier.liquidity = addDelta(tier.liquidity, liquidity);
         }
 
@@ -137,9 +137,9 @@ contract Pair {
         tickInfo.liquidityGross = addDelta(tickInfo.liquidityGross, liquidity);
 
         if (isLower) {
-            tickInfo.liquidityNet = addDelta(tickInfo.liquidityNet, liquidity);
+            tickInfo.liquidityNet += liquidity;
         } else {
-            tickInfo.liquidityNet = addDelta(tickInfo.liquidityNet, -liquidity);
+            tickInfo.liquidityNet -= liquidity;
         }
     }
 

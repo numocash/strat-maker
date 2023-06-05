@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
-import { getRatioAtTick, Q96, Q128 } from "./TickMath.sol";
-import { mulDiv } from "./FullMath.sol";
+import {getRatioAtTick, Q96, Q128} from "./TickMath.sol";
+import {mulDiv} from "./FullMath.sol";
 
 uint256 constant Q32 = Q128 / Q96;
 
@@ -62,8 +62,8 @@ function calcAmountsForLiquidity(
     } else if (tickLower > tickCurrent) {
         return (getAmount0Delta(tickLower, tickUpper, liquidity), 0);
     } else {
-        amount0 = tickLower != tickCurrent ? getAmount0Delta(tickLower, tickCurrent - 1, liquidity) : 0;
-        amount1 = tickUpper != tickCurrent ? getAmount1Delta(tickCurrent + 1, tickUpper, liquidity) : 0;
+        amount0 = tickUpper != tickCurrent ? getAmount0Delta(tickCurrent + 1, tickUpper, liquidity) : 0;
+        amount1 = tickLower != tickCurrent ? getAmount1Delta(tickLower, tickCurrent - 1, liquidity) : 0;
 
         amount0 += mulDiv(liquidity, (Q96 - composition) * Q32, getRatioAtTick(tickCurrent));
         amount1 += mulDiv(liquidity, composition, Q96);
@@ -83,7 +83,7 @@ function calcLiquidityForAmounts(
 )
     pure
     returns (uint256 liquidity)
-{ }
+{}
 
 function addDelta(uint256 x, int256 y) pure returns (uint256 z) {
     if (y < 0) {

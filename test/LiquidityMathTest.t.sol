@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
-import { Test } from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 
-import { getAmount0Delta, getAmount1Delta, calcAmountsForLiquidity } from "src/core/LiquidityMath.sol";
-import { getRatioAtTick, Q96, Q128 } from "src/core/TickMath.sol";
-import { mulDiv } from "src/core/FullMath.sol";
+import {getAmount0Delta, getAmount1Delta, calcAmountsForLiquidity} from "src/core/LiquidityMath.sol";
+import {getRatioAtTick, Q96, Q128} from "src/core/TickMath.sol";
+import {mulDiv} from "src/core/FullMath.sol";
 
 contract LiquidityMathTest is Test {
     function testGetAmount0DeltaBasic() external {
@@ -60,6 +60,17 @@ contract LiquidityMathTest is Test {
         (uint256 amount0, uint256 amount1) = calcAmountsForLiquidity(tickCurrent, 0, tickLower, tickUpper, liquidity);
         assertEq(amount0, getAmount0Delta(tickLower, tickUpper, liquidity));
         assertEq(amount1, 0);
+    }
+
+    function testCalcAmountsForLiquidityInRange() external {
+        int24 tickLower = -2;
+        int24 tickUpper = 0;
+        int24 tickCurrent = 0;
+
+        uint256 liquidity = 1e18;
+        (uint256 amount0, uint256 amount1) = calcAmountsForLiquidity(tickCurrent, 0, tickLower, tickUpper, liquidity);
+        assertEq(amount0, 1e18);
+        assertEq(amount1, 2e18);
     }
 
     function testCalcAmountsForLiquidityWithCompositionBasic() external {
