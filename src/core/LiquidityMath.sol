@@ -84,3 +84,11 @@ function calcLiquidityForAmounts(
     pure
     returns (uint256 liquidity)
 { }
+
+function addDelta(uint256 x, int256 y) pure returns (uint256 z) {
+    if (y < 0) {
+        require((z = x - uint256(-y)) < x, "LS");
+    } else {
+        require((z = x + uint256(y)) >= x, "LA");
+    }
+}

@@ -5,4 +5,8 @@ library Tier {
     struct Info {
         uint256 liquidity;
     }
+
+    function get(mapping(uint8 => Info) storage tiers, uint8 tierID) internal view returns (Info storage tierInfo) {
+        tierInfo = tiers[tierID];
+    }
 }
