@@ -163,3 +163,65 @@ contract BurnTest is Test, PairHelper {
         pair.burn(address(this), 10, -1, 0, 1e18);
     }
 }
+
+contract SwapTest is Test, PairHelper {
+    function setUp() external {
+        _setUp();
+    }
+
+    function testSwapReturnAmountsToken1ExactIn() external {
+        basicMint();
+        (int256 amount0, int256 amount1) = pair.swap(address(this), false, 1e18);
+
+        assertEq(amount0, -1e18);
+        assertEq(amount1, 1e18);
+    }
+
+    function testSwapReturnAmountsToken0ExactOut() external {
+        basicMint();
+        (int256 amount0, int256 amount1) = pair.swap(address(this), true, -1e18);
+
+        assertEq(amount0, -1e18);
+        assertEq(amount1, 1e18);
+    }
+
+    function testSwapAmount0Out() external {
+        basicMint();
+        pair.swap(address(this), false, 1e18);
+
+        assertEq(token0.balanceOf(address(this)), 1e18);
+        assertEq(token1.balanceOf(address(this)), 0);
+    }
+
+    function testSwapAmount1Out() external {}
+
+    function testSwapCompositionToken1ExactIn() external {
+        basicMint();
+        pair.swap(address(this), false, 1e18);
+
+        assertEq(pair.composition(), type(uint96).max);
+    }
+
+    function testSwapCompositionToken0ExactOut() external {
+        basicMint();
+        pair.swap(address(this), true, -1e18);
+
+        assertEq(pair.composition(), type(uint96).max);
+    }
+
+    function testSwapNoChangeLiquidity() external {
+        basicMint();
+        pair.swap(address(this), false, 1e18);
+
+        (uint256 liquidity) = pair.tiers(0);
+
+        assertEq(liquidity, 1e18);
+    }
+
+    function testSwapNoChangeTick() external {
+        basicMint();
+        pair.swap(address(this), false, 1e18);
+
+        assertEq(pair.tickCurrent(), 0);
+    }
+}

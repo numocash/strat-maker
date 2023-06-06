@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
-uint256 constant Q32 = 0x100000000000000;
-uint256 constant Q96 = 0x1000000000000000000;
+uint256 constant Q32 = 0x100000000;
+uint256 constant Q96 = 0x1000000000000000000000000;
 uint256 constant Q128 = 0x100000000000000000000000000000000;
 
 int24 constant MIN_TICK = -887_272;

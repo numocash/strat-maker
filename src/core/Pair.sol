@@ -5,8 +5,10 @@ import {Tick} from "./Tick.sol";
 import {Tier} from "./Tier.sol";
 import {Position} from "./Position.sol";
 import {Factory} from "./Factory.sol";
-import {MIN_TICK, MAX_TICK} from "./TickMath.sol";
+import {MIN_TICK, MAX_TICK, getRatioAtTick, Q128, Q96, Q32} from "./TickMath.sol";
+import {mulDiv, mulDivRoundingUp} from "./FullMath.sol";
 import {addDelta, calcAmountsForLiquidity} from "./LiquidityMath.sol";
+import {computeSwapStep} from "./SwapMath.sol";
 import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
 import {BalanceLib} from "src/libraries/BalaneLib.sol";
 import {IMintCallback} from "./interfaces/IMintCallback.sol";
@@ -23,16 +25,13 @@ contract Pair {
     address public immutable token0;
     address public immutable token1;
 
+    uint96 public composition;
+    int24 public tickCurrent;
+
     /**
      * @custom:team This is where we should add the offsets of each tier, i.e. an int8 that shows how far each the
      * current tick of a tier is away from the global current tick
      */
-    struct Slot0 {
-        uint96 composition;
-        int24 tick;
-    }
-
-    Slot0 public slot0;
 
     mapping(bytes32 tickID => Tick.Info) public ticks;
     mapping(uint8 tierID => Tier.Info) public tiers;
@@ -83,7 +82,73 @@ contract Pair {
         // emit
     }
 
-    // swap
+    struct SwapState {
+        uint256 liquidity;
+        uint96 composition;
+        int24 tickCurrent;
+        // pool's balance change of the token which "amountDesired" refers to
+        int256 amountA;
+        // pool's balance change of the opposite token
+        int256 amountB;
+    }
+
+    /// @return amount0 The delta of the balance of token0 of the pool
+    /// @return amount1 The delta of the balance of token1 of the pool
+    function swap(address to, bool isToken0, int256 amountDesired) external returns (int256 amount0, int256 amount1) {
+        if (amountDesired == 0) revert();
+
+        bool isExactIn = amountDesired > 0;
+
+        SwapState memory state = SwapState({
+            liquidity: tiers.get(0).liquidity,
+            composition: composition,
+            tickCurrent: tickCurrent,
+            amountA: 0,
+            amountB: 0
+        });
+
+        while (true) {
+            uint256 ratioX128 = getRatioAtTick(state.tickCurrent);
+            (uint256 amountIn, uint256 amountOut,) =
+                computeSwapStep(ratioX128, state.composition, state.liquidity, isToken0, amountDesired);
+
+            if (isExactIn) {
+                amountDesired = amountDesired - int256(amountIn);
+                state.amountA = state.amountA + int256(amountIn);
+                state.amountB = state.amountB - int256(amountOut);
+            } else {
+                amountDesired = amountDesired + int256(amountOut);
+                state.amountA = state.amountA - int256(amountOut);
+                state.amountB = state.amountB + int256(amountIn);
+            }
+
+            if (amountDesired == 0) {
+                // update composition
+                break;
+            }
+            // else cross next tick
+        }
+
+        if (isToken0) {
+            amount0 = state.amountA;
+            amount1 = state.amountB;
+        } else {
+            amount0 = state.amountB;
+            amount1 = state.amountA;
+        }
+
+        composition = state.composition;
+        tickCurrent = state.tickCurrent;
+        tiers.get(0).liquidity = state.liquidity;
+
+        // pay out
+        if (amount0 < 0) SafeTransferLib.safeTransfer(token0, to, uint256(-amount0));
+        else if (amount1 < 0) SafeTransferLib.safeTransfer(token1, to, uint256(-amount1));
+
+        // receive input
+
+        // emit
+    }
 
     function checkTickInputs(int24 tickLower, int24 tickUpper) internal pure {
         if (tickLower > tickUpper || MIN_TICK > tickLower || tickUpper > MAX_TICK) {
@@ -110,7 +175,7 @@ contract Pair {
 
         // update current liquidity if in-range
         Tier.Info storage tier = tiers.get(tierID);
-        if (tickLower <= slot0.tick && slot0.tick <= tickUpper) {
+        if (tickLower <= tickCurrent && tickCurrent <= tickUpper) {
             tier.liquidity = addDelta(tier.liquidity, liquidity);
         }
 
@@ -123,11 +188,7 @@ contract Pair {
 
         // determine amounts
         (amount0, amount1) = calcAmountsForLiquidity(
-            slot0.tick,
-            slot0.composition,
-            tickLower,
-            tickUpper,
-            liquidity > 0 ? uint256(liquidity) : uint256(-liquidity)
+            tickCurrent, composition, tickLower, tickUpper, liquidity > 0 ? uint256(liquidity) : uint256(-liquidity)
         );
     }
 
