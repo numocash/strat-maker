@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import {mulDiv, mulDivRoundingUp} from "./FullMath.sol";
 import {Q128, Q96, Q32} from "./TickMath.sol";
 
+/// @custom:team when do we need to round up
 function computeSwapStep(
     uint256 ratioX128,
     uint96 composition,
