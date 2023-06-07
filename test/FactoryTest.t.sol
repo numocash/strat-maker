@@ -63,6 +63,7 @@ contract FactoryTest is Test {
 
         vm.expectEmit(true, true, false, true, address(factory));
         emit PairCreated(address(1), address(2), pair);
+
         factory.createPair(address(1), address(2));
     }
 }
