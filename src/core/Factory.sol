@@ -3,15 +3,17 @@ pragma solidity ^0.8.19;
 
 import {Pair} from "./Pair.sol";
 
+/// @notice Deploy and lookup pairs
+/// @author Robert Leifke and Kyle Scott
 contract Factory {
     /*//////////////////////////////////////////////////////////////
-                        EVENTS
+                                 EVENTS
     //////////////////////////////////////////////////////////////*/
 
     event PairCreated(address indexed token0, address indexed token1, address pair);
 
     /*//////////////////////////////////////////////////////////////
-                        ERRORS
+                                 ERRORS
     //////////////////////////////////////////////////////////////*/
 
     error SameTokenError();
@@ -21,7 +23,7 @@ contract Factory {
     error DeployedError();
 
     /*//////////////////////////////////////////////////////////////
-                        STORAGE
+                                STORAGE
     //////////////////////////////////////////////////////////////*/
 
     /// @custom:team Potentially replace this with an address estimated and then check if deployed with
@@ -29,7 +31,7 @@ contract Factory {
     mapping(address tokenA => mapping(address tokenB => address pair)) public getPair;
 
     /*//////////////////////////////////////////////////////////////
-                        DEPLOYER STORAGE
+                           TEMPORARY STORAGE
     //////////////////////////////////////////////////////////////*/
 
     struct Parameters {
@@ -38,6 +40,10 @@ contract Factory {
     }
 
     Parameters public parameters;
+
+    /*//////////////////////////////////////////////////////////////
+                                  LOGIC
+    //////////////////////////////////////////////////////////////*/
 
     function createPair(address tokenA, address tokenB) external returns (address pair) {
         if (tokenA == tokenB) revert SameTokenError();

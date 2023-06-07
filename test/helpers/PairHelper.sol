@@ -5,6 +5,7 @@ import {Factory} from "src/core/Factory.sol";
 import {Pair} from "src/periphery/PairAddress.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
 import {IMintCallback} from "src/core/interfaces/IMintCallback.sol";
+import {ISwapCallback} from "src/core/interfaces/ISwapCallback.sol";
 
 contract PairHelper is IMintCallback {
     Factory internal factory;
@@ -21,18 +22,21 @@ contract PairHelper is IMintCallback {
         (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
     }
 
-    function mintCallback(address, address, uint256 amount0, uint256 amount1, bytes calldata) external {
-        token0.transfer(msg.sender, amount0);
-        token1.transfer(msg.sender, amount1);
+    function mintCallback(uint256 amount0, uint256 amount1, bytes calldata) external {
+        if (amount0 > 0) token0.mint(msg.sender, amount0);
+        if (amount1 > 0) token1.mint(msg.sender, amount1);
+    }
+
+    function swapCallback(int256 amount0, int256 amount1, bytes calldata) external {
+        if (amount0 > 0) token0.mint(msg.sender, uint256(amount0));
+        if (amount1 > 0) token1.mint(msg.sender, uint256(amount1));
     }
 
     function basicMint() internal returns (uint256 amount0, uint256 amount1) {
-        token0.mint(address(this), 1e18);
-        token1.mint(address(this), 1e18);
-        (amount0, amount1) = pair.mint(address(this), 0, -1, 1, 1e18, bytes(""));
+        (amount0, amount1) = pair.addLiquidity(address(this), 0, -1, 1, 1e18, bytes(""));
     }
 
     function basicBurn() internal returns (uint256 amount0, uint256 amount1) {
-        (amount0, amount1) = pair.burn(address(this), 0, -1, 1, 1e18);
+        (amount0, amount1) = pair.removeLiquidity(address(this), 0, -1, 1, 1e18);
     }
 }
