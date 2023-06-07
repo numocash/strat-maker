@@ -125,7 +125,7 @@ contract Pair {
             if (amountDesired == 0) {
                 if (isToken0 == isExactIn) {
                     // amountRemaining is in token1
-                    state.composition = type(uint96).max - uint96(mulDiv(amountRemaining, Q96, state.liquidity));
+                    state.composition = uint96(mulDiv(amountRemaining, Q96, state.liquidity));
                 } else {
                     // amountRemaining is in token0
                     state.composition =
@@ -175,7 +175,7 @@ contract Pair {
     }
 
     function checkTickInputs(int24 tickLower, int24 tickUpper) internal pure {
-        if (tickLower > tickUpper || MIN_TICK > tickLower || tickUpper > MAX_TICK) {
+        if (tickLower >= tickUpper || MIN_TICK > tickLower || tickUpper > MAX_TICK) {
             revert InvalidTick();
         }
     }
@@ -199,7 +199,7 @@ contract Pair {
 
         // update current liquidity if in-range
         Tier.Info storage tier = tiers.get(tierID);
-        if (tickLower <= tickCurrent && tickCurrent <= tickUpper) {
+        if (tickLower <= tickCurrent && tickCurrent < tickUpper) {
             tier.liquidity = addDelta(tier.liquidity, liquidity);
         }
 

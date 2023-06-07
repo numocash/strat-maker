@@ -29,10 +29,10 @@ contract PairHelper is IMintCallback {
     function basicMint() internal returns (uint256 amount0, uint256 amount1) {
         token0.mint(address(this), 1e18);
         token1.mint(address(this), 1e18);
-        (amount0, amount1) = pair.mint(address(this), 0, -1, 0, 1e18, bytes(""));
+        (amount0, amount1) = pair.mint(address(this), 0, -1, 1, 1e18, bytes(""));
     }
 
     function basicBurn() internal returns (uint256 amount0, uint256 amount1) {
-        (amount0, amount1) = pair.burn(address(this), 0, -1, 0, 1e18);
+        (amount0, amount1) = pair.burn(address(this), 0, -1, 1, 1e18);
     }
 }

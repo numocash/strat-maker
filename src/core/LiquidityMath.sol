@@ -26,12 +26,12 @@ function finiteGeoSeriesSumNeg(uint256 a1, int24 n) pure returns (uint256 sum) {
 /// @custom:team Rounding needs to be checked
 function getAmount0Delta(int24 tickLower, int24 tickUpper, uint256 liquidity) pure returns (uint256 amount0) {
     if (tickLower >= 0) {
-        return finiteGeoSeriesSumPos(mulDiv(liquidity, getRatioAtTick(tickLower), Q128), (tickUpper - tickLower) + 1);
-    } else if (tickUpper <= 0) {
-        return finiteGeoSeriesSumNeg(mulDiv(liquidity, getRatioAtTick(tickLower), Q128), (tickUpper - tickLower) + 1);
+        return finiteGeoSeriesSumPos(mulDiv(liquidity, getRatioAtTick(tickLower), Q128), tickUpper - tickLower);
+    } else if (tickUpper <= 1) {
+        return finiteGeoSeriesSumNeg(mulDiv(liquidity, getRatioAtTick(tickLower), Q128), tickUpper - tickLower);
     } else {
-        return finiteGeoSeriesSumPos(liquidity, tickUpper + 1) + finiteGeoSeriesSumNeg(liquidity, -tickLower + 1)
-            - liquidity;
+        return
+            finiteGeoSeriesSumPos(liquidity, tickUpper) + finiteGeoSeriesSumNeg(liquidity, -tickLower + 1) - liquidity;
     }
 }
 
@@ -40,7 +40,7 @@ function getAmount0Delta(int24 tickLower, int24 tickUpper, uint256 liquidity) pu
 /// i.e. y = L
 /// @custom:team Rounding needs to be checked
 function getAmount1Delta(int24 tickLower, int24 tickUpper, uint256 liquidity) pure returns (uint256 amount1) {
-    return liquidity * (uint24(tickUpper - tickLower) + 1);
+    return liquidity * uint24(tickUpper - tickLower);
 }
 
 /// @notice Calculate amount{0,1} needed for the given liquidity change
@@ -55,13 +55,13 @@ function calcAmountsForLiquidity(
     pure
     returns (uint256 amount0, uint256 amount1)
 {
-    if (tickUpper < tickCurrent) {
+    if (tickUpper <= tickCurrent) {
         return (0, getAmount1Delta(tickLower, tickUpper, liquidity));
     } else if (tickLower > tickCurrent) {
         return (getAmount0Delta(tickLower, tickUpper, liquidity), 0);
     } else {
         amount0 = tickUpper != tickCurrent ? getAmount0Delta(tickCurrent + 1, tickUpper, liquidity) : 0;
-        amount1 = tickLower != tickCurrent ? getAmount1Delta(tickLower, tickCurrent - 1, liquidity) : 0;
+        amount1 = tickLower != tickCurrent ? getAmount1Delta(tickLower, tickCurrent, liquidity) : 0;
 
         amount0 += mulDiv(liquidity, (Q96 - composition) * Q32, getRatioAtTick(tickCurrent));
         amount1 += mulDiv(liquidity, composition, Q96);
