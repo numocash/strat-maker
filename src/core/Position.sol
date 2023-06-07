@@ -4,22 +4,19 @@ pragma solidity ^0.8.19;
 library Position {
     struct Info {
         uint256 liquidity;
-        uint256 tickInside0Last;
-        uint256 tickInside1Last;
-        uint256 limitOrderTyper;
-        uint256 settlementSnapshotID;
     }
 
     function get(
-        mapping(bytes32 => Position.Info) storage positions,
-        uint8 tierId,
+        mapping(bytes32 => Info) storage positions,
+        address owner,
+        uint8 tierID,
         int24 tickLower,
         int24 tickUpper
     )
         internal
         view
-        returns (Position.Info storage position)
+        returns (Info storage positionInfo)
     {
-        position = positions[keccak256(abi.encodePacked(tierId, tickLower, tickUpper))];
+        positionInfo = positions[keccak256(abi.encodePacked(owner, tierID, tickLower, tickUpper))];
     }
 }

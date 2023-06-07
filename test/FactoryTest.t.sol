@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
-import { Test } from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 
-import { Factory } from "../src/core/Factory.sol";
-import { Pair } from "../src/core/Pair.sol";
-import { computeAddress } from "../src/periphery/PairAddress.sol";
+import {Factory} from "src/core/Factory.sol";
+import {Pair} from "src/periphery/PairAddress.sol";
+import {computeAddress} from "src/periphery/PairAddress.sol";
 
 contract FactoryTest is Test {
     event PairCreated(address indexed token0, address indexed token1, address pair);
@@ -20,14 +20,7 @@ contract FactoryTest is Test {
         address pair = factory.createPair(address(1), address(2));
 
         assertEq(pair, factory.getPair(address(1), address(2)));
-    }
-
-    function testDeployAddress() external {
-        address pairEstimate = computeAddress(address(factory), address(1), address(2));
-
-        address pair = factory.createPair(address(1), address(2));
-
-        assertEq(pair, pairEstimate);
+        assertEq(pair, factory.getPair(address(2), address(1)));
     }
 
     function testSameTokenError() external {
@@ -66,22 +59,11 @@ contract FactoryTest is Test {
     }
 
     function testEmit() external {
-        address pairEstimate = address(
-            uint160(
-                uint256(
-                    keccak256(
-                        abi.encodePacked(
-                            hex"ff",
-                            address(factory),
-                            keccak256(abi.encode(address(1), address(2))),
-                            keccak256(type(Pair).creationCode)
-                        )
-                    )
-                )
-            )
-        );
-        vm.expectEmit(true, true, true, true, address(factory));
-        emit PairCreated(address(1), address(2), pairEstimate);
+        address pair = computeAddress(address(factory), address(1), address(2));
+
+        vm.expectEmit(true, true, false, true, address(factory));
+        emit PairCreated(address(1), address(2), pair);
+
         factory.createPair(address(1), address(2));
     }
 }
