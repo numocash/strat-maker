@@ -47,7 +47,7 @@ contract Pair {
 
     uint128[5] public compositions;
     int24 public tickCurrent;
-    uint8[5] public offsets;
+    int8[5] public offsets;
 
     /**
      * @custom:team This is where we should add the offsets of each tier, i.e. an int8 that shows how far each the
@@ -138,13 +138,25 @@ contract Pair {
         returns (int256 amount0, int256 amount1)
     {
         bool isExactIn = amountDesired > 0;
+        bool isSwap0To1 = isToken0 == isExactIn;
+
+        // liquidity is active if it lags by the proper amount in the opposite of the direction that is being swapped
+
+        int24 _tickCurrent = tickCurrent;
+        uint256 liquidity = 0;
+
+        for (uint8 i = 0; i < 5; i++) {
+            bool active = i == 0 ? true : isSwap0To1 ? offsets[i] == int8(i) : offsets[i] == -int8(i);
+
+            // TODO: potentially exit early once not active
+            if (active) liquidity += ticks.get(i, _tickCurrent + offsets[i]).liquidity;
+        }
 
         // TODO: could we cache liquidity and composition
-
         SwapState memory state = SwapState({
-            liquidity: ticks.get(0, tickCurrent).liquidity,
+            liquidity: liquidity,
             composition: compositions[0],
-            tickCurrent: tickCurrent,
+            tickCurrent: _tickCurrent,
             amountA: 0,
             amountB: 0
         });
@@ -166,7 +178,7 @@ contract Pair {
             }
 
             if (amountDesired == 0) {
-                if (isToken0 == isExactIn) {
+                if (isSwap0To1) {
                     // amountRemaining is in token1
                     state.composition = uint128(mulDiv(amountRemaining, Q128, state.liquidity));
                 } else {
@@ -177,14 +189,29 @@ contract Pair {
                 break;
             }
 
-            if (isToken0 == isExactIn) {
+            if (isSwap0To1) {
                 state.tickCurrent -= 1;
-                state.liquidity = ticks.get(0, state.tickCurrent).liquidity;
+                // TODO: this partly depends on the composition of the new liquidity being added
                 state.composition = type(uint128).max;
+                state.liquidity = 0;
+
+                for (uint8 i = 0; i < 5; i++) {
+                    bool active = i == 0 ? true : offsets[i] == int8(i);
+
+                    if (active) state.liquidity += ticks.get(i, _tickCurrent + offsets[i]).liquidity;
+                    if (!active) offsets[i] += 1;
+                }
             } else {
                 state.tickCurrent += 1;
-                state.liquidity = ticks.get(0, state.tickCurrent).liquidity;
                 state.composition = 0;
+                state.liquidity = 0;
+
+                for (uint8 i = 0; i < 5; i++) {
+                    bool active = i == 0 ? true : offsets[i] == -int8(i);
+
+                    if (active) state.liquidity += ticks.get(i, _tickCurrent + offsets[i]).liquidity;
+                    if (!active) offsets[i] -= 1;
+                }
             }
         }
 
@@ -196,6 +223,7 @@ contract Pair {
             amount1 = state.amountA;
         }
 
+        // TODO: all active ticks should be set to this composition
         compositions[0] = state.composition;
         tickCurrent = state.tickCurrent;
 
