@@ -45,9 +45,9 @@ contract Pair {
                                 STORAGE
     //////////////////////////////////////////////////////////////*/
 
-    uint128[5] compositions;
+    uint128[5] public compositions;
     int24 public tickCurrent;
-    uint8[5] offsets;
+    uint8[5] public offsets;
 
     /**
      * @custom:team This is where we should add the offsets of each tier, i.e. an int8 that shows how far each the
@@ -128,95 +128,92 @@ contract Pair {
     /// @param data Extra data passed back to the caller
     /// @return amount0 The delta of the balance of token0 of the pool
     /// @return amount1 The delta of the balance of token1 of the pool
-    // function swap(
-    //     address to,
-    //     bool isToken0,
-    //     int256 amountDesired,
-    //     bytes calldata data
-    // )
-    //     external
-    //     returns (int256 amount0, int256 amount1)
-    // {
-    //     bool isExactIn = amountDesired > 0;
+    function swap(
+        address to,
+        bool isToken0,
+        int256 amountDesired,
+        bytes calldata data
+    )
+        external
+        returns (int256 amount0, int256 amount1)
+    {
+        bool isExactIn = amountDesired > 0;
 
-    //     SwapState memory state = SwapState({
-    //         liquidity: tiers.get(0).liquidity,
-    //         composition: composition,
-    //         tickCurrent: tickCurrent,
-    //         amountA: 0,
-    //         amountB: 0
-    //     });
+        // TODO: could we cache liquidity and composition
 
-    //     while (true) {
-    //         uint256 ratioX128 = getRatioAtTick(state.tickCurrent);
+        SwapState memory state = SwapState({
+            liquidity: ticks.get(0, tickCurrent).liquidity,
+            composition: compositions[0],
+            tickCurrent: tickCurrent,
+            amountA: 0,
+            amountB: 0
+        });
 
-    //         (uint256 amountIn, uint256 amountOut, uint256 amountRemaining) =
-    //             computeSwapStep(ratioX128, state.composition, state.liquidity, isToken0, amountDesired);
+        while (true) {
+            uint256 ratioX128 = getRatioAtTick(state.tickCurrent);
 
-    //         if (isExactIn) {
-    //             amountDesired = amountDesired - int256(amountIn);
-    //             state.amountA = state.amountA + int256(amountIn);
-    //             state.amountB = state.amountB - int256(amountOut);
-    //         } else {
-    //             amountDesired = amountDesired + int256(amountOut);
-    //             state.amountA = state.amountA - int256(amountOut);
-    //             state.amountB = state.amountB + int256(amountIn);
-    //         }
+            (uint256 amountIn, uint256 amountOut, uint256 amountRemaining) =
+                computeSwapStep(ratioX128, state.composition, state.liquidity, isToken0, amountDesired);
 
-    //         if (amountDesired == 0) {
-    //             if (isToken0 == isExactIn) {
-    //                 // amountRemaining is in token1
-    //                 state.composition = uint96(mulDiv(amountRemaining, Q96, state.liquidity));
-    //             } else {
-    //                 // amountRemaining is in token0
-    //                 state.composition =
-    //                     type(uint96).max - uint96(mulDiv(amountRemaining, ratioX128, state.liquidity) / Q32);
-    //             }
-    //             break;
-    //         }
+            if (isExactIn) {
+                amountDesired = amountDesired - int256(amountIn);
+                state.amountA = state.amountA + int256(amountIn);
+                state.amountB = state.amountB - int256(amountOut);
+            } else {
+                amountDesired = amountDesired + int256(amountOut);
+                state.amountA = state.amountA - int256(amountOut);
+                state.amountB = state.amountB + int256(amountIn);
+            }
 
-    //         if (isToken0 == isExactIn) {
-    //             Tick.Info memory tickInfo = ticks.get(0, state.tickCurrent);
+            if (amountDesired == 0) {
+                if (isToken0 == isExactIn) {
+                    // amountRemaining is in token1
+                    state.composition = uint128(mulDiv(amountRemaining, Q128, state.liquidity));
+                } else {
+                    // amountRemaining is in token0
+                    // solhint-disable-next-line max-line-length
+                    state.composition = type(uint128).max - uint128(mulDiv(amountRemaining, ratioX128, state.liquidity));
+                }
+                break;
+            }
 
-    //             state.tickCurrent -= 1;
-    //             state.liquidity = addDelta(state.liquidity, -tickInfo.liquidityNet);
-    //             state.composition = type(uint96).max;
-    //         } else {
-    //             Tick.Info memory tickInfo = ticks.get(0, state.tickCurrent);
+            if (isToken0 == isExactIn) {
+                state.tickCurrent -= 1;
+                state.liquidity = ticks.get(0, state.tickCurrent).liquidity;
+                state.composition = type(uint128).max;
+            } else {
+                state.tickCurrent += 1;
+                state.liquidity = ticks.get(0, state.tickCurrent).liquidity;
+                state.composition = 0;
+            }
+        }
 
-    //             state.tickCurrent += 1;
-    //             state.liquidity = addDelta(state.liquidity, tickInfo.liquidityNet);
-    //             state.composition = 0;
-    //         }
-    //     }
+        if (isToken0) {
+            amount0 = state.amountA;
+            amount1 = state.amountB;
+        } else {
+            amount0 = state.amountB;
+            amount1 = state.amountA;
+        }
 
-    //     if (isToken0) {
-    //         amount0 = state.amountA;
-    //         amount1 = state.amountB;
-    //     } else {
-    //         amount0 = state.amountB;
-    //         amount1 = state.amountA;
-    //     }
+        compositions[0] = state.composition;
+        tickCurrent = state.tickCurrent;
 
-    //     composition = state.composition;
-    //     tickCurrent = state.tickCurrent;
-    //     tiers.get(0).liquidity = state.liquidity;
+        // pay out
+        if (isToken0 == isExactIn) {
+            if (amount1 < 0) SafeTransferLib.safeTransfer(token1, to, uint256(-amount1));
+            uint256 balance0 = BalanceLib.getBalance(token0);
+            ISwapCallback(msg.sender).swapCallback(amount0, amount1, data);
+            if (BalanceLib.getBalance(token0) < balance0 + uint256(amount0)) revert InsufficientInput();
+        } else {
+            if (amount0 < 0) SafeTransferLib.safeTransfer(token0, to, uint256(-amount0));
+            uint256 balance1 = BalanceLib.getBalance(token1);
+            ISwapCallback(msg.sender).swapCallback(amount0, amount1, data);
+            if (BalanceLib.getBalance(token1) < balance1 + uint256(amount1)) revert InsufficientInput();
+        }
 
-    //     // pay out
-    //     if (isToken0 == isExactIn) {
-    //         if (amount1 < 0) SafeTransferLib.safeTransfer(token1, to, uint256(-amount1));
-    //         uint256 balance0 = BalanceLib.getBalance(token0);
-    //         ISwapCallback(msg.sender).swapCallback(amount0, amount1, data);
-    //         if (BalanceLib.getBalance(token0) < balance0 + uint256(amount0)) revert InsufficientInput();
-    //     } else {
-    //         if (amount0 < 0) SafeTransferLib.safeTransfer(token0, to, uint256(-amount0));
-    //         uint256 balance1 = BalanceLib.getBalance(token1);
-    //         ISwapCallback(msg.sender).swapCallback(amount0, amount1, data);
-    //         if (BalanceLib.getBalance(token1) < balance1 + uint256(amount1)) revert InsufficientInput();
-    //     }
-
-    //     // emit
-    // }
+        // emit
+    }
 
     /*//////////////////////////////////////////////////////////////
                              INTERNAL LOGIC
@@ -231,7 +228,7 @@ contract Pair {
 
     /// @notice Check the validity of the tier
     function checkTier(uint8 tier) internal pure {
-        if (tier > 3) revert InvalidTier();
+        if (tier > 5) revert InvalidTier();
     }
 
     /// @notice Update a positions liquidity

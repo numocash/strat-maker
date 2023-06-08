@@ -111,141 +111,140 @@ contract RemoveLiquidityTest is Test, PairHelper {
     }
 }
 
-// contract SwapTest is Test, PairHelper {
-//     function setUp() external {
-//         _setUp();
-//     }
+contract SwapTest is Test, PairHelper {
+    function setUp() external {
+        _setUp();
+    }
 
-//     function testSwapReturnAmountsToken1ExactIn() external {
-//         basicMint();
-//         // 1->0
-//         (int256 amount0, int256 amount1) = pair.swap(address(this), false, 1e18, bytes(""));
+    function testSwapReturnAmountsToken1ExactIn() external {
+        basicAddLiquidity();
+        // 1->0
+        (int256 amount0, int256 amount1) = pair.swap(address(this), false, 1e18 - 1, bytes(""));
 
-//         assertEq(amount0, -1e18);
-//         assertEq(amount1, 1e18);
-//     }
+        assertEq(amount0, -1e18 + 1);
+        assertEq(amount1, 1e18 - 1);
+    }
 
-//     function testSwapReturnAmountsToken0ExactOut() external {
-//         basicMint();
-//         // 1->0
-//         (int256 amount0, int256 amount1) = pair.swap(address(this), true, -1e18, bytes(""));
+    function testSwapReturnAmountsToken0ExactOut() external {
+        basicAddLiquidity();
+        // 1->0
+        (int256 amount0, int256 amount1) = pair.swap(address(this), true, -1e18 + 1, bytes(""));
 
-//         assertEq(amount0, -1e18);
-//         assertEq(amount1, 1e18);
-//     }
+        assertEq(amount0, -1e18);
+        assertEq(amount1, 1e18);
+    }
 
-//     function testSwapReturnAmountsToken0ExactIn() external {
-//         basicMint();
-//         // 0->1
-//         (int256 amount0, int256 amount1) = pair.swap(address(this), true, 1e18, bytes(""));
+    // function testSwapReturnAmountsToken0ExactIn() external {
+    //     basicAddLiquidity();
+    //     // 0->1
+    //     (int256 amount0, int256 amount1) = pair.swap(address(this), true, 1e18, bytes(""));
 
-//         uint256 amountOut = mulDiv(1e18, getRatioAtTick(-1), Q128);
+    //     uint256 amountOut = mulDiv(1e18, getRatioAtTick(-1), Q128);
 
-//         assertEq(amount0, 1e18, "amount0");
-//         assertEq(amount1, -int256(amountOut), "amount1");
-//     }
+    //     assertEq(amount0, 1e18, "amount0");
+    //     assertEq(amount1, -int256(amountOut), "amount1");
+    // }
 
-//     // function testSwapReturnAmountsToken1ExactOut() external {
-//     //     basicMint();
-//     //     // 0->1
-//     //     (int256 amount0, int256 amount1) = pair.swap(address(this), false, -0.5e18);
+    // function testSwapReturnAmountsToken1ExactOut() external {
+    //     basicMint();
+    //     // 0->1
+    //     (int256 amount0, int256 amount1) = pair.swap(address(this), false, -0.5e18);
 
-//     //     uint256 amountIn = mulDiv(1e18, Q128, getRatioAtTick(-1));
+    //     uint256 amountIn = mulDiv(1e18, Q128, getRatioAtTick(-1));
 
-//     //     assertEq(amount0, int256(amountIn), "amount0");
-//     //     assertEq(amount1, -1e18, "amount1");
-//     // }
+    //     assertEq(amount0, int256(amountIn), "amount0");
+    //     assertEq(amount1, -1e18, "amount1");
+    // }
 
-//     function testSwapPartialReturnAmountsToken1ExactIn() external {
-//         basicMint();
-//         (int256 amount0, int256 amount1) = pair.swap(address(this), false, 0.5e18, bytes(""));
+    function testSwapPartialReturnAmountsToken1ExactIn() external {
+        basicAddLiquidity();
+        // 1->0
+        (int256 amount0, int256 amount1) = pair.swap(address(this), false, 0.5e18, bytes(""));
 
-//         assertEq(amount0, -0.5e18);
-//         assertEq(amount1, 0.5e18);
-//     }
+        assertEq(amount0, -0.5e18);
+        assertEq(amount1, 0.5e18);
+    }
 
-//     function testSwapPartialReturnAmountsToken0ExactOut() external {
-//         basicMint();
-//         (int256 amount0, int256 amount1) = pair.swap(address(this), true, -0.5e18, bytes(""));
+    function testSwapPartialReturnAmountsToken0ExactOut() external {
+        basicAddLiquidity();
+        // 1->0
+        (int256 amount0, int256 amount1) = pair.swap(address(this), true, -0.5e18, bytes(""));
 
-//         assertEq(amount0, -0.5e18);
-//         assertEq(amount1, 0.5e18);
-//     }
+        assertEq(amount0, -0.5e18);
+        assertEq(amount1, 0.5e18);
+    }
 
-//     function testSwapAmount0Out() external {
-//         basicMint();
-//         pair.swap(address(this), false, 1e18, bytes(""));
+    function testSwapAmount0Out() external {
+        basicAddLiquidity();
+        // 1->0
+        pair.swap(address(this), false, 1e18 - 1, bytes(""));
 
-//         assertEq(token0.balanceOf(address(this)), 1e18);
-//         assertEq(token1.balanceOf(address(this)), 0);
-//     }
+        assertEq(token0.balanceOf(address(this)), 1e18);
+        assertEq(token1.balanceOf(address(this)), 0);
+    }
 
-//     function testSwapAmount1Out() external {
-//         basicMint();
-//         pair.swap(address(this), true, 1e18, bytes(""));
+    // function testSwapAmount1Out() external {
+    //     basicAddLiquidity();
+    //     // 1->0
+    //     pair.swap(address(this), true, 1e18 - 1, bytes(""));
 
-//         uint256 amountOut = mulDiv(1e18, getRatioAtTick(-1), Q128);
+    //     uint256 amountOut = mulDiv(1e18, getRatioAtTick(-1), Q128);
 
-//         assertEq(token0.balanceOf(address(this)), 0);
-//         assertEq(token1.balanceOf(address(this)), amountOut);
-//     }
+    //     assertEq(token0.balanceOf(address(this)), 0);
+    //     assertEq(token1.balanceOf(address(this)), amountOut);
+    // }
 
-//     function testSwapCompositionToken1ExactIn() external {
-//         basicMint();
-//         pair.swap(address(this), false, 1e18, bytes(""));
+    function testSwapCompositionToken1ExactIn() external {
+        basicAddLiquidity();
+        // 1->0
+        pair.swap(address(this), false, 1e18 - 1, bytes(""));
 
-//         assertEq(pair.composition(), type(uint96).max);
-//     }
+        assertEq(pair.compositions(0), type(uint96).max);
+    }
 
-//     function testSwapCompositionToken0ExactOut() external {
-//         basicMint();
-//         pair.swap(address(this), true, -1e18, bytes(""));
+    function testSwapCompositionToken0ExactOut() external {
+        basicAddLiquidity();
+        //1->0
+        pair.swap(address(this), true, -1e18 + 1, bytes(""));
 
-//         assertEq(pair.composition(), type(uint96).max);
-//     }
+        assertEq(pair.compositions(0), type(uint96).max);
+    }
 
-//     function testSwapCompositionToken0ExactIn() external {
-//         basicMint();
-//         uint256 amountIn = mulDiv(1e18, Q128, getRatioAtTick(-1));
-//         pair.swap(address(this), true, int256(amountIn), bytes(""));
+    // function testSwapCompositionToken0ExactIn() external {
+    //     basicAddLiquidity();
 
-//         assertEq(pair.composition(), 0);
-//     }
+    //     uint256 amountIn = mulDiv(1e18, Q128, getRatioAtTick(-1));
+    //     pair.swap(address(this), true, int256(amountIn), bytes(""));
 
-//     // function testSwapCompositionToken1ExactOut() external {
-//     //     basicMint();
-//     //     pair.swap(address(this), false, -1e18);
+    //     assertEq(pair.compositions(0), 0);
+    // }
 
-//     //     assertEq(pair.composition(), 0);
-//     // }
+    // function testSwapCompositionToken1ExactOut() external {
+    //     basicAddLiquidity();
+    //     pair.swap(address(this), false, -1e18);
 
-//     function testSwapPartialCompositionToken1ExactIn() external {
-//         basicMint();
-//         pair.swap(address(this), false, 0.5e18, bytes(""));
+    //     assertEq(pair.composition(), 0);
+    // }
 
-//         assertEq(pair.composition(), Q96 / 2);
-//     }
+    function testSwapPartialCompositionToken1ExactIn() external {
+        basicAddLiquidity();
+        pair.swap(address(this), false, 0.5e18, bytes(""));
 
-//     function testSwapPartialCompositionToken0ExactOut() external {
-//         basicMint();
-//         pair.swap(address(this), true, -0.5e18, bytes(""));
+        assertEq(pair.compositions(0), Q128 / 2);
+    }
 
-//         assertEq(pair.composition(), Q96 / 2);
-//     }
+    function testSwapPartialCompositionToken0ExactOut() external {
+        basicAddLiquidity();
 
-//     function testSwapNoChangeLiquidity() external {
-//         basicMint();
-//         pair.swap(address(this), false, 1e18, bytes(""));
+        pair.swap(address(this), true, -0.5e18, bytes(""));
 
-//         (uint256 liquidity) = pair.tiers(0);
+        assertEq(pair.compositions(0), Q128 / 2);
+    }
 
-//         assertEq(liquidity, 1e18);
-//     }
+    function testSwapNoChangeTick() external {
+        basicAddLiquidity();
+        pair.swap(address(this), false, 1e18 - 1, bytes(""));
 
-//     function testSwapNoChangeTick() external {
-//         basicMint();
-//         pair.swap(address(this), false, 1e18, bytes(""));
-
-//         assertEq(pair.tickCurrent(), 0);
-//     }
-// }
+        assertEq(pair.tickCurrent(), 0);
+    }
+}
