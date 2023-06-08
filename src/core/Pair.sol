@@ -12,7 +12,7 @@ import {getRatioAtTick, MAX_TICK, MIN_TICK, Q128} from "./TickMath.sol";
 import {BalanceLib} from "src/libraries/BalaneLib.sol";
 import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
 
-import {IMintCallback} from "./interfaces/IMintCallback.sol";
+import {IAddLiquidityCallback} from "./interfaces/IAddLiquidityCallback.sol";
 import {ISwapCallback} from "./interfaces/ISwapCallback.sol";
 
 /// @author Robert Leifke and Kyle Scott
@@ -86,7 +86,7 @@ contract Pair {
 
         uint256 balance0 = BalanceLib.getBalance(token0);
         uint256 balance1 = BalanceLib.getBalance(token1);
-        IMintCallback(msg.sender).mintCallback(amount0, amount1, data);
+        IAddLiquidityCallback(msg.sender).addLiquidityCallback(amount0, amount1, data);
         if (BalanceLib.getBalance(token0) < balance0 + amount0) revert InsufficientInput();
         if (BalanceLib.getBalance(token1) < balance1 + amount1) revert InsufficientInput();
 

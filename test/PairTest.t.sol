@@ -1,173 +1,115 @@
-// // SPDX-License-Identifier: GPL-3.0-only
-// pragma solidity ^0.8.0;
+// SPDX-License-Identifier: GPL-3.0-only
+pragma solidity ^0.8.0;
 
-// import {Test} from "forge-std/Test.sol";
-// import {PairHelper} from "./helpers/PairHelper.sol";
+import {Test} from "forge-std/Test.sol";
+import {PairHelper} from "./helpers/PairHelper.sol";
 
-// import {Pair} from "src/core/Pair.sol";
-// import {mulDiv} from "src/core/FullMath.sol";
-// import {getRatioAtTick} from "src/core/TickMath.sol";
-// import {Q128, Q96} from "src/core/TickMath.sol";
+import {Pair} from "src/core/Pair.sol";
+import {mulDiv} from "src/core/FullMath.sol";
+import {getRatioAtTick} from "src/core/TickMath.sol";
+import {Q128} from "src/core/TickMath.sol";
 
-// contract MintTest is Test, PairHelper {
-//     function setUp() external {
-//         _setUp();
-//     }
+contract AddLiquidityTest is Test, PairHelper {
+    function setUp() external {
+        _setUp();
+    }
 
-//     function testMintReturnAmounts() external {
-//         (uint256 amount0, uint256 amount1) = basicMint();
+    function testAddLiquidityReturnAmounts() external {
+        (uint256 amount0, uint256 amount1) = basicAddLiquidity();
 
-//         assertEq(amount0, 1e18);
-//         assertEq(amount1, 1e18);
-//     }
+        assertEq(amount0, 1e18);
+        assertEq(amount1, 0);
+    }
 
-//     function testMintTokenBalances() external {
-//         basicMint();
+    function testLiqudityTokenBalances() external {
+        basicAddLiquidity();
 
-//         assertEq(token0.balanceOf(address(this)), 0);
-//         assertEq(token1.balanceOf(address(this)), 0);
+        assertEq(token0.balanceOf(address(this)), 0);
+        assertEq(token1.balanceOf(address(this)), 0);
 
-//         assertEq(token0.balanceOf(address(pair)), 1e18);
-//         assertEq(token1.balanceOf(address(pair)), 1e18);
-//     }
+        assertEq(token0.balanceOf(address(pair)), 1e18);
+        assertEq(token1.balanceOf(address(pair)), 0);
+    }
 
-//     function testMintTierLiquidityInRange() external {
-//         basicMint();
+    function testLiquidityTicks() external {
+        basicAddLiquidity();
 
-//         (uint256 liquidity) = pair.tiers(0);
+        (uint256 liquidity) = pair.ticks(keccak256(abi.encodePacked(uint8(0), int24(0))));
+        assertEq(liquidity, 1e18);
+    }
 
-//         assertEq(liquidity, 1e18);
-//     }
+    function testLiquidityPosition() external {
+        basicAddLiquidity();
+        (uint256 liquidity) = pair.positions(keccak256(abi.encodePacked(address(this), uint8(0), int24(0))));
 
-//     function testMintTierLiquidityOutRange() external {
-//         token1.mint(address(this), 1e18);
-//         pair.addLiquidity(address(this), 0, -1, 0, 1e18, bytes(""));
+        assertEq(liquidity, 1e18);
+    }
 
-//         (uint256 liquidity) = pair.tiers(0);
+    function testAddLiquidityBadTicks() external {
+        vm.expectRevert(Pair.InvalidTick.selector);
+        pair.addLiquidity(address(this), 0, type(int24).min, 1e18, bytes(""));
 
-//         assertEq(liquidity, 0);
-//     }
+        vm.expectRevert(Pair.InvalidTick.selector);
+        pair.addLiquidity(address(this), 0, type(int24).max, 1e18, bytes(""));
+    }
 
-//     function testMintTicks() external {
-//         basicMint();
+    function testAddLiquidityBadTier() external {
+        vm.expectRevert(Pair.InvalidTier.selector);
+        pair.addLiquidity(address(this), 10, 0, 1e18, bytes(""));
+    }
+}
 
-//         (uint256 liquidityGross, int256 liquidityNet) = pair.ticks(keccak256(abi.encodePacked(uint8(0), int24(-1))));
-//         assertEq(liquidityGross, 1e18);
-//         assertEq(liquidityNet, 1e18);
+contract RemoveLiquidityTest is Test, PairHelper {
+    function setUp() external {
+        _setUp();
+    }
 
-//         (liquidityGross, liquidityNet) = pair.ticks(keccak256(abi.encodePacked(uint8(0), int24(1))));
-//         assertEq(liquidityGross, 1e18);
-//         assertEq(liquidityNet, -1e18);
-//     }
+    function testRemoveLiquidityReturnAmounts() external {
+        basicAddLiquidity();
+        (uint256 amount0, uint256 amount1) = basicRemoveLiquidity();
 
-//     function testMintPosition() external {
-//         basicMint();
-//         (uint256 liquidity) = pair.positions(keccak256(abi.encodePacked(address(this), uint8(0), int24(-1),
-// int24(1))));
+        assertEq(amount0, 1e18);
+        assertEq(amount1, 0);
+    }
 
-//         assertEq(liquidity, 1e18);
-//     }
+    function testRemoveLiquidityTokenAmounts() external {
+        basicAddLiquidity();
+        basicRemoveLiquidity();
+        assertEq(token0.balanceOf(address(this)), 1e18);
+        assertEq(token1.balanceOf(address(this)), 0);
 
-//     function testMintBadTicks() external {
-//         vm.expectRevert(Pair.InvalidTick.selector);
-//         pair.addLiquidity(address(this), 0, type(int24).min, 0, 1e18, bytes(""));
+        assertEq(token0.balanceOf(address(pair)), 0);
+        assertEq(token1.balanceOf(address(pair)), 0);
+    }
 
-//         vm.expectRevert(Pair.InvalidTick.selector);
-//         pair.addLiquidity(address(this), 0, 0, type(int24).max, 1e18, bytes(""));
+    function testRemoveLiquidityTicks() external {
+        basicAddLiquidity();
+        basicRemoveLiquidity();
+        (uint256 liquidity) = pair.ticks(keccak256(abi.encodePacked(uint8(0), int24(0))));
+        assertEq(liquidity, 0);
+    }
 
-//         vm.expectRevert(Pair.InvalidTick.selector);
-//         pair.addLiquidity(address(this), 0, 1, 0, 1e18, bytes(""));
-//     }
+    function testRemoveLiquidityPosition() external {
+        basicAddLiquidity();
+        basicRemoveLiquidity();
+        (uint256 liquidity) = pair.positions(keccak256(abi.encodePacked(address(this), uint8(0), int24(0))));
 
-//     function testMintBadTier() external {
-//         vm.expectRevert(Pair.InvalidTier.selector);
-//         pair.addLiquidity(address(this), 10, -1, 0, 1e18, bytes(""));
-//     }
-// }
+        assertEq(liquidity, 0);
+    }
 
-// contract BurnTest is Test, PairHelper {
-//     function setUp() external {
-//         _setUp();
-//     }
+    function testRemoveLiquidityBadTicks() external {
+        vm.expectRevert(Pair.InvalidTick.selector);
+        pair.removeLiquidity(address(this), 0, type(int24).min, 1e18);
 
-//     function testBurnReturnAmounts() external {
-//         basicMint();
-//         (uint256 amount0, uint256 amount1) = basicBurn();
+        vm.expectRevert(Pair.InvalidTick.selector);
+        pair.removeLiquidity(address(this), 0, type(int24).max, 1e18);
+    }
 
-//         assertEq(amount0, 1e18);
-//         assertEq(amount1, 1e18);
-//     }
-
-//     function testBurnTokenAmounts() external {
-//         basicMint();
-//         basicBurn();
-
-//         assertEq(token0.balanceOf(address(this)), 1e18);
-//         assertEq(token1.balanceOf(address(this)), 1e18);
-
-//         assertEq(token0.balanceOf(address(pair)), 0);
-//         assertEq(token1.balanceOf(address(pair)), 0);
-//     }
-
-//     function testTierInRange() external {
-//         basicMint();
-//         basicBurn();
-
-//         (uint256 liquidity) = pair.tiers(0);
-
-//         assertEq(liquidity, 0);
-//     }
-
-//     function testTierOutRange() external {
-//         token1.mint(address(this), 1e18);
-//         pair.addLiquidity(address(this), 0, -1, 0, 1e18, bytes(""));
-
-//         pair.removeLiquidity(address(this), 0, -1, 0, 1e18);
-
-//         (uint256 liquidity) = pair.tiers(0);
-
-//         assertEq(liquidity, 0);
-//     }
-
-//     function testBurnTicks() external {
-//         basicMint();
-//         basicBurn();
-
-//         (uint256 liquidityGross, int256 liquidityNet) = pair.ticks(keccak256(abi.encodePacked(uint8(0), int24(-1))));
-//         assertEq(liquidityGross, 0);
-//         assertEq(liquidityNet, 0);
-
-//         (liquidityGross, liquidityNet) = pair.ticks(keccak256(abi.encodePacked(uint8(0), int24(0))));
-//         assertEq(liquidityGross, 0);
-//         assertEq(liquidityNet, 0);
-//     }
-
-//     function testBurnPosition() external {
-//         basicMint();
-//         basicBurn();
-
-//         (uint256 liquidity) = pair.positions(keccak256(abi.encodePacked(address(this), uint8(0), int24(-1),
-// int24(0))));
-
-//         assertEq(liquidity, 0);
-//     }
-
-//     function testBurnBadTicks() external {
-//         vm.expectRevert(Pair.InvalidTick.selector);
-//         pair.removeLiquidity(address(this), 0, type(int24).min, 0, 1e18);
-
-//         vm.expectRevert(Pair.InvalidTick.selector);
-//         pair.removeLiquidity(address(this), 0, 0, type(int24).max, 1e18);
-
-//         vm.expectRevert(Pair.InvalidTick.selector);
-//         pair.removeLiquidity(address(this), 0, 1, 0, 1e18);
-//     }
-
-//     function testBurnBadTier() external {
-//         vm.expectRevert(Pair.InvalidTier.selector);
-//         pair.removeLiquidity(address(this), 10, -1, 0, 1e18);
-//     }
-// }
+    function testRemoveLiquidityBadTier() external {
+        vm.expectRevert(Pair.InvalidTier.selector);
+        pair.removeLiquidity(address(this), 10, 0, 1e18);
+    }
+}
 
 // contract SwapTest is Test, PairHelper {
 //     function setUp() external {
