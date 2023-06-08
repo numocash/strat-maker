@@ -135,7 +135,6 @@ contract SwapTest is Test, PairHelper {
     }
 
     function testSwapReturnAmountsToken0ExactIn() external {
-        basicAddLiquidity();
         pair.addLiquidity(address(this), 0, -1, 1e18, bytes(""));
         // 0->1
         (int256 amount0, int256 amount1) = pair.swap(address(this), true, 1e18 - 1, bytes(""));
@@ -147,8 +146,6 @@ contract SwapTest is Test, PairHelper {
     }
 
     function testSwapReturnAmountsToken1ExactOut() external {
-        basicAddLiquidity();
-
         pair.addLiquidity(address(this), 0, -1, 1e18, bytes(""));
         // 0->1
         (int256 amount0, int256 amount1) = pair.swap(address(this), false, -1e18 + 1, bytes(""));
@@ -203,7 +200,7 @@ contract SwapTest is Test, PairHelper {
         // 1->0
         pair.swap(address(this), false, 1e18 - 1, bytes(""));
 
-        assertEq(pair.compositions(0), type(uint96).max);
+        assertEq(pair.compositions(0), type(uint128).max);
     }
 
     function testSwapCompositionToken0ExactOut() external {
@@ -211,7 +208,7 @@ contract SwapTest is Test, PairHelper {
         //1->0
         pair.swap(address(this), true, -1e18 + 1, bytes(""));
 
-        assertEq(pair.compositions(0), type(uint96).max);
+        assertEq(pair.compositions(0), type(uint128).max);
     }
 
     function testSwapCompositionToken0ExactIn() external {
@@ -226,11 +223,9 @@ contract SwapTest is Test, PairHelper {
     }
 
     function testSwapCompositionToken1ExactOut() external {
-        basicAddLiquidity();
         pair.addLiquidity(address(this), 0, -1, 1e18, bytes(""));
-
         // 0->1
-        pair.swap(address(this), true, -1e18 + 1, bytes(""));
+        pair.swap(address(this), false, -1e18 + 1, bytes(""));
 
         assertEq(pair.compositions(0), 0);
     }

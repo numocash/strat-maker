@@ -15,8 +15,6 @@ import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
 import {IAddLiquidityCallback} from "./interfaces/IAddLiquidityCallback.sol";
 import {ISwapCallback} from "./interfaces/ISwapCallback.sol";
 
-import {console2} from "forge-std/console2.sol";
-
 /// @author Robert Leifke and Kyle Scott
 /// @custom:team Doesn't handle more than one tier or record swap fees
 contract Pair {
@@ -151,7 +149,13 @@ contract Pair {
             uint256 liquidity = 0;
 
             for (uint8 i = 0; i <= uint8(_maxOffset >= 0 ? _maxOffset : -_maxOffset); i++) {
-                liquidity += ticks.get(i, isSwap0To1 ? _tickCurrent + _maxOffset : _tickCurrent - _maxOffset).liquidity;
+                // TODO: I think this is wrong
+                liquidity += ticks.get(
+                    i,
+                    isSwap0To1
+                        ? state.maxOffset > int8(i) ? _tickCurrent + int8(i) : _tickCurrent + _maxOffset
+                        : state.maxOffset > -int8(i) ? _tickCurrent - int8(i) : _tickCurrent - _maxOffset
+                ).liquidity;
             }
 
             // TODO: could we cache liquidity and composition
@@ -183,10 +187,8 @@ contract Pair {
 
             if (amountDesired == 0) {
                 if (isSwap0To1) {
-                    // amountRemaining is in token1
                     state.composition = uint128(mulDiv(amountRemaining, Q128, state.liquidity));
                 } else {
-                    // amountRemaining is in token0
                     // solhint-disable-next-line max-line-length
                     state.composition = type(uint128).max - uint128(mulDiv(amountRemaining, ratioX128, state.liquidity));
                 }
@@ -198,35 +200,38 @@ contract Pair {
                 state.liquidity = 0;
                 state.maxOffset += 1;
 
-                uint256 token1Liquidity;
+                uint256 token0Liquidity;
 
                 for (uint8 i = 0; i <= uint8(state.maxOffset); i++) {
-                    uint256 liquidity = ticks.get(i, state.tickCurrent + state.maxOffset).liquidity;
+                    uint256 liquidity = ticks.get(
+                        i, state.maxOffset > int8(i) ? state.tickCurrent + int8(i) : state.tickCurrent + state.maxOffset
+                    ).liquidity;
                     state.liquidity += liquidity;
 
-                    if (i < uint8(state.maxOffset)) {
-                        token1Liquidity += liquidity;
-                    } else {
-                        token1Liquidity += mulDiv(liquidity, compositions[i], Q128);
+                    if (i == uint8(state.maxOffset) && i != 0) {
+                        token0Liquidity += mulDiv(liquidity, type(uint128).max - compositions[i], Q128);
                     }
                 }
-                state.composition = uint128(mulDiv(token1Liquidity, Q128, state.liquidity));
+
+                state.composition = uint128(type(uint128).max - mulDiv(token0Liquidity, Q128, state.liquidity));
             } else {
                 state.tickCurrent += 1;
                 state.liquidity = 0;
                 state.maxOffset -= 1;
 
-                uint256 token1Liquidity;
+                uint256 token0Liquidity;
 
                 for (uint8 i = 0; i <= uint8(-state.maxOffset); i++) {
                     uint256 liquidity = ticks.get(i, state.tickCurrent - state.maxOffset).liquidity;
                     state.liquidity += liquidity;
 
-                    if (i == uint8(-state.maxOffset)) {
-                        token1Liquidity += mulDiv(liquidity, compositions[i], Q128);
+                    if (i < uint8(-state.maxOffset) || i == 0) {
+                        token0Liquidity += liquidity;
+                    } else {
+                        token0Liquidity += mulDiv(liquidity, type(uint128).max - compositions[i], Q128);
                     }
                 }
-                state.composition = uint128(mulDiv(token1Liquidity, Q128, state.liquidity));
+                state.composition = uint128(type(uint128).max - mulDiv(token0Liquidity, Q128, state.liquidity));
             }
         }
 
