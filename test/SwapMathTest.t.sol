@@ -4,12 +4,12 @@ pragma solidity ^0.8.19;
 import {Test} from "forge-std/Test.sol";
 
 import {computeSwapStep} from "src/core/SwapMath.sol";
-import {Q128, Q96} from "src/core/TickMath.sol";
+import {Q128} from "src/core/TickMath.sol";
 
 contract SwapMathTest is Test {
     function testToken0ExactInBasic() external {
         (uint256 amountIn, uint256 amountOut, uint256 amountRemaining) =
-            computeSwapStep(Q128, type(uint96).max, 1e18, true, 1e18);
+            computeSwapStep(Q128, type(uint128).max, 1e18, true, 1e18);
 
         assertEq(amountIn, 1e18, "amountIn");
         assertEq(amountOut, 1e18, "amountOut");
@@ -34,7 +34,7 @@ contract SwapMathTest is Test {
 
     function testToken1ExactOutBasic() external {
         (uint256 amountIn, uint256 amountOut, uint256 amountRemaining) =
-            computeSwapStep(Q128, type(uint96).max, 1e18, false, -1e18);
+            computeSwapStep(Q128, type(uint128).max, 1e18, false, -1e18);
 
         assertEq(amountIn, 1e18, "amountIn");
         assertEq(amountOut, 1e18, "amountOut");
@@ -43,7 +43,7 @@ contract SwapMathTest is Test {
 
     function testToken0ExactInPartial() external {
         (uint256 amountIn, uint256 amountOut, uint256 amountRemaining) =
-            computeSwapStep(Q128, type(uint96).max, 1e18, true, 0.5e18);
+            computeSwapStep(Q128, type(uint128).max, 1e18, true, 0.5e18);
 
         assertEq(amountIn, 0.5e18, "amountIn");
         assertEq(amountOut, 0.5e18, "amountOut");
@@ -68,7 +68,7 @@ contract SwapMathTest is Test {
 
     function testToken1ExactOutPartial() external {
         (uint256 amountIn, uint256 amountOut, uint256 amountRemaining) =
-            computeSwapStep(Q128, type(uint96).max, 1e18, false, -0.5e18);
+            computeSwapStep(Q128, type(uint128).max, 1e18, false, -0.5e18);
 
         assertEq(amountIn, 0.5e18, "amountIn");
         assertEq(amountOut, 0.5e18, "amountOut");
