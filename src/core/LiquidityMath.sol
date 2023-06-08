@@ -53,7 +53,7 @@ function calcAmountsForLiquidity(
     if (tick > tickCurrent) {
         return (getAmount0Delta(liquidity, tick), 0);
     } else if (tick < tickCurrent) {
-        return (getAmount1Delta(liquidity), 0);
+        return (0, getAmount1Delta(liquidity));
     } else {
         return (
             getAmount0FromComposition(composition, liquidity, getRatioAtTick(tick)),
