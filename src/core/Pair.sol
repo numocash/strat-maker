@@ -7,13 +7,15 @@ import {addDelta, calcAmountsForLiquidity} from "./LiquidityMath.sol";
 import {Position} from "./Position.sol";
 import {computeSwapStep} from "./SwapMath.sol";
 import {Tick} from "./Tick.sol";
-import {getRatioAtTick, MAX_TICK, MIN_TICK, Q128} from "./TickMath.sol";
+import {getCurrentTickForTierFromOffset, getRatioAtTick, MAX_TICK, MIN_TICK, Q128} from "./TickMath.sol";
 
 import {BalanceLib} from "src/libraries/BalaneLib.sol";
 import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
 
 import {IAddLiquidityCallback} from "./interfaces/IAddLiquidityCallback.sol";
 import {ISwapCallback} from "./interfaces/ISwapCallback.sol";
+
+import {console2} from "forge-std/console2.sol";
 
 /// @author Robert Leifke and Kyle Scott
 /// @custom:team Doesn't handle more than one tier or record swap fees
@@ -47,7 +49,8 @@ contract Pair {
 
     uint128[5] public compositions;
     int24 public tickCurrent;
-    int8[5] public offsets;
+    int8 public maxOffset;
+    bool public swap0To1Last;
 
     /**
      * @custom:team This is where we should add the offsets of each tier, i.e. an int8 that shows how far each the
@@ -115,6 +118,7 @@ contract Pair {
         uint256 liquidity;
         uint128 composition;
         int24 tickCurrent;
+        int8 maxOffset;
         // pool's balance change of the token which "amountDesired" refers to
         int256 amountA;
         // pool's balance change of the opposite token
@@ -140,26 +144,26 @@ contract Pair {
         bool isExactIn = amountDesired > 0;
         bool isSwap0To1 = isToken0 == isExactIn;
 
-        // liquidity is active if it lags by the proper amount in the opposite of the direction that is being swapped
+        SwapState memory state;
+        {
+            int24 _tickCurrent = tickCurrent;
+            int8 _maxOffset = isSwap0To1 == swap0To1Last ? maxOffset : int8(0);
+            uint256 liquidity = 0;
 
-        int24 _tickCurrent = tickCurrent;
-        uint256 liquidity = 0;
+            for (uint8 i = 0; i <= uint8(_maxOffset >= 0 ? _maxOffset : -_maxOffset); i++) {
+                liquidity += ticks.get(i, isSwap0To1 ? _tickCurrent + _maxOffset : _tickCurrent - _maxOffset).liquidity;
+            }
 
-        for (uint8 i = 0; i < 5; i++) {
-            bool active = i == 0 ? true : isSwap0To1 ? offsets[i] == int8(i) : offsets[i] == -int8(i);
-
-            // TODO: potentially exit early once not active
-            if (active) liquidity += ticks.get(i, _tickCurrent + offsets[i]).liquidity;
+            // TODO: could we cache liquidity and composition
+            state = SwapState({
+                liquidity: liquidity,
+                composition: compositions[0],
+                tickCurrent: _tickCurrent,
+                maxOffset: _maxOffset,
+                amountA: 0,
+                amountB: 0
+            });
         }
-
-        // TODO: could we cache liquidity and composition
-        SwapState memory state = SwapState({
-            liquidity: liquidity,
-            composition: compositions[0],
-            tickCurrent: _tickCurrent,
-            amountA: 0,
-            amountB: 0
-        });
 
         while (true) {
             uint256 ratioX128 = getRatioAtTick(state.tickCurrent);
@@ -191,27 +195,38 @@ contract Pair {
 
             if (isSwap0To1) {
                 state.tickCurrent -= 1;
-                // TODO: this partly depends on the composition of the new liquidity being added
-                state.composition = type(uint128).max;
                 state.liquidity = 0;
+                state.maxOffset += 1;
 
-                for (uint8 i = 0; i < 5; i++) {
-                    bool active = i == 0 ? true : offsets[i] == int8(i);
+                uint256 token1Liquidity;
 
-                    if (active) state.liquidity += ticks.get(i, _tickCurrent + offsets[i]).liquidity;
-                    if (!active) offsets[i] += 1;
+                for (uint8 i = 0; i <= uint8(state.maxOffset); i++) {
+                    uint256 liquidity = ticks.get(i, state.tickCurrent + state.maxOffset).liquidity;
+                    state.liquidity += liquidity;
+
+                    if (i < uint8(state.maxOffset)) {
+                        token1Liquidity += liquidity;
+                    } else {
+                        token1Liquidity += mulDiv(liquidity, compositions[i], Q128);
+                    }
                 }
+                state.composition = uint128(mulDiv(token1Liquidity, Q128, state.liquidity));
             } else {
                 state.tickCurrent += 1;
-                state.composition = 0;
                 state.liquidity = 0;
+                state.maxOffset -= 1;
 
-                for (uint8 i = 0; i < 5; i++) {
-                    bool active = i == 0 ? true : offsets[i] == -int8(i);
+                uint256 token1Liquidity;
 
-                    if (active) state.liquidity += ticks.get(i, _tickCurrent + offsets[i]).liquidity;
-                    if (!active) offsets[i] -= 1;
+                for (uint8 i = 0; i <= uint8(-state.maxOffset); i++) {
+                    uint256 liquidity = ticks.get(i, state.tickCurrent - state.maxOffset).liquidity;
+                    state.liquidity += liquidity;
+
+                    if (i == uint8(-state.maxOffset)) {
+                        token1Liquidity += mulDiv(liquidity, compositions[i], Q128);
+                    }
                 }
+                state.composition = uint128(mulDiv(token1Liquidity, Q128, state.liquidity));
             }
         }
 
@@ -223,9 +238,12 @@ contract Pair {
             amount1 = state.amountA;
         }
 
-        // TODO: all active ticks should be set to this composition
-        compositions[0] = state.composition;
+        for (uint8 i = 0; i <= uint8(state.maxOffset >= 0 ? state.maxOffset : -state.maxOffset); i++) {
+            compositions[i] = state.composition;
+        }
         tickCurrent = state.tickCurrent;
+        swap0To1Last = isSwap0To1;
+        maxOffset = state.maxOffset;
 
         // pay out
         if (isToken0 == isExactIn) {
@@ -280,11 +298,10 @@ contract Pair {
         updatePosition(to, tierID, tick, liquidity);
 
         // determine amounts
-        uint128 composition = compositions[tierID];
+        int24 tickCurrentForTier = getCurrentTickForTierFromOffset(tickCurrent, maxOffset, tierID);
 
-        // TODO: update tickCurrent based on offset
         (amount0, amount1) = calcAmountsForLiquidity(
-            tickCurrent, composition, tick, liquidity > 0 ? uint256(liquidity) : uint256(-liquidity)
+            tickCurrentForTier, compositions[tierID], tick, liquidity > 0 ? uint256(liquidity) : uint256(-liquidity)
         );
     }
 

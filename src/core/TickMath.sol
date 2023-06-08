@@ -59,3 +59,22 @@ function getRatioAtTick(int24 tick) pure returns (uint256 ratioX128) {
 /// @notice Calculates the greatest tick value such that getRatioAtTick(tick) <= ratio
 /// @dev Find tick = floor(log_1.0001(ratioX128))
 function getTickAtRatio(uint256 ratioX128) pure returns (int24 tick) {}
+
+/// @notice Calculates the tick that a tier is currently at
+function getCurrentTickForTierFromOffset(
+    int24 tickCurrent,
+    int8 maxOffset,
+    uint8 tier
+)
+    pure
+    returns (int24 tickCurrentForTier)
+{
+    bool swap0To1Last = maxOffset > 0;
+    int8 absOffset = maxOffset >= 0 ? maxOffset : -maxOffset;
+
+    if (absOffset > int8(tier)) {
+        return swap0To1Last ? tickCurrent + int8(tier) : tickCurrent - int8(tier);
+    } else {
+        return tickCurrent + maxOffset;
+    }
+}
