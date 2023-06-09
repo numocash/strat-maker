@@ -48,7 +48,6 @@ contract Pair {
     uint128[5] public compositions;
     int24 public tickCurrent;
     int8 public maxOffset;
-    bool public swap0To1Last;
 
     /**
      * @custom:team This is where we should add the offsets of each tier, i.e. an int8 that shows how far each the
@@ -145,20 +144,14 @@ contract Pair {
         SwapState memory state;
         {
             int24 _tickCurrent = tickCurrent;
-            int8 _maxOffset = isSwap0To1 == swap0To1Last ? maxOffset : int8(0);
+            int8 _maxOffset = isSwap0To1 == (maxOffset > 0) ? maxOffset : int8(0);
             uint256 liquidity = 0;
 
-            for (uint8 i = 0; i <= uint8(_maxOffset >= 0 ? _maxOffset : -_maxOffset); i++) {
-                // TODO: I think this is wrong
-                liquidity += ticks.get(
-                    i,
-                    isSwap0To1
-                        ? state.maxOffset > int8(i) ? _tickCurrent + int8(i) : _tickCurrent + _maxOffset
-                        : state.maxOffset > -int8(i) ? _tickCurrent - int8(i) : _tickCurrent - _maxOffset
-                ).liquidity;
+            for (int8 i = 0; i <= (_maxOffset >= 0 ? _maxOffset : -_maxOffset); i++) {
+                liquidity += ticks.get(uint8(i), isSwap0To1 ? _tickCurrent + i : _tickCurrent - i).liquidity;
             }
 
-            // TODO: could we cache liquidity and composition
+            // TODO: could we cache liquidity
             state = SwapState({
                 liquidity: liquidity,
                 composition: compositions[0],
@@ -200,38 +193,30 @@ contract Pair {
                 state.liquidity = 0;
                 state.maxOffset += 1;
 
-                uint256 token0Liquidity;
-
-                for (uint8 i = 0; i <= uint8(state.maxOffset); i++) {
-                    uint256 liquidity = ticks.get(
-                        i, state.maxOffset > int8(i) ? state.tickCurrent + int8(i) : state.tickCurrent + state.maxOffset
-                    ).liquidity;
-                    state.liquidity += liquidity;
-
-                    if (i == uint8(state.maxOffset) && i != 0) {
-                        token0Liquidity += mulDiv(liquidity, type(uint128).max - compositions[i], Q128);
-                    }
+                for (int8 i = 0; i < state.maxOffset; i++) {
+                    state.liquidity += ticks.get(uint8(i), state.tickCurrent + i).liquidity;
                 }
 
-                state.composition = uint128(type(uint128).max - mulDiv(token0Liquidity, Q128, state.liquidity));
+                uint256 newLiquidity = ticks.get(uint8(state.maxOffset), state.tickCurrent + state.maxOffset).liquidity;
+                uint256 newComposition = compositions[uint8(state.maxOffset)];
+
+                state.liquidity += newLiquidity;
+                state.composition = type(uint128).max
+                    - uint128(mulDiv(type(uint128).max - newComposition, newLiquidity, state.liquidity));
             } else {
                 state.tickCurrent += 1;
                 state.liquidity = 0;
                 state.maxOffset -= 1;
 
-                uint256 token0Liquidity;
-
-                for (uint8 i = 0; i <= uint8(-state.maxOffset); i++) {
-                    uint256 liquidity = ticks.get(i, state.tickCurrent - state.maxOffset).liquidity;
-                    state.liquidity += liquidity;
-
-                    if (i < uint8(-state.maxOffset) || i == 0) {
-                        token0Liquidity += liquidity;
-                    } else {
-                        token0Liquidity += mulDiv(liquidity, type(uint128).max - compositions[i], Q128);
-                    }
+                for (int8 i = 0; i < -state.maxOffset; i++) {
+                    state.liquidity += ticks.get(uint8(i), state.tickCurrent - i).liquidity;
                 }
-                state.composition = uint128(type(uint128).max - mulDiv(token0Liquidity, Q128, state.liquidity));
+                // solhint-disable-next-line max-line-length
+                uint256 newLiquidity = ticks.get(uint8(-state.maxOffset), state.tickCurrent - state.maxOffset).liquidity;
+                uint256 newComposition = compositions[uint8(-state.maxOffset)];
+
+                state.liquidity += newLiquidity;
+                state.composition = uint128(mulDiv(newComposition, newLiquidity, state.liquidity));
             }
         }
 
@@ -247,7 +232,6 @@ contract Pair {
             compositions[i] = state.composition;
         }
         tickCurrent = state.tickCurrent;
-        swap0To1Last = isSwap0To1;
         maxOffset = state.maxOffset;
 
         // pay out
