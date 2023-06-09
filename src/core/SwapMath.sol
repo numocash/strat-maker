@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import {mulDiv, mulDivRoundingUp} from "./FullMath.sol";
-import {addDelta, getAmount0FromComposition, getAmount1FromComposition} from "./LiquidityMath.sol";
+import {getAmount0FromComposition, getAmount1FromComposition} from "./LiquidityMath.sol";
 import {Q128} from "./TickMath.sol";
 
 /// @notice Compoutes the result of a swap within a tick
