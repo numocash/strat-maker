@@ -3,4 +3,4 @@
 
 pnpm format
 pnpm lint
-forge test
+forge snapshot --check
