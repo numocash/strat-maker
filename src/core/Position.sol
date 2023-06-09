@@ -10,13 +10,12 @@ library Position {
         mapping(bytes32 => Info) storage positions,
         address owner,
         uint8 tierID,
-        int24 tickLower,
-        int24 tickUpper
+        int24 tick
     )
         internal
         view
         returns (Info storage positionInfo)
     {
-        positionInfo = positions[keccak256(abi.encodePacked(owner, tierID, tickLower, tickUpper))];
+        positionInfo = positions[keccak256(abi.encodePacked(owner, tierID, tick))];
     }
 }

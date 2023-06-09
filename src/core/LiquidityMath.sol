@@ -2,63 +2,40 @@
 pragma solidity ^0.8.19;
 
 import {mulDiv} from "./FullMath.sol";
-import {getRatioAtTick, Q32, Q96, Q128} from "./TickMath.sol";
+import {getRatioAtTick, Q128} from "./TickMath.sol";
 
-/// @notice Calculates the sum of a geometric series for positive ticks
-/// @dev Use r = 1/1.0001
-/// i.e. Sn = a1 (1 - r^n) / (1 - r)
-/// @dev Takes advantage of the fact that getRatioAtTick(-n) == (1/1.0001)^n
-function finiteGeoSeriesSumPos(uint256 a1, int24 n) pure returns (uint256 sum) {
-    return 10_001 * (a1 - mulDiv(a1, getRatioAtTick(-n), Q128));
-}
-
-/// @notice Calculates the sum of a geometric series for negative ticks
-/// @dev Use r = 1.0001
-/// i.e. Sn = a1 (1 - r^n) / (1 - r)
-/// @dev Takes advantage of the fact that getRatioAtTick(n) == 1.0001^n
-function finiteGeoSeriesSumNeg(uint256 a1, int24 n) pure returns (uint256 sum) {
-    return 10_000 * (mulDiv(a1, getRatioAtTick(n), Q128) - a1);
-}
-
-/// @notice Calculate amount0 delta when tick moves from tickLower to tickUpper.
+/// @notice Calculate amount0 delta when moving completely through the liquidity at the tick.
 /// @dev Assumes inputs are valid
-/// i.e. x = ∑ L/Pi
+/// i.e. x = L/Pi
 /// @custom:team Rounding needs to be checked
-function getAmount0Delta(int24 tickLower, int24 tickUpper, uint256 liquidity) pure returns (uint256 amount0) {
-    if (tickLower >= 0) {
-        return finiteGeoSeriesSumPos(mulDiv(liquidity, getRatioAtTick(tickLower), Q128), tickUpper - tickLower);
-    } else if (tickUpper <= 1) {
-        return finiteGeoSeriesSumNeg(mulDiv(liquidity, getRatioAtTick(tickLower), Q128), tickUpper - tickLower);
-    } else {
-        return
-            finiteGeoSeriesSumPos(liquidity, tickUpper) + finiteGeoSeriesSumNeg(liquidity, -tickLower + 1) - liquidity;
-    }
+function getAmount0Delta(uint256 liquidity, int24 tick) pure returns (uint256 amount0) {
+    return mulDiv(liquidity, Q128, getRatioAtTick(tick));
 }
 
-/// @notice Calculate amount1 delta when tick moves from tickLower to tickUpper.
+/// @notice Calculate amount1 delta when moving completely through the liquidity at the tick.
 /// @dev Assumes inputs are valid
 /// i.e. y = L
 /// @custom:team Rounding needs to be checked
-function getAmount1Delta(int24 tickLower, int24 tickUpper, uint256 liquidity) pure returns (uint256 amount1) {
-    return liquidity * uint24(tickUpper - tickLower);
+function getAmount1Delta(uint256 liquidity) pure returns (uint256 amount1) {
+    return liquidity;
 }
 
 /// @notice Calculate amount0 in a tick for a given composition and liquidity
 /// @custom:team check for overflow
 function getAmount0FromComposition(
-    uint96 composition,
+    uint128 composition,
     uint256 liquidity,
     uint256 ratioX128
 )
     pure
     returns (uint256 amount0)
 {
-    return mulDiv(liquidity, (Q96 - composition) * Q32, ratioX128);
+    return mulDiv(liquidity, (type(uint128).max - composition), ratioX128);
 }
 
 /// @notice Calculate amount0 in a tick for a given composition and liquidity
-function getAmount1FromComposition(uint96 composition, uint256 liquidity) pure returns (uint256 amount1) {
-    return mulDiv(liquidity, composition, Q96);
+function getAmount1FromComposition(uint128 composition, uint256 liquidity) pure returns (uint256 amount1) {
+    return mulDiv(liquidity, composition, Q128);
 }
 
 /// @notice Calculate amount{0,1} needed for the given liquidity change
@@ -66,31 +43,29 @@ function getAmount1FromComposition(uint96 composition, uint256 liquidity) pure r
 /// @custom:team check when we can use unchecked math
 function calcAmountsForLiquidity(
     int24 tickCurrent,
-    uint96 composition,
-    int24 tickLower,
-    int24 tickUpper,
+    uint128 composition,
+    int24 tick,
     uint256 liquidity
 )
     pure
     returns (uint256 amount0, uint256 amount1)
 {
-    if (tickUpper <= tickCurrent) {
-        return (0, getAmount1Delta(tickLower, tickUpper, liquidity));
-    } else if (tickLower > tickCurrent) {
-        return (getAmount0Delta(tickLower, tickUpper, liquidity), 0);
+    if (tick > tickCurrent) {
+        return (getAmount0Delta(liquidity, tick), 0);
+    } else if (tick < tickCurrent) {
+        return (0, getAmount1Delta(liquidity));
     } else {
-        amount0 = tickUpper != tickCurrent ? getAmount0Delta(tickCurrent + 1, tickUpper, liquidity) : 0;
-        amount1 = tickLower != tickCurrent ? getAmount1Delta(tickLower, tickCurrent, liquidity) : 0;
-
-        amount0 += getAmount0FromComposition(composition, liquidity, getRatioAtTick(tickCurrent));
-        amount1 += getAmount1FromComposition(composition, liquidity);
+        return (
+            getAmount0FromComposition(composition, liquidity, getRatioAtTick(tick)),
+            getAmount1FromComposition(composition, liquidity)
+        );
     }
 }
 
 /// @notice Calculate max liquidity received if adding the given token amounts
 function calcLiquidityForAmounts(
     int24 tickCurrent,
-    uint96 composition,
+    uint128 composition,
     int24 tickLower,
     int24 tickUpper,
     uint256 amount0,

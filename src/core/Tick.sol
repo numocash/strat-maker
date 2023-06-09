@@ -3,8 +3,7 @@ pragma solidity ^0.8.19;
 
 library Tick {
     struct Info {
-        uint256 liquidityGross;
-        int256 liquidityNet;
+        uint256 liquidity;
     }
 
     function get(

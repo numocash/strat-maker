@@ -7,301 +7,301 @@ import {PairHelper} from "./helpers/PairHelper.sol";
 import {Pair} from "src/core/Pair.sol";
 import {mulDiv} from "src/core/FullMath.sol";
 import {getRatioAtTick} from "src/core/TickMath.sol";
-import {Q128, Q96} from "src/core/TickMath.sol";
+import {Q128} from "src/core/TickMath.sol";
 
-contract MintTest is Test, PairHelper {
+contract AddLiquidityTest is Test, PairHelper {
+    uint256 precision = 1e9;
+
     function setUp() external {
         _setUp();
     }
 
-    function testMintReturnAmounts() external {
-        (uint256 amount0, uint256 amount1) = basicMint();
+    function testAddLiquidityReturnAmounts() external {
+        (uint256 amount0, uint256 amount1) = basicAddLiquidity();
 
-        assertEq(amount0, 1e18);
-        assertEq(amount1, 1e18);
+        assertApproxEqRel(amount0, 1e18, precision);
+        assertEq(amount1, 0);
     }
 
-    function testMintTokenBalances() external {
-        basicMint();
+    function testLiquidityTokenBalances() external {
+        basicAddLiquidity();
 
-        assertEq(token0.balanceOf(address(this)), 0);
+        assertApproxEqRel(token0.balanceOf(address(this)), 0, precision);
         assertEq(token1.balanceOf(address(this)), 0);
 
-        assertEq(token0.balanceOf(address(pair)), 1e18);
-        assertEq(token1.balanceOf(address(pair)), 1e18);
-    }
-
-    function testMintTierLiquidityInRange() external {
-        basicMint();
-
-        (uint256 liquidity) = pair.tiers(0);
-
-        assertEq(liquidity, 1e18);
-    }
-
-    function testMintTierLiquidityOutRange() external {
-        token1.mint(address(this), 1e18);
-        pair.addLiquidity(address(this), 0, -1, 0, 1e18, bytes(""));
-
-        (uint256 liquidity) = pair.tiers(0);
-
-        assertEq(liquidity, 0);
-    }
-
-    function testMintTicks() external {
-        basicMint();
-
-        (uint256 liquidityGross, int256 liquidityNet) = pair.ticks(keccak256(abi.encodePacked(uint8(0), int24(-1))));
-        assertEq(liquidityGross, 1e18);
-        assertEq(liquidityNet, 1e18);
-
-        (liquidityGross, liquidityNet) = pair.ticks(keccak256(abi.encodePacked(uint8(0), int24(1))));
-        assertEq(liquidityGross, 1e18);
-        assertEq(liquidityNet, -1e18);
-    }
-
-    function testMintPosition() external {
-        basicMint();
-        (uint256 liquidity) = pair.positions(keccak256(abi.encodePacked(address(this), uint8(0), int24(-1), int24(1))));
-
-        assertEq(liquidity, 1e18);
-    }
-
-    function testMintBadTicks() external {
-        vm.expectRevert(Pair.InvalidTick.selector);
-        pair.addLiquidity(address(this), 0, type(int24).min, 0, 1e18, bytes(""));
-
-        vm.expectRevert(Pair.InvalidTick.selector);
-        pair.addLiquidity(address(this), 0, 0, type(int24).max, 1e18, bytes(""));
-
-        vm.expectRevert(Pair.InvalidTick.selector);
-        pair.addLiquidity(address(this), 0, 1, 0, 1e18, bytes(""));
-    }
-
-    function testMintBadTier() external {
-        vm.expectRevert(Pair.InvalidTier.selector);
-        pair.addLiquidity(address(this), 10, -1, 0, 1e18, bytes(""));
-    }
-}
-
-contract BurnTest is Test, PairHelper {
-    function setUp() external {
-        _setUp();
-    }
-
-    function testBurnReturnAmounts() external {
-        basicMint();
-        (uint256 amount0, uint256 amount1) = basicBurn();
-
-        assertEq(amount0, 1e18);
-        assertEq(amount1, 1e18);
-    }
-
-    function testBurnTokenAmounts() external {
-        basicMint();
-        basicBurn();
-
-        assertEq(token0.balanceOf(address(this)), 1e18);
-        assertEq(token1.balanceOf(address(this)), 1e18);
-
-        assertEq(token0.balanceOf(address(pair)), 0);
+        assertApproxEqRel(token0.balanceOf(address(pair)), 1e18, precision);
         assertEq(token1.balanceOf(address(pair)), 0);
     }
 
-    function testTierInRange() external {
-        basicMint();
-        basicBurn();
+    function testLiquidityTicks() external {
+        basicAddLiquidity();
 
-        (uint256 liquidity) = pair.tiers(0);
-
-        assertEq(liquidity, 0);
+        (uint256 liquidity) = pair.ticks(keccak256(abi.encodePacked(uint8(0), int24(0))));
+        assertEq(liquidity, 1e18);
     }
 
-    function testTierOutRange() external {
-        token1.mint(address(this), 1e18);
-        pair.addLiquidity(address(this), 0, -1, 0, 1e18, bytes(""));
+    function testLiquidityPosition() external {
+        basicAddLiquidity();
+        (uint256 liquidity) = pair.positions(keccak256(abi.encodePacked(address(this), uint8(0), int24(0))));
 
-        pair.removeLiquidity(address(this), 0, -1, 0, 1e18);
-
-        (uint256 liquidity) = pair.tiers(0);
-
-        assertEq(liquidity, 0);
+        assertEq(liquidity, 1e18);
     }
 
-    function testBurnTicks() external {
-        basicMint();
-        basicBurn();
-
-        (uint256 liquidityGross, int256 liquidityNet) = pair.ticks(keccak256(abi.encodePacked(uint8(0), int24(-1))));
-        assertEq(liquidityGross, 0);
-        assertEq(liquidityNet, 0);
-
-        (liquidityGross, liquidityNet) = pair.ticks(keccak256(abi.encodePacked(uint8(0), int24(0))));
-        assertEq(liquidityGross, 0);
-        assertEq(liquidityNet, 0);
-    }
-
-    function testBurnPosition() external {
-        basicMint();
-        basicBurn();
-
-        (uint256 liquidity) = pair.positions(keccak256(abi.encodePacked(address(this), uint8(0), int24(-1), int24(0))));
-
-        assertEq(liquidity, 0);
-    }
-
-    function testBurnBadTicks() external {
+    function testAddLiquidityBadTicks() external {
         vm.expectRevert(Pair.InvalidTick.selector);
-        pair.removeLiquidity(address(this), 0, type(int24).min, 0, 1e18);
+        pair.addLiquidity(address(this), 0, type(int24).min, 1e18, bytes(""));
 
         vm.expectRevert(Pair.InvalidTick.selector);
-        pair.removeLiquidity(address(this), 0, 0, type(int24).max, 1e18);
-
-        vm.expectRevert(Pair.InvalidTick.selector);
-        pair.removeLiquidity(address(this), 0, 1, 0, 1e18);
+        pair.addLiquidity(address(this), 0, type(int24).max, 1e18, bytes(""));
     }
 
-    function testBurnBadTier() external {
+    function testAddLiquidityBadTier() external {
         vm.expectRevert(Pair.InvalidTier.selector);
-        pair.removeLiquidity(address(this), 10, -1, 0, 1e18);
+        pair.addLiquidity(address(this), 10, 0, 1e18, bytes(""));
+    }
+}
+
+contract RemoveLiquidityTest is Test, PairHelper {
+    uint256 precision = 1e9;
+
+    function setUp() external {
+        _setUp();
+    }
+
+    function testRemoveLiquidityReturnAmounts() external {
+        basicAddLiquidity();
+        (uint256 amount0, uint256 amount1) = basicRemoveLiquidity();
+
+        assertApproxEqRel(amount0, 1e18, precision);
+        assertEq(amount1, 0);
+    }
+
+    function testRemoveLiquidityTokenAmounts() external {
+        basicAddLiquidity();
+        basicRemoveLiquidity();
+        assertApproxEqRel(token0.balanceOf(address(this)), 1e18, precision);
+        assertEq(token1.balanceOf(address(this)), 0);
+
+        assertApproxEqRel(token0.balanceOf(address(pair)), 0, precision);
+        assertEq(token1.balanceOf(address(pair)), 0);
+    }
+
+    function testRemoveLiquidityTicks() external {
+        basicAddLiquidity();
+        basicRemoveLiquidity();
+        (uint256 liquidity) = pair.ticks(keccak256(abi.encodePacked(uint8(0), int24(0))));
+        assertEq(liquidity, 0);
+    }
+
+    function testRemoveLiquidityPosition() external {
+        basicAddLiquidity();
+        basicRemoveLiquidity();
+        (uint256 liquidity) = pair.positions(keccak256(abi.encodePacked(address(this), uint8(0), int24(0))));
+
+        assertEq(liquidity, 0);
+    }
+
+    function testRemoveLiquidityBadTicks() external {
+        vm.expectRevert(Pair.InvalidTick.selector);
+        pair.removeLiquidity(address(this), 0, type(int24).min, 1e18);
+
+        vm.expectRevert(Pair.InvalidTick.selector);
+        pair.removeLiquidity(address(this), 0, type(int24).max, 1e18);
+    }
+
+    function testRemoveLiquidityBadTier() external {
+        vm.expectRevert(Pair.InvalidTier.selector);
+        pair.removeLiquidity(address(this), 10, 0, 1e18);
     }
 }
 
 contract SwapTest is Test, PairHelper {
+    uint256 precision = 10;
+
     function setUp() external {
         _setUp();
     }
 
-    function testSwapReturnAmountsToken1ExactIn() external {
-        basicMint();
+    function testSwapToken1ExactInBasic() external {
+        basicAddLiquidity();
         // 1->0
-        (int256 amount0, int256 amount1) = pair.swap(address(this), false, 1e18, bytes(""));
+        (int256 amount0, int256 amount1) = pair.swap(address(this), false, 1e18 - 1, bytes(""));
 
-        assertEq(amount0, -1e18);
-        assertEq(amount1, 1e18);
+        assertApproxEqRel(amount0, -1e18 + 1, precision);
+        assertApproxEqRel(amount1, 1e18 - 1, precision);
+
+        assertApproxEqRel(token0.balanceOf(address(this)), 1e18, precision);
+        assertApproxEqRel(token1.balanceOf(address(this)), 0, precision);
+
+        assertApproxEqRel(token0.balanceOf(address(pair)), 0, precision);
+        assertApproxEqRel(token1.balanceOf(address(pair)), 1e18, precision);
+
+        assertApproxEqRel(pair.compositions(0), type(uint128).max, precision);
+        assertEq(pair.tickCurrent(), 0);
+        assertEq(pair.maxOffset(), 0);
     }
 
-    function testSwapReturnAmountsToken0ExactOut() external {
-        basicMint();
+    function testSwapToken0ExactOutBasic() external {
+        basicAddLiquidity();
         // 1->0
-        (int256 amount0, int256 amount1) = pair.swap(address(this), true, -1e18, bytes(""));
+        (int256 amount0, int256 amount1) = pair.swap(address(this), true, -1e18 + 1, bytes(""));
 
-        assertEq(amount0, -1e18);
-        assertEq(amount1, 1e18);
+        assertApproxEqRel(amount0, -1e18, precision);
+        assertApproxEqRel(amount1, 1e18, precision);
+
+        assertApproxEqRel(token0.balanceOf(address(this)), 1e18, precision);
+        assertApproxEqRel(token1.balanceOf(address(this)), 0, precision);
+
+        assertApproxEqRel(token0.balanceOf(address(pair)), 0, precision);
+        assertApproxEqRel(token1.balanceOf(address(pair)), 1e18, precision);
+
+        assertApproxEqRel(pair.compositions(0), type(uint128).max, precision);
+        assertEq(pair.tickCurrent(), 0);
+        assertEq(pair.maxOffset(), 0);
     }
 
-    function testSwapReturnAmountsToken0ExactIn() external {
-        basicMint();
+    function testSwapToken0ExactInBasic() external {
+        pair.addLiquidity(address(this), 0, -1, 1e18, bytes(""));
         // 0->1
-        (int256 amount0, int256 amount1) = pair.swap(address(this), true, 1e18, bytes(""));
+        uint256 amountIn = mulDiv(1e18, Q128, getRatioAtTick(-1));
+        (int256 amount0, int256 amount1) = pair.swap(address(this), true, int256(amountIn), bytes(""));
 
-        uint256 amountOut = mulDiv(1e18, getRatioAtTick(-1), Q128);
+        assertApproxEqAbs(amount0, int256(amountIn), precision, "amount0");
+        assertApproxEqAbs(amount1, -1e18, precision, "amount1");
 
-        assertEq(amount0, 1e18, "amount0");
-        assertEq(amount1, -int256(amountOut), "amount1");
+        assertApproxEqAbs(token0.balanceOf(address(this)), 0, precision);
+        assertApproxEqAbs(token1.balanceOf(address(this)), 1e18, precision);
+
+        assertApproxEqAbs(token0.balanceOf(address(pair)), amountIn, precision);
+        assertApproxEqAbs(token1.balanceOf(address(pair)), 0, precision);
+
+        assertApproxEqRel(pair.compositions(0), 0, 1e9, "composition");
+        assertEq(pair.tickCurrent(), -1, "tickCurrent");
+        assertEq(pair.maxOffset(), 1, "maxOffset");
     }
 
-    // function testSwapReturnAmountsToken1ExactOut() external {
-    //     basicMint();
-    //     // 0->1
-    //     (int256 amount0, int256 amount1) = pair.swap(address(this), false, -0.5e18);
+    function testSwapToken1ExactOutBasic() external {
+        pair.addLiquidity(address(this), 0, -1, 1e18, bytes(""));
+        // 0->1
+        (int256 amount0, int256 amount1) = pair.swap(address(this), false, -1e18 + 1, bytes(""));
 
-    //     uint256 amountIn = mulDiv(1e18, Q128, getRatioAtTick(-1));
+        uint256 amountIn = mulDiv(1e18, Q128, getRatioAtTick(-1));
 
-    //     assertEq(amount0, int256(amountIn), "amount0");
-    //     assertEq(amount1, -1e18, "amount1");
-    // }
+        assertApproxEqAbs(amount0, int256(amountIn), precision, "amount0");
+        assertApproxEqAbs(amount1, -1e18, precision, "amount1");
 
-    function testSwapPartialReturnAmountsToken1ExactIn() external {
-        basicMint();
+        assertApproxEqAbs(token0.balanceOf(address(this)), 0, precision, "balance0");
+        assertApproxEqAbs(token1.balanceOf(address(this)), 1e18, precision, "balance1");
+
+        assertApproxEqAbs(token0.balanceOf(address(pair)), amountIn, precision, "balance0 pair");
+        assertApproxEqAbs(token1.balanceOf(address(pair)), 0, precision, "balance1 pair");
+
+        assertApproxEqRel(pair.compositions(0), 0, 1e9, "composition");
+        assertEq(pair.tickCurrent(), -1, "tickCurrent");
+        assertEq(pair.maxOffset(), 1, "maxOffset");
+    }
+
+    function testSwapPartial0To1() external {
+        basicAddLiquidity();
+        // 1->0
         (int256 amount0, int256 amount1) = pair.swap(address(this), false, 0.5e18, bytes(""));
 
-        assertEq(amount0, -0.5e18);
-        assertEq(amount1, 0.5e18);
+        assertApproxEqAbs(amount0, -0.5e18, precision);
+        assertApproxEqAbs(amount1, 0.5e18, precision);
+
+        assertApproxEqRel(pair.compositions(0), Q128 / 2, 1e9, "composition");
     }
 
-    function testSwapPartialReturnAmountsToken0ExactOut() external {
-        basicMint();
+    function testSwapPartial1To0() external {
+        basicAddLiquidity();
+        // 1->0
         (int256 amount0, int256 amount1) = pair.swap(address(this), true, -0.5e18, bytes(""));
 
-        assertEq(amount0, -0.5e18);
-        assertEq(amount1, 0.5e18);
+        assertApproxEqAbs(amount0, -0.5e18, precision);
+        assertApproxEqAbs(amount1, 0.5e18, precision);
+
+        assertApproxEqRel(pair.compositions(0), Q128 / 2, 1e9);
     }
 
-    function testSwapAmount0Out() external {
-        basicMint();
-        pair.swap(address(this), false, 1e18, bytes(""));
+    function testSwapStartPartial0To1() external {}
 
-        assertEq(token0.balanceOf(address(this)), 1e18);
-        assertEq(token1.balanceOf(address(this)), 0);
+    function testSwapStartPartial1To0() external {}
+
+    function testSwapGasSameTick() external {
+        vm.pauseGasMetering();
+        basicAddLiquidity();
+        vm.resumeGasMetering();
+
+        pair.swap(address(this), false, 1e18 - 1, bytes(""));
     }
 
-    function testSwapAmount1Out() external {
-        basicMint();
-        pair.swap(address(this), true, 1e18, bytes(""));
+    function testSwapGasMulti() external {
+        vm.pauseGasMetering();
+        basicAddLiquidity();
+        vm.resumeGasMetering();
 
-        uint256 amountOut = mulDiv(1e18, getRatioAtTick(-1), Q128);
-
-        assertEq(token0.balanceOf(address(this)), 0);
-        assertEq(token1.balanceOf(address(this)), amountOut);
+        pair.swap(address(this), false, 0.2e18, bytes(""));
+        pair.swap(address(this), false, 0.2e18, bytes(""));
     }
 
-    function testSwapCompositionToken1ExactIn() external {
-        basicMint();
-        pair.swap(address(this), false, 1e18, bytes(""));
-
-        assertEq(pair.composition(), type(uint96).max);
+    function testSwapGasTwoTicks() external {
+        vm.pauseGasMetering();
+        pair.addLiquidity(address(this), 0, 0, 1e18, bytes(""));
+        pair.addLiquidity(address(this), 0, 1, 1e18, bytes(""));
+        vm.resumeGasMetering();
+        pair.swap(address(this), false, 1.5e18, bytes(""));
     }
 
-    function testSwapCompositionToken0ExactOut() external {
-        basicMint();
-        pair.swap(address(this), true, -1e18, bytes(""));
+    function testMultiTierDown() external {
+        pair.addLiquidity(address(this), 0, 0, 1e18, bytes(""));
+        pair.addLiquidity(address(this), 1, 0, 1e18, bytes(""));
 
-        assertEq(pair.composition(), type(uint96).max);
+        pair.swap(address(this), false, 1.5e18, bytes(""));
+
+        assertApproxEqRel(pair.compositions(0), type(uint128).max / 2, 1e14, "composition 0");
+        assertApproxEqRel(pair.compositions(1), type(uint128).max / 2, 1e14, "composition 1");
+        assertEq(pair.tickCurrent(), 1);
+        assertEq(pair.maxOffset(), -1);
     }
 
-    function testSwapCompositionToken0ExactIn() external {
-        basicMint();
-        uint256 amountIn = mulDiv(1e18, Q128, getRatioAtTick(-1));
-        pair.swap(address(this), true, int256(amountIn), bytes(""));
+    function testMultiTierUp() external {
+        pair.addLiquidity(address(this), 0, -1, 1e18, bytes(""));
+        pair.addLiquidity(address(this), 1, -1, 1e18, bytes(""));
 
-        assertEq(pair.composition(), 0);
+        pair.swap(address(this), true, 1.5e18, bytes(""));
+
+        assertApproxEqRel(pair.compositions(0), type(uint128).max / 2, 1e15, "composition 0");
+        assertApproxEqRel(pair.compositions(1), type(uint128).max / 2, 1e15, "composition 1");
+        assertEq(pair.tickCurrent(), -2);
+        assertEq(pair.maxOffset(), 2);
     }
 
-    // function testSwapCompositionToken1ExactOut() external {
-    //     basicMint();
-    //     pair.swap(address(this), false, -1e18);
+    function testInitialLiquidity() external {
+        pair.addLiquidity(address(this), 0, 0, 1e18, bytes(""));
+        pair.addLiquidity(address(this), 0, 1, 1e18, bytes(""));
 
-    //     assertEq(pair.composition(), 0);
-    // }
+        pair.addLiquidity(address(this), 1, 0, 1e18, bytes(""));
 
-    function testSwapPartialCompositionToken1ExactIn() external {
-        basicMint();
-        pair.swap(address(this), false, 0.5e18, bytes(""));
+        pair.swap(address(this), false, 1.5e18, bytes(""));
+        pair.swap(address(this), false, 0.4e18, bytes(""));
 
-        assertEq(pair.composition(), Q96 / 2);
+        assertApproxEqRel(pair.compositions(0), (uint256(type(uint128).max) * 45) / 100, 1e15, "composition 0");
+        assertApproxEqRel(pair.compositions(1), (uint256(type(uint128).max) * 45) / 100, 1e15, "composition 1");
+        assertEq(pair.tickCurrent(), 1);
+        assertEq(pair.maxOffset(), -1);
     }
 
-    function testSwapPartialCompositionToken0ExactOut() external {
-        basicMint();
-        pair.swap(address(this), true, -0.5e18, bytes(""));
+    function testTierComposition() external {
+        pair.addLiquidity(address(this), 0, -1, 1e18, bytes(""));
+        pair.addLiquidity(address(this), 0, -2, 1e18, bytes(""));
 
-        assertEq(pair.composition(), Q96 / 2);
-    }
+        pair.addLiquidity(address(this), 1, 0, 1e18, bytes(""));
 
-    function testSwapNoChangeLiquidity() external {
-        basicMint();
-        pair.swap(address(this), false, 1e18, bytes(""));
+        pair.swap(address(this), true, 1.5e18, bytes(""));
 
-        (uint256 liquidity) = pair.tiers(0);
-
-        assertEq(liquidity, 1e18);
-    }
-
-    function testSwapNoChangeTick() external {
-        basicMint();
-        pair.swap(address(this), false, 1e18, bytes(""));
-
-        assertEq(pair.tickCurrent(), 0);
+        assertApproxEqRel(pair.compositions(0), type(uint128).max / 2, 1e15, "composition 0");
+        assertApproxEqRel(pair.compositions(1), type(uint128).max / 2, 1e15, "composition 1");
+        assertEq(pair.tickCurrent(), -2);
+        assertEq(pair.maxOffset(), 2);
     }
 }

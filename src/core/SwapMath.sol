@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 import {mulDiv, mulDivRoundingUp} from "./FullMath.sol";
 import {addDelta, getAmount0FromComposition, getAmount1FromComposition} from "./LiquidityMath.sol";
-import {Q32, Q96, Q128} from "./TickMath.sol";
+import {Q128} from "./TickMath.sol";
 
 /// @notice Compoutes the result of a swap within a tick
 /// @param isToken0 True if amountDesired refers to token0
@@ -14,7 +14,7 @@ import {Q32, Q96, Q128} from "./TickMath.sol";
 /// @custom:team when do we need to round up and when can we use unchecked math
 function computeSwapStep(
     uint256 ratioX128,
-    uint96 composition,
+    uint128 composition,
     uint256 liquidity,
     bool isToken0,
     int256 amountDesired
@@ -25,8 +25,8 @@ function computeSwapStep(
     bool isExactIn = amountDesired > 0;
     if (isExactIn) {
         uint256 maxAmountIn = isToken0
-            ? getAmount0FromComposition(type(uint96).max - composition, liquidity, ratioX128)
-            : getAmount1FromComposition(type(uint96).max - composition, liquidity);
+            ? getAmount0FromComposition(type(uint128).max - composition, liquidity, ratioX128)
+            : getAmount1FromComposition(type(uint128).max - composition, liquidity);
 
         bool completeSwap = uint256(amountDesired) >= maxAmountIn;
 
