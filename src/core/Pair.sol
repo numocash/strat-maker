@@ -47,6 +47,7 @@ contract Pair {
     uint128[5] public compositions;
     int24 public tickCurrent;
     int8 public maxOffset;
+    bool private initialized;
 
     mapping(bytes32 tickID => Tick.Info) public ticks;
     mapping(bytes32 positionID => Position.Info) public positions;
@@ -60,11 +61,21 @@ contract Pair {
         (token0, token1) = Factory(msg.sender).parameters();
     }
 
+    modifier onlyUninitialized() {
+        require(!initialized, "Contract is already initialized");
+        _;
+    }
+
     /*//////////////////////////////////////////////////////////////
                                   LOGIC
     //////////////////////////////////////////////////////////////*/
 
     /// @custom:team Need initialization function to set the tickCurrent
+
+    function initialize(int24 initialTick) external onlyUninitialized {
+        tickCurrent = initialTick;
+        initialized = true;
+    }
 
     function addLiquidity(
         address to,
