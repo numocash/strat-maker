@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
-library Position {
-    struct Info {
+library Positions {
+    struct Position {
         uint256 liquidity;
     }
 
     function get(
-        mapping(bytes32 => Info) storage positions,
+        mapping(bytes32 => Position) storage positions,
         address owner,
         uint8 tierID,
         int24 tick
     )
         internal
         view
-        returns (Info storage positionInfo)
+        returns (Position storage positionInfo)
     {
         positionInfo = positions[keccak256(abi.encodePacked(owner, tierID, tick))];
     }

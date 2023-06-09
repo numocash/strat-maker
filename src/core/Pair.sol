@@ -4,9 +4,10 @@ pragma solidity ^0.8.19;
 import {Factory} from "./Factory.sol";
 import {mulDiv, mulDivRoundingUp} from "./FullMath.sol";
 import {addDelta, calcAmountsForLiquidity} from "./LiquidityMath.sol";
-import {Position} from "./Position.sol";
+import {Positions} from "./Positions.sol";
 import {computeSwapStep} from "./SwapMath.sol";
-import {Tick} from "./Tick.sol";
+import {Ticks} from "./Ticks.sol";
+import {TickMaps} from "./TickMaps.sol";
 import {getCurrentTickForTierFromOffset, getRatioAtTick, MAX_TICK, MIN_TICK, Q128} from "./TickMath.sol";
 
 import {BalanceLib} from "src/libraries/BalaneLib.sol";
@@ -17,8 +18,9 @@ import {ISwapCallback} from "./interfaces/ISwapCallback.sol";
 
 /// @author Robert Leifke and Kyle Scott
 contract Pair {
-    using Tick for mapping(bytes32 => Tick.Info);
-    using Position for mapping(bytes32 => Position.Info);
+    using Ticks for Ticks.Tick;
+    using TickMaps for TickMaps.TickMap;
+    using Positions for Positions.Position;
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -51,8 +53,9 @@ contract Pair {
     int8 public maxOffset;
     bool private initialized;
 
-    mapping(bytes32 tickID => Tick.Info) public ticks;
-    mapping(bytes32 positionID => Position.Info) public positions;
+    mapping(int24 => Ticks.Tick) public ticks;
+    mapping(uint256 => TickMaps.TickMap) tickMaps;
+    mapping(bytes32 positionID => Positions.Position) public positions;
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -156,11 +159,10 @@ contract Pair {
             uint256 liquidity = 0;
 
             for (int8 i = 0; i <= (_maxOffset >= 0 ? _maxOffset : -_maxOffset); i++) {
-                liquidity += ticks.get(uint8(i), isSwap0To1 ? _tickCurrent + i : _tickCurrent - i).liquidity;
+                liquidity += ticks[isSwap0To1 ? _tickCurrent + i : _tickCurrent - i].getLiquidity(uint8(i));
             }
 
             // TODO: could we cache liquidity
-            // TODO: cap maxOffset to the number of tiers there are
             state = SwapState({
                 liquidity: liquidity,
                 composition: compositions[0],
@@ -204,10 +206,11 @@ contract Pair {
                 if (state.maxOffset < int8(MAX_TIERS - 1)) state.maxOffset += 1;
 
                 for (int8 i = 0; i < state.maxOffset; i++) {
-                    state.liquidity += ticks.get(uint8(i), state.tickCurrent + i).liquidity;
+                    state.liquidity += ticks[state.tickCurrent + i].getLiquidity(uint8(i));
                 }
 
-                uint256 newLiquidity = ticks.get(uint8(state.maxOffset), state.tickCurrent + state.maxOffset).liquidity;
+                uint256 newLiquidity = ticks[state.tickCurrent + state.maxOffset].getLiquidity(uint8(state.maxOffset));
+
                 uint256 newComposition = compositions[uint8(state.maxOffset)];
 
                 state.liquidity += newLiquidity;
@@ -223,11 +226,11 @@ contract Pair {
                 if (state.maxOffset > -int8(MAX_TIERS - 1)) state.maxOffset -= 1;
 
                 for (int8 i = 0; i < -state.maxOffset; i++) {
-                    state.liquidity += ticks.get(uint8(i), state.tickCurrent - i).liquidity;
+                    state.liquidity += ticks[state.tickCurrent - i].getLiquidity(uint8(i));
                 }
 
                 // solhint-disable-next-line max-line-length
-                uint256 newLiquidity = ticks.get(uint8(-state.maxOffset), state.tickCurrent + state.maxOffset).liquidity;
+                uint256 newLiquidity = ticks[state.tickCurrent + state.maxOffset].getLiquidity(uint8(-state.maxOffset));
                 uint256 newComposition = compositions[uint8(-state.maxOffset)];
 
                 state.liquidity += newLiquidity;
@@ -313,15 +316,13 @@ contract Pair {
     /// @notice Update a tick
     /// @param liquidity The amount of liquidity being added or removed
     function updateTick(uint8 tierID, int24 tick, int256 liquidity) internal {
-        Tick.Info storage tickInfo = ticks.get(tierID, tick);
-
-        tickInfo.liquidity = addDelta(tickInfo.liquidity, liquidity);
+        ticks[tick].tierLiquidity[tierID] = addDelta(ticks[tick].tierLiquidity[tierID], liquidity);
     }
 
     /// @notice Update a position
     /// @param liquidity The amount of liquidity being added or removed
     function updatePosition(address to, uint8 tierID, int24 tick, int256 liquidity) internal {
-        Position.Info storage positionInfo = positions.get(to, tierID, tick);
+        Positions.Position storage positionInfo = Positions.get(positions, to, tierID, tick);
 
         positionInfo.liquidity = addDelta(positionInfo.liquidity, liquidity);
     }
