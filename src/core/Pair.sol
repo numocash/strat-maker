@@ -15,8 +15,9 @@ import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
 import {IAddLiquidityCallback} from "./interfaces/IAddLiquidityCallback.sol";
 import {ISwapCallback} from "./interfaces/ISwapCallback.sol";
 
+import {console2} from "forge-std/console2.sol";
+
 /// @author Robert Leifke and Kyle Scott
-/// @custom:team Doesn't handle more than one tier or record swap fees
 contract Pair {
     using Tick for mapping(bytes32 => Tick.Info);
     using Position for mapping(bytes32 => Position.Info);
@@ -48,11 +49,6 @@ contract Pair {
     uint128[5] public compositions;
     int24 public tickCurrent;
     int8 public maxOffset;
-
-    /**
-     * @custom:team This is where we should add the offsets of each tier, i.e. an int8 that shows how far each the
-     * current tick of a tier is away from the global current tick
-     */
 
     mapping(bytes32 tickID => Tick.Info) public ticks;
     mapping(bytes32 positionID => Position.Info) public positions;
@@ -167,6 +163,10 @@ contract Pair {
         while (true) {
             uint256 ratioX128 = getRatioAtTick(state.tickCurrent);
 
+            console2.log("liquidity %d", state.liquidity);
+            console2.log("composition %d", state.composition);
+            console2.log("remaining %d", state.amountDesired);
+
             (uint256 amountIn, uint256 amountOut, uint256 amountRemaining) =
                 computeSwapStep(ratioX128, state.composition, state.liquidity, isToken0, state.amountDesired);
 
@@ -204,7 +204,11 @@ contract Pair {
 
                 state.liquidity += newLiquidity;
                 state.composition = type(uint128).max
-                    - uint128(mulDiv(type(uint128).max - newComposition, newLiquidity, state.liquidity));
+                    - (
+                        state.liquidity == 0
+                            ? 0
+                            : uint128(mulDiv(type(uint128).max - newComposition, newLiquidity, state.liquidity))
+                    );
             } else {
                 state.tickCurrent += 1;
                 state.liquidity = 0;
@@ -213,12 +217,14 @@ contract Pair {
                 for (int8 i = 0; i < -state.maxOffset; i++) {
                     state.liquidity += ticks.get(uint8(i), state.tickCurrent - i).liquidity;
                 }
+
                 // solhint-disable-next-line max-line-length
-                uint256 newLiquidity = ticks.get(uint8(-state.maxOffset), state.tickCurrent - state.maxOffset).liquidity;
+                uint256 newLiquidity = ticks.get(uint8(-state.maxOffset), state.tickCurrent + state.maxOffset).liquidity;
                 uint256 newComposition = compositions[uint8(-state.maxOffset)];
 
                 state.liquidity += newLiquidity;
-                state.composition = uint128(mulDiv(newComposition, newLiquidity, state.liquidity));
+                state.composition =
+                    state.liquidity == 0 ? 0 : uint128(mulDiv(newComposition, newLiquidity, state.liquidity));
             }
         }
 

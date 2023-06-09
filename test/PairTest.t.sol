@@ -252,5 +252,10 @@ contract SwapTest is Test, PairHelper {
         pair.swap(address(this), false, 1.5e18, bytes(""));
     }
 
-    // test multi tiers and specifically maxOffset
+    function testMultiTier() external {
+        pair.addLiquidity(address(this), 0, 0, 1e18, bytes(""));
+        pair.addLiquidity(address(this), 1, 0, 1e18, bytes(""));
+
+        pair.swap(address(this), false, 1.5e18, bytes(""));
+    }
 }
