@@ -50,6 +50,7 @@ contract Pair {
     /// @custom:team 96 bits is completely arbitrary
     uint96 public composition;
     int24 public tickCurrent;
+    // int24 public initialTick;
 
     /**
      * @custom:team This is where we should add the offsets of each tier, i.e. an int8 that shows how far each the
@@ -64,9 +65,16 @@ contract Pair {
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
+    bool private initialized;
+
     constructor() {
         factory = msg.sender;
         (token0, token1) = Factory(msg.sender).parameters();
+    }
+
+    modifier onlyUninitialized() {
+        require(!initialized, "Contract is already initialized");
+        _;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -74,6 +82,11 @@ contract Pair {
     //////////////////////////////////////////////////////////////*/
 
     /// @custom:team Need initialization function to set the tickCurrent
+
+    function initialize(int24 initialTick) external onlyUninitialized {
+        tickCurrent = initialTick;
+        initialized = true;
+    }
 
     function addLiquidity(
         address to,
