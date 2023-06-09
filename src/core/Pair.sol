@@ -15,8 +15,6 @@ import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
 import {IAddLiquidityCallback} from "./interfaces/IAddLiquidityCallback.sol";
 import {ISwapCallback} from "./interfaces/ISwapCallback.sol";
 
-import {console2} from "forge-std/console2.sol";
-
 /// @author Robert Leifke and Kyle Scott
 contract Pair {
     using Tick for mapping(bytes32 => Tick.Info);
@@ -149,6 +147,7 @@ contract Pair {
             }
 
             // TODO: could we cache liquidity
+            // TODO: cap maxOffset to the number of tiers there are
             state = SwapState({
                 liquidity: liquidity,
                 composition: compositions[0],
@@ -162,10 +161,6 @@ contract Pair {
 
         while (true) {
             uint256 ratioX128 = getRatioAtTick(state.tickCurrent);
-
-            console2.log("liquidity %d", state.liquidity);
-            console2.log("composition %d", state.composition);
-            console2.log("remaining %d", state.amountDesired);
 
             (uint256 amountIn, uint256 amountOut, uint256 amountRemaining) =
                 computeSwapStep(ratioX128, state.composition, state.liquidity, isToken0, state.amountDesired);

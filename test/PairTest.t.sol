@@ -252,10 +252,56 @@ contract SwapTest is Test, PairHelper {
         pair.swap(address(this), false, 1.5e18, bytes(""));
     }
 
-    function testMultiTier() external {
+    function testMultiTierDown() external {
         pair.addLiquidity(address(this), 0, 0, 1e18, bytes(""));
         pair.addLiquidity(address(this), 1, 0, 1e18, bytes(""));
 
         pair.swap(address(this), false, 1.5e18, bytes(""));
+
+        assertApproxEqRel(pair.compositions(0), type(uint128).max / 2, 1e14, "composition 0");
+        assertApproxEqRel(pair.compositions(1), type(uint128).max / 2, 1e14, "composition 1");
+        assertEq(pair.tickCurrent(), 1);
+        assertEq(pair.maxOffset(), -1);
+    }
+
+    function testMultiTierUp() external {
+        pair.addLiquidity(address(this), 0, -1, 1e18, bytes(""));
+        pair.addLiquidity(address(this), 1, -1, 1e18, bytes(""));
+
+        pair.swap(address(this), true, 1.5e18, bytes(""));
+
+        assertApproxEqRel(pair.compositions(0), type(uint128).max / 2, 1e15, "composition 0");
+        assertApproxEqRel(pair.compositions(1), type(uint128).max / 2, 1e15, "composition 1");
+        assertEq(pair.tickCurrent(), -2);
+        assertEq(pair.maxOffset(), 2);
+    }
+
+    function testInitialLiquidity() external {
+        pair.addLiquidity(address(this), 0, 0, 1e18, bytes(""));
+        pair.addLiquidity(address(this), 0, 1, 1e18, bytes(""));
+
+        pair.addLiquidity(address(this), 1, 0, 1e18, bytes(""));
+
+        pair.swap(address(this), false, 1.5e18, bytes(""));
+        pair.swap(address(this), false, 0.4e18, bytes(""));
+
+        assertApproxEqRel(pair.compositions(0), (uint256(type(uint128).max) * 45) / 100, 1e15, "composition 0");
+        assertApproxEqRel(pair.compositions(1), (uint256(type(uint128).max) * 45) / 100, 1e15, "composition 1");
+        assertEq(pair.tickCurrent(), 1);
+        assertEq(pair.maxOffset(), -1);
+    }
+
+    function testTierComposition() external {
+        pair.addLiquidity(address(this), 0, -1, 1e18, bytes(""));
+        pair.addLiquidity(address(this), 0, -2, 1e18, bytes(""));
+
+        pair.addLiquidity(address(this), 1, 0, 1e18, bytes(""));
+
+        pair.swap(address(this), true, 1.5e18, bytes(""));
+
+        assertApproxEqRel(pair.compositions(0), type(uint128).max / 2, 1e15, "composition 0");
+        assertApproxEqRel(pair.compositions(1), type(uint128).max / 2, 1e15, "composition 1");
+        assertEq(pair.tickCurrent(), -2);
+        assertEq(pair.maxOffset(), 2);
     }
 }
