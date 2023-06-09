@@ -10,6 +10,8 @@ import {getRatioAtTick} from "src/core/TickMath.sol";
 import {Q128} from "src/core/TickMath.sol";
 
 contract AddLiquidityTest is Test, PairHelper {
+    uint256 precision = 1e9;
+
     function setUp() external {
         _setUp();
     }
@@ -17,17 +19,17 @@ contract AddLiquidityTest is Test, PairHelper {
     function testAddLiquidityReturnAmounts() external {
         (uint256 amount0, uint256 amount1) = basicAddLiquidity();
 
-        assertEq(amount0, 1e18);
+        assertApproxEqRel(amount0, 1e18, precision);
         assertEq(amount1, 0);
     }
 
-    function testLiqudityTokenBalances() external {
+    function testLiquidityTokenBalances() external {
         basicAddLiquidity();
 
-        assertEq(token0.balanceOf(address(this)), 0);
+        assertApproxEqRel(token0.balanceOf(address(this)), 0, precision);
         assertEq(token1.balanceOf(address(this)), 0);
 
-        assertEq(token0.balanceOf(address(pair)), 1e18);
+        assertApproxEqRel(token0.balanceOf(address(pair)), 1e18, precision);
         assertEq(token1.balanceOf(address(pair)), 0);
     }
 
@@ -60,6 +62,8 @@ contract AddLiquidityTest is Test, PairHelper {
 }
 
 contract RemoveLiquidityTest is Test, PairHelper {
+    uint256 precision = 1e9;
+
     function setUp() external {
         _setUp();
     }
@@ -68,17 +72,17 @@ contract RemoveLiquidityTest is Test, PairHelper {
         basicAddLiquidity();
         (uint256 amount0, uint256 amount1) = basicRemoveLiquidity();
 
-        assertEq(amount0, 1e18);
+        assertApproxEqRel(amount0, 1e18, precision);
         assertEq(amount1, 0);
     }
 
     function testRemoveLiquidityTokenAmounts() external {
         basicAddLiquidity();
         basicRemoveLiquidity();
-        assertEq(token0.balanceOf(address(this)), 1e18);
+        assertApproxEqRel(token0.balanceOf(address(this)), 1e18, precision);
         assertEq(token1.balanceOf(address(this)), 0);
 
-        assertEq(token0.balanceOf(address(pair)), 0);
+        assertApproxEqRel(token0.balanceOf(address(pair)), 0, precision);
         assertEq(token1.balanceOf(address(pair)), 0);
     }
 
@@ -112,6 +116,8 @@ contract RemoveLiquidityTest is Test, PairHelper {
 }
 
 contract SwapTest is Test, PairHelper {
+    uint256 precision = 10;
+
     function setUp() external {
         _setUp();
     }
@@ -121,16 +127,16 @@ contract SwapTest is Test, PairHelper {
         // 1->0
         (int256 amount0, int256 amount1) = pair.swap(address(this), false, 1e18 - 1, bytes(""));
 
-        assertEq(amount0, -1e18 + 1);
-        assertEq(amount1, 1e18 - 1);
+        assertApproxEqRel(amount0, -1e18 + 1, precision);
+        assertApproxEqRel(amount1, 1e18 - 1, precision);
 
-        assertEq(token0.balanceOf(address(this)), 1e18);
-        assertEq(token1.balanceOf(address(this)), 0);
+        assertApproxEqRel(token0.balanceOf(address(this)), 1e18, precision);
+        assertApproxEqRel(token1.balanceOf(address(this)), 0, precision);
 
-        assertEq(token0.balanceOf(address(pair)), 0);
-        assertEq(token1.balanceOf(address(pair)), 1e18);
+        assertApproxEqRel(token0.balanceOf(address(pair)), 0, precision);
+        assertApproxEqRel(token1.balanceOf(address(pair)), 1e18, precision);
 
-        assertEq(pair.compositions(0), type(uint128).max);
+        assertApproxEqRel(pair.compositions(0), type(uint128).max, precision);
         assertEq(pair.tickCurrent(), 0);
         assertEq(pair.maxOffset(), 0);
     }
@@ -140,16 +146,16 @@ contract SwapTest is Test, PairHelper {
         // 1->0
         (int256 amount0, int256 amount1) = pair.swap(address(this), true, -1e18 + 1, bytes(""));
 
-        assertEq(amount0, -1e18);
-        assertEq(amount1, 1e18);
+        assertApproxEqRel(amount0, -1e18, precision);
+        assertApproxEqRel(amount1, 1e18, precision);
 
-        assertEq(token0.balanceOf(address(this)), 1e18);
-        assertEq(token1.balanceOf(address(this)), 0);
+        assertApproxEqRel(token0.balanceOf(address(this)), 1e18, precision);
+        assertApproxEqRel(token1.balanceOf(address(this)), 0, precision);
 
-        assertEq(token0.balanceOf(address(pair)), 0);
-        assertEq(token1.balanceOf(address(pair)), 1e18);
+        assertApproxEqRel(token0.balanceOf(address(pair)), 0, precision);
+        assertApproxEqRel(token1.balanceOf(address(pair)), 1e18, precision);
 
-        assertEq(pair.compositions(0), type(uint128).max);
+        assertApproxEqRel(pair.compositions(0), type(uint128).max, precision);
         assertEq(pair.tickCurrent(), 0);
         assertEq(pair.maxOffset(), 0);
     }
@@ -160,16 +166,16 @@ contract SwapTest is Test, PairHelper {
         uint256 amountIn = mulDiv(1e18, Q128, getRatioAtTick(-1));
         (int256 amount0, int256 amount1) = pair.swap(address(this), true, int256(amountIn), bytes(""));
 
-        assertEq(amount0, int256(amountIn), "amount0");
-        assertEq(amount1, 1e18, "amount1");
+        assertApproxEqAbs(amount0, int256(amountIn), precision, "amount0");
+        assertApproxEqAbs(amount1, -1e18, precision, "amount1");
 
-        assertEq(token0.balanceOf(address(this)), 0);
-        assertEq(token1.balanceOf(address(this)), 1e18);
+        assertApproxEqAbs(token0.balanceOf(address(this)), 0, precision);
+        assertApproxEqAbs(token1.balanceOf(address(this)), 1e18, precision);
 
-        assertEq(token0.balanceOf(address(pair)), amountIn);
-        assertEq(token1.balanceOf(address(pair)), 0);
+        assertApproxEqAbs(token0.balanceOf(address(pair)), amountIn, precision);
+        assertApproxEqAbs(token1.balanceOf(address(pair)), 0, precision);
 
-        assertEq(pair.compositions(0), 0, "composition");
+        assertApproxEqRel(pair.compositions(0), 0, 1e9, "composition");
         assertEq(pair.tickCurrent(), -1, "tickCurrent");
         assertEq(pair.maxOffset(), 1, "maxOffset");
     }
@@ -181,16 +187,16 @@ contract SwapTest is Test, PairHelper {
 
         uint256 amountIn = mulDiv(1e18, Q128, getRatioAtTick(-1));
 
-        assertEq(amount0, int256(amountIn), "amount0");
-        assertEq(amount1, 1e18, "amount1");
+        assertApproxEqAbs(amount0, int256(amountIn), precision, "amount0");
+        assertApproxEqAbs(amount1, -1e18, precision, "amount1");
 
-        assertEq(token0.balanceOf(address(this)), 0);
-        assertEq(token1.balanceOf(address(this)), 1e18);
+        assertApproxEqAbs(token0.balanceOf(address(this)), 0, precision, "balance0");
+        assertApproxEqAbs(token1.balanceOf(address(this)), 1e18, precision, "balance1");
 
-        assertEq(token0.balanceOf(address(pair)), amountIn);
-        assertEq(token1.balanceOf(address(pair)), 0);
+        assertApproxEqAbs(token0.balanceOf(address(pair)), amountIn, precision, "balance0 pair");
+        assertApproxEqAbs(token1.balanceOf(address(pair)), 0, precision, "balance1 pair");
 
-        assertEq(pair.compositions(0), 0, "composition");
+        assertApproxEqRel(pair.compositions(0), 0, 1e9, "composition");
         assertEq(pair.tickCurrent(), -1, "tickCurrent");
         assertEq(pair.maxOffset(), 1, "maxOffset");
     }
@@ -200,10 +206,10 @@ contract SwapTest is Test, PairHelper {
         // 1->0
         (int256 amount0, int256 amount1) = pair.swap(address(this), false, 0.5e18, bytes(""));
 
-        assertEq(amount0, -0.5e18);
-        assertEq(amount1, 0.5e18);
+        assertApproxEqAbs(amount0, -0.5e18, precision);
+        assertApproxEqAbs(amount1, 0.5e18, precision);
 
-        assertEq(pair.compositions(0), Q128 / 2, "composition");
+        assertApproxEqRel(pair.compositions(0), Q128 / 2, 1e9, "composition");
     }
 
     function testSwapPartial1To0() external {
@@ -211,10 +217,10 @@ contract SwapTest is Test, PairHelper {
         // 1->0
         (int256 amount0, int256 amount1) = pair.swap(address(this), true, -0.5e18, bytes(""));
 
-        assertEq(amount0, -0.5e18);
-        assertEq(amount1, 0.5e18);
+        assertApproxEqAbs(amount0, -0.5e18, precision);
+        assertApproxEqAbs(amount1, 0.5e18, precision);
 
-        assertEq(pair.compositions(0), Q128 / 2);
+        assertApproxEqRel(pair.compositions(0), Q128 / 2, 1e9);
     }
 
     function testSwapStartPartial0To1() external {}

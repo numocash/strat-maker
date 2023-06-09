@@ -116,6 +116,7 @@ contract Pair {
         uint128 composition;
         int24 tickCurrent;
         int8 maxOffset;
+        int256 amountDesired;
         // pool's balance change of the token which "amountDesired" refers to
         int256 amountA;
         // pool's balance change of the opposite token
@@ -157,6 +158,7 @@ contract Pair {
                 composition: compositions[0],
                 tickCurrent: _tickCurrent,
                 maxOffset: _maxOffset,
+                amountDesired: amountDesired,
                 amountA: 0,
                 amountB: 0
             });
@@ -166,19 +168,19 @@ contract Pair {
             uint256 ratioX128 = getRatioAtTick(state.tickCurrent);
 
             (uint256 amountIn, uint256 amountOut, uint256 amountRemaining) =
-                computeSwapStep(ratioX128, state.composition, state.liquidity, isToken0, amountDesired);
+                computeSwapStep(ratioX128, state.composition, state.liquidity, isToken0, state.amountDesired);
 
             if (isExactIn) {
-                amountDesired = amountDesired - int256(amountIn);
+                state.amountDesired = state.amountDesired - int256(amountIn);
                 state.amountA = state.amountA + int256(amountIn);
                 state.amountB = state.amountB - int256(amountOut);
             } else {
-                amountDesired = amountDesired + int256(amountOut);
+                state.amountDesired = state.amountDesired + int256(amountOut);
                 state.amountA = state.amountA - int256(amountOut);
                 state.amountB = state.amountB + int256(amountIn);
             }
 
-            if (amountDesired == 0) {
+            if (state.amountDesired == 0) {
                 if (isSwap0To1) {
                     state.composition = uint128(mulDiv(amountRemaining, Q128, state.liquidity));
                 } else {
