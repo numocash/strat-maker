@@ -70,8 +70,6 @@ contract Pair {
     constructor() {
         factory = msg.sender;
         (token0, token1) = Factory(msg.sender).parameters();
-
-        initialized = false;
     }
 
     modifier onlyUninitialized() {
