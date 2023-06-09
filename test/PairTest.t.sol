@@ -252,6 +252,14 @@ contract SwapTest is Test, PairHelper {
         pair.swap(address(this), false, 1.5e18, bytes(""));
     }
 
+    function testSwapGasFarTicks() external {
+        vm.pauseGasMetering();
+        pair.addLiquidity(address(this), 0, 0, 1e18, bytes(""));
+        pair.addLiquidity(address(this), 0, 10, 1e18, bytes(""));
+        vm.resumeGasMetering();
+        pair.swap(address(this), false, 1.5e18, bytes(""));
+    }
+
     function testMultiTierDown() external {
         pair.addLiquidity(address(this), 0, 0, 1e18, bytes(""));
         pair.addLiquidity(address(this), 1, 0, 1e18, bytes(""));

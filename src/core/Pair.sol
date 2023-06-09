@@ -40,11 +40,13 @@ contract Pair {
 
     address public immutable token1;
 
+    uint8 public constant MAX_TIERS = 5;
+
     /*//////////////////////////////////////////////////////////////
                                 STORAGE
     //////////////////////////////////////////////////////////////*/
 
-    uint128[5] public compositions;
+    uint128[MAX_TIERS] public compositions;
     int24 public tickCurrent;
     int8 public maxOffset;
     bool private initialized;
@@ -199,7 +201,7 @@ contract Pair {
             if (isSwap0To1) {
                 state.tickCurrent -= 1;
                 state.liquidity = 0;
-                state.maxOffset += 1;
+                if (state.maxOffset < int8(MAX_TIERS - 1)) state.maxOffset += 1;
 
                 for (int8 i = 0; i < state.maxOffset; i++) {
                     state.liquidity += ticks.get(uint8(i), state.tickCurrent + i).liquidity;
@@ -218,7 +220,7 @@ contract Pair {
             } else {
                 state.tickCurrent += 1;
                 state.liquidity = 0;
-                state.maxOffset -= 1;
+                if (state.maxOffset > -int8(MAX_TIERS - 1)) state.maxOffset -= 1;
 
                 for (int8 i = 0; i < -state.maxOffset; i++) {
                     state.liquidity += ticks.get(uint8(i), state.tickCurrent - i).liquidity;
@@ -277,7 +279,7 @@ contract Pair {
 
     /// @notice Check the validity of the tier
     function checkTier(uint8 tier) internal pure {
-        if (tier > 5) revert InvalidTier();
+        if (tier > MAX_TIERS) revert InvalidTier();
     }
 
     /// @notice Update a positions liquidity
