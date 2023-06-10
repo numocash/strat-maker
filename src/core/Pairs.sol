@@ -8,11 +8,6 @@ import {getCurrentTickForTierFromOffset, getRatioAtTick, MAX_TICK, MIN_TICK, Q12
 import {Position} from "./Position.sol";
 import {Tick} from "./Tick.sol";
 
-import {BalanceLib} from "src/libraries/BalanceLib.sol";
-import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
-
-import {ISwapCallback} from "./interfaces/ISwapCallback.sol";
-
 /// @author Robert Leifke and Kyle Scott
 library Pairs {
     using Tick for mapping(bytes32 => Tick.Info);
@@ -48,11 +43,11 @@ library Pairs {
                               INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
-    function initialize(Pair storage pair, int24 initialTick) internal {
+    function initialize(Pair storage pair, int24 tickInitial) internal {
         if (pair.lock != 0) revert Initialized();
-        _checkTick(initialTick);
+        _checkTick(tickInitial);
 
-        pair.tickCurrent = initialTick;
+        pair.tickCurrent = tickInitial;
         pair.lock = 1;
     }
 

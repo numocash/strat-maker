@@ -1,119 +1,207 @@
-// // SPDX-License-Identifier: GPL-3.0-only
-// pragma solidity ^0.8.0;
+// SPDX-License-Identifier: GPL-3.0-only
+pragma solidity ^0.8.0;
 
-// import {Test} from "forge-std/Test.sol";
-// import {PairHelper} from "./helpers/PairHelper.sol";
+import {Test} from "forge-std/Test.sol";
+import {PairHelper} from "./helpers/PairHelper.sol";
 
-// import {Pair} from "src/core/Pair.sol";
-// import {mulDiv} from "src/core/FullMath.sol";
-// import {getRatioAtTick} from "src/core/TickMath.sol";
-// import {Q128} from "src/core/TickMath.sol";
+import {Pairs} from "src/core/Pairs.sol";
+import {Engine} from "src/core/Engine.sol";
+import {Tick} from "src/core/Tick.sol";
+import {Position} from "src/core/Position.sol";
+import {mulDiv} from "src/core/math/FullMath.sol";
+import {getRatioAtTick} from "src/core/math/TickMath.sol";
+import {Q128} from "src/core/math/TickMath.sol";
 
-// contract AddLiquidityTest is Test, PairHelper {
-//     uint256 precision = 1e9;
+contract InitializationTest is Test {
+    Engine internal engine;
 
-//     function setUp() external {
-//         _setUp();
-//     }
+    function setUp() external {
+        engine = new Engine();
+    }
 
-//     function testAddLiquidityReturnAmounts() external {
-//         (uint256 amount0, uint256 amount1) = basicAddLiquidity();
+    function testInitialize() internal {
+        engine.createPair(address(1), address(2), 5);
 
-//         assertApproxEqRel(amount0, 1e18, precision);
-//         assertEq(amount1, 0);
-//     }
+        (, int24 tickCurrent,, uint8 lock) = engine.getPair(address(1), address(2));
 
-//     function testLiquidityTokenBalances() external {
-//         basicAddLiquidity();
+        assertEq(tickCurrent, 5);
+        assertEq(lock, 1);
+    }
 
-//         assertApproxEqRel(token0.balanceOf(address(this)), 0, precision);
-//         assertEq(token1.balanceOf(address(this)), 0);
+    function testInitializeDouble() internal {
+        engine.createPair(address(1), address(2), 5);
+        vm.expectRevert(Pairs.Initialized.selector);
+        engine.createPair(address(1), address(2), 5);
+    }
 
-//         assertApproxEqRel(token0.balanceOf(address(pair)), 1e18, precision);
-//         assertEq(token1.balanceOf(address(pair)), 0);
-//     }
+    function testInitializeBadTick() internal {
+        vm.expectRevert(Pairs.InvalidTick.selector);
+        engine.createPair(address(1), address(2), type(int24).max);
+    }
+}
 
-//     function testLiquidityTicks() external {
-//         basicAddLiquidity();
+contract AddLiquidityTest is Test, PairHelper {
+    uint256 precision = 1e9;
 
-//         (uint256 liquidity) = pair.ticks(keccak256(abi.encodePacked(uint8(0), int24(0))));
-//         assertEq(liquidity, 1e18);
-//     }
+    function setUp() external {
+        _setUp();
+    }
 
-//     function testLiquidityPosition() external {
-//         basicAddLiquidity();
-//         (uint256 liquidity) = pair.positions(keccak256(abi.encodePacked(address(this), uint8(0), int24(0))));
+    function testAddLiquidityReturnAmounts() external {
+        (uint256 amount0, uint256 amount1) = basicAddLiquidity();
 
-//         assertEq(liquidity, 1e18);
-//     }
+        assertApproxEqRel(amount0, 1e18, precision);
+        assertEq(amount1, 0);
+    }
 
-//     function testAddLiquidityBadTicks() external {
-//         vm.expectRevert(Pair.InvalidTick.selector);
-//         pair.addLiquidity(address(this), 0, type(int24).min, 1e18, bytes(""));
+    function testLiquidityTokenBalances() external {
+        basicAddLiquidity();
 
-//         vm.expectRevert(Pair.InvalidTick.selector);
-//         pair.addLiquidity(address(this), 0, type(int24).max, 1e18, bytes(""));
-//     }
+        assertApproxEqRel(token0.balanceOf(address(this)), 0, precision);
+        assertEq(token1.balanceOf(address(this)), 0);
 
-//     function testAddLiquidityBadTier() external {
-//         vm.expectRevert(Pair.InvalidTier.selector);
-//         pair.addLiquidity(address(this), 10, 0, 1e18, bytes(""));
-//     }
-// }
+        assertApproxEqRel(token0.balanceOf(address(engine)), 1e18, precision);
+        assertEq(token1.balanceOf(address(engine)), 0);
+    }
 
-// contract RemoveLiquidityTest is Test, PairHelper {
-//     uint256 precision = 1e9;
+    function testLiquidityTicks() external {
+        basicAddLiquidity();
 
-//     function setUp() external {
-//         _setUp();
-//     }
+        Tick.Info memory tickInfo = engine.getTick(address(token0), address(token1), 0, 0);
+        assertEq(tickInfo.liquidity, 1e18);
+    }
 
-//     function testRemoveLiquidityReturnAmounts() external {
-//         basicAddLiquidity();
-//         (uint256 amount0, uint256 amount1) = basicRemoveLiquidity();
+    function testLiquidityPosition() external {
+        basicAddLiquidity();
+        Position.Info memory positionInfo = engine.getPosition(address(token0), address(token1), address(this), 0, 0);
 
-//         assertApproxEqRel(amount0, 1e18, precision);
-//         assertEq(amount1, 0);
-//     }
+        assertEq(positionInfo.liquidity, 1e18);
+    }
 
-//     function testRemoveLiquidityTokenAmounts() external {
-//         basicAddLiquidity();
-//         basicRemoveLiquidity();
-//         assertApproxEqRel(token0.balanceOf(address(this)), 1e18, precision);
-//         assertEq(token1.balanceOf(address(this)), 0);
+    function testAddLiquidityBadTick() external {
+        vm.expectRevert(Pairs.InvalidTick.selector);
+        engine.addLiquidity(
+            Engine.AddLiquidityParams({
+                token0: address(token0),
+                token1: address(token1),
+                to: address(this),
+                tierID: 0,
+                tick: type(int24).min,
+                liquidity: 1e18,
+                data: bytes("")
+            })
+        );
 
-//         assertApproxEqRel(token0.balanceOf(address(pair)), 0, precision);
-//         assertEq(token1.balanceOf(address(pair)), 0);
-//     }
+        vm.expectRevert(Pairs.InvalidTick.selector);
+        engine.addLiquidity(
+            Engine.AddLiquidityParams({
+                token0: address(token0),
+                token1: address(token1),
+                to: address(this),
+                tierID: 0,
+                tick: type(int24).max,
+                liquidity: 1e18,
+                data: bytes("")
+            })
+        );
+    }
 
-//     function testRemoveLiquidityTicks() external {
-//         basicAddLiquidity();
-//         basicRemoveLiquidity();
-//         (uint256 liquidity) = pair.ticks(keccak256(abi.encodePacked(uint8(0), int24(0))));
-//         assertEq(liquidity, 0);
-//     }
+    function testAddLiquidityBadTier() external {
+        vm.expectRevert(Pairs.InvalidTier.selector);
+        engine.addLiquidity(
+            Engine.AddLiquidityParams({
+                token0: address(token0),
+                token1: address(token1),
+                to: address(this),
+                tierID: 10,
+                tick: 0,
+                liquidity: 1e18,
+                data: bytes("")
+            })
+        );
+    }
+}
 
-//     function testRemoveLiquidityPosition() external {
-//         basicAddLiquidity();
-//         basicRemoveLiquidity();
-//         (uint256 liquidity) = pair.positions(keccak256(abi.encodePacked(address(this), uint8(0), int24(0))));
+contract RemoveLiquidityTest is Test, PairHelper {
+    uint256 precision = 1e9;
 
-//         assertEq(liquidity, 0);
-//     }
+    function setUp() external {
+        _setUp();
+    }
 
-//     function testRemoveLiquidityBadTicks() external {
-//         vm.expectRevert(Pair.InvalidTick.selector);
-//         pair.removeLiquidity(address(this), 0, type(int24).min, 1e18);
+    function testRemoveLiquidityReturnAmounts() external {
+        basicAddLiquidity();
+        (uint256 amount0, uint256 amount1) = basicRemoveLiquidity();
 
-//         vm.expectRevert(Pair.InvalidTick.selector);
-//         pair.removeLiquidity(address(this), 0, type(int24).max, 1e18);
-//     }
+        assertApproxEqRel(amount0, 1e18, precision);
+        assertEq(amount1, 0);
+    }
 
-//     function testRemoveLiquidityBadTier() external {
-//         vm.expectRevert(Pair.InvalidTier.selector);
-//         pair.removeLiquidity(address(this), 10, 0, 1e18);
-//     }
-// }
+    function testRemoveLiquidityTokenAmounts() external {
+        basicAddLiquidity();
+        basicRemoveLiquidity();
+        assertApproxEqRel(token0.balanceOf(address(this)), 1e18, precision);
+        assertEq(token1.balanceOf(address(this)), 0);
+
+        assertApproxEqRel(token0.balanceOf(address(engine)), 0, precision);
+        assertEq(token1.balanceOf(address(engine)), 0);
+    }
+
+    function testRemoveLiquidityTicks() external {
+        basicAddLiquidity();
+        basicRemoveLiquidity();
+        Tick.Info memory tickInfo = engine.getTick(address(token0), address(token1), 0, 0);
+        assertEq(tickInfo.liquidity, 0);
+    }
+
+    function testRemoveLiquidityPosition() external {
+        basicAddLiquidity();
+        basicRemoveLiquidity();
+        Position.Info memory positionInfo = engine.getPosition(address(token0), address(token1), address(this), 0, 0);
+
+        assertEq(positionInfo.liquidity, 0);
+    }
+
+    function testRemoveLiquidityBadTick() external {
+        vm.expectRevert(Pairs.InvalidTick.selector);
+        engine.removeLiquidity(
+            Engine.RemoveLiquidityParams({
+                token0: address(token0),
+                token1: address(token1),
+                to: address(this),
+                tierID: 0,
+                tick: type(int24).min,
+                liquidity: 1e18
+            })
+        );
+
+        vm.expectRevert(Pairs.InvalidTick.selector);
+        engine.removeLiquidity(
+            Engine.RemoveLiquidityParams({
+                token0: address(token0),
+                token1: address(token1),
+                to: address(this),
+                tierID: 0,
+                tick: type(int24).max,
+                liquidity: 1e18
+            })
+        );
+    }
+
+    function testRemoveLiquidityBadTier() external {
+        vm.expectRevert(Pairs.InvalidTier.selector);
+        engine.removeLiquidity(
+            Engine.RemoveLiquidityParams({
+                token0: address(token0),
+                token1: address(token1),
+                to: address(this),
+                tierID: 10,
+                tick: 0,
+                liquidity: 1e18
+            })
+        );
+    }
+}
 
 // contract SwapTest is Test, PairHelper {
 //     uint256 precision = 10;
