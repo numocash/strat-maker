@@ -6,6 +6,8 @@ library Ticks {
         mapping(uint8 tier => uint256) tierLiquidity;
         int24 next0To1;
         int24 next1To0;
+        uint8 reference0To1;
+        uint8 reference1To0;
     }
 
     function getLiquidity(Tick storage self, uint8 tier) internal view returns (uint256 liquidity) {

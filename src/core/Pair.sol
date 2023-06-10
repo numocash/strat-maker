@@ -65,6 +65,11 @@ contract Pair {
     constructor() {
         factory = msg.sender;
         (token0, token1) = Factory(msg.sender).parameters();
+
+        tickMap0To1.set(MIN_TICK);
+        tickMap1To0.set(MIN_TICK);
+        ticks[MIN_TICK].next1To0 = MAX_TICK;
+        ticks[MIN_TICK].next1To0 = MAX_TICK;
     }
 
     modifier onlyUninitialized() {
@@ -81,9 +86,6 @@ contract Pair {
     function initialize(int24 initialTick) external onlyUninitialized {
         tickCurrent = initialTick;
         initialized = true;
-
-        tickMap0To1.set(MIN_TICK);
-        tickMap1To0.set(MAX_TICK);
     }
 
     function addLiquidity(
@@ -323,44 +325,64 @@ contract Pair {
         Ticks.Tick storage obj = ticks[tick];
 
         uint256 existingLiquidity = obj.tierLiquidity[tier];
-
         obj.tierLiquidity[tier] = addDelta(existingLiquidity, liquidity);
 
-        // if (existingLiquidity == 0 && liquidity > 0) {
-        //     int24 tick0To1 = tick - int8(tier);
-        //     int24 tick1To0 = tick + int8(tier);
+        if (existingLiquidity == 0 && liquidity > 0) {
+            int24 tick0To1 = tick - int8(tier);
+            int24 tick1To0 = tick + int8(tier);
+            uint8 reference0To1 = ticks[tick0To1].reference0To1;
+            uint8 reference1To0 = ticks[tick1To0].reference1To0;
 
-        //     int24 below0To1 = tickMap0To1.nextBelow(tick0To1);
-        //     int24 above0To1 = ticks[below0To1].next0To1;
-        //     int24 below1To0 = tickMap1To0.nextBelow(tick1To0);
-        //     int24 above1To0 = ticks[below1To0].next1To0;
+            bool add0To1 = reference0To1 == 0;
+            bool add1To0 = reference1To0 == 0;
+            ticks[tick0To1].reference0To1 = reference0To1 + 1;
+            ticks[tick1To0].reference1To0 = reference1To0 + 1;
 
-        //     obj.next0To1 = above0To1;
-        //     obj.next1To0 = above1To0;
+            if (add0To1) {
+                int24 below = -tickMap0To1.nextBelow(-tick0To1);
+                int24 above = ticks[below].next0To1;
 
-        //     ticks[below0To1].next0To1 = tick;
-        //     ticks[below1To0].next1To0 = tick;
+                obj.next0To1 = above;
+                ticks[below].next0To1 = tick0To1;
+                tickMap0To1.set(-tick0To1);
+            }
 
-        //     tickMap0To1.set(tick0To1);
-        //     tickMap1To0.set(tick1To0);
-        // } else if (liquidity < 0 && existingLiquidity == uint256(-liquidity)) {
-        //     int24 tick0To1 = tick - int8(tier);
-        //     int24 tick1To0 = tick + int8(tier);
+            if (add1To0) {
+                int24 below = tickMap1To0.nextBelow(tick1To0);
+                int24 above = ticks[below].next1To0;
 
-        //     int24 below0To1 = tickMap0To1.nextBelow(tick0To1);
-        //     int24 above0To1 = obj.next0To1;
-        //     int24 below1To0 = tickMap1To0.nextBelow(tick1To0);
-        //     int24 above1To0 = obj.next1To0;
+                obj.next1To0 = above;
+                ticks[below].next1To0 = tick1To0;
+                tickMap1To0.set(tick1To0);
+            }
+        } else if (liquidity < 0 && existingLiquidity == uint256(-liquidity)) {
+            int24 tick0To1 = tick - int8(tier);
+            int24 tick1To0 = tick + int8(tier);
+            uint8 reference0To1 = ticks[tick0To1].reference0To1;
+            uint8 reference1To0 = ticks[tick1To0].reference1To0;
 
-        //     // TODO: when can we delete
+            bool remove0To1 = reference0To1 == 1;
+            bool remove1To0 = reference1To0 == 1;
+            ticks[tick0To1].reference0To1 = reference0To1 - 1;
+            ticks[tick1To0].reference1To0 = reference1To0 - 1;
 
-        //     ticks[below0To1].next0To1 = above0To1;
-        //     ticks[below1To0].next1To0 = above1To0;
+            if (remove0To1) {
+                int24 below = -tickMap0To1.nextBelow(-tick0To1);
+                int24 above = obj.next0To1;
 
-        //     // TODO: could we get into trouble unsetting a tick that another is referencing
-        //     tickMap0To1.unset(tick0To1);
-        //     tickMap1To0.unset(tick1To0);
-        // }
+                ticks[below].next0To1 = above;
+                tickMap0To1.unset(-tick0To1);
+            }
+
+            if (remove1To0) {
+                int24 below = tickMap1To0.nextBelow(tick1To0);
+                int24 above = obj.next1To0;
+
+                // todo should we clear out the obj next value
+                ticks[below].next1To0 = above;
+                tickMap1To0.unset(tick1To0);
+            }
+        }
     }
 
     /// @notice Update a position
