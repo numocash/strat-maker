@@ -49,6 +49,18 @@ contract AddLiquidityTest is Test, PairHelper {
         assertEq(liquidity, 1e18);
     }
 
+    function testAddLiquidityGasFreshTicks() external {
+        pair.addLiquidity(address(this), 1, 0, 1e18, bytes(""));
+    }
+
+    function testAddLiquidityGasHotTicks() external {
+        vm.pauseGasMetering();
+        pair.addLiquidity(address(this), 1, 0, 1e18, bytes(""));
+        vm.resumeGasMetering();
+
+        pair.addLiquidity(address(this), 1, 0, 1e18, bytes(""));
+    }
+
     function testAddLiquidityBadTicks() external {
         vm.expectRevert(Pair.InvalidTick.selector);
         pair.addLiquidity(address(this), 0, type(int24).min, 1e18, bytes(""));
@@ -101,6 +113,23 @@ contract RemoveLiquidityTest is Test, PairHelper {
         (uint256 liquidity) = pair.positions(keccak256(abi.encodePacked(address(this), uint8(0), int24(0))));
 
         assertEq(liquidity, 0);
+    }
+
+    function testRemoveLiquidityGasCloseTicks() external {
+        vm.pauseGasMetering();
+        pair.addLiquidity(address(this), 1, 0, 1e18, bytes(""));
+        vm.resumeGasMetering();
+
+        pair.removeLiquidity(address(this), 1, 0, 1e18);
+    }
+
+    function testRemoveLiquidityGasOpenTicks() external {
+        vm.pauseGasMetering();
+        pair.addLiquidity(address(this), 1, 0, 1e18, bytes(""));
+        pair.addLiquidity(address(this), 1, 0, 1e18, bytes(""));
+        vm.resumeGasMetering();
+
+        pair.removeLiquidity(address(this), 1, 0, 1e18);
     }
 
     function testRemoveLiquidityBadTicks() external {
