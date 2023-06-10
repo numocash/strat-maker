@@ -3,8 +3,8 @@ pragma solidity ^0.8.19;
 
 import {Test} from "forge-std/Test.sol";
 
-import {computeSwapStep} from "src/core/SwapMath.sol";
-import {Q128} from "src/core/TickMath.sol";
+import {computeSwapStep} from "src/core/math/SwapMath.sol";
+import {Q128} from "src/core/math/TickMath.sol";
 
 contract SwapMathTest is Test {
     uint256 precision = 1e9;

@@ -3,9 +3,9 @@ pragma solidity ^0.8.19;
 
 import {Test} from "forge-std/Test.sol";
 
-import {getAmount0Delta, getAmount1Delta, calcAmountsForLiquidity} from "src/core/LiquidityMath.sol";
-import {getRatioAtTick, Q128} from "src/core/TickMath.sol";
-import {mulDiv} from "src/core/FullMath.sol";
+import {getAmount0Delta, getAmount1Delta, calcAmountsForLiquidity} from "src/core/math/LiquidityMath.sol";
+import {getRatioAtTick, Q128} from "src/core/math/TickMath.sol";
+import {mulDiv} from "src/core/math/FullMath.sol";
 
 contract LiquidityMathTest is Test {
     function testGetAmount0DeltaBasic() external {
