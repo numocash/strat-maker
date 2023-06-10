@@ -19,7 +19,7 @@ contract InitializationTest is Test {
         engine = new Engine();
     }
 
-    function testInitialize() internal {
+    function testInitialize() external {
         engine.createPair(address(1), address(2), 5);
 
         (, int24 tickCurrent,, uint8 lock) = engine.getPair(address(1), address(2));
@@ -28,13 +28,13 @@ contract InitializationTest is Test {
         assertEq(lock, 1);
     }
 
-    function testInitializeDouble() internal {
+    function testInitializeDouble() external {
         engine.createPair(address(1), address(2), 5);
         vm.expectRevert(Pairs.Initialized.selector);
         engine.createPair(address(1), address(2), 5);
     }
 
-    function testInitializeBadTick() internal {
+    function testInitializeBadTick() external {
         vm.expectRevert(Pairs.InvalidTick.selector);
         engine.createPair(address(1), address(2), type(int24).max);
     }

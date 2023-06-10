@@ -14,10 +14,21 @@ contract EngineTest is Test {
         engine = new Engine();
     }
 
-    // test zero token
-    // test same token
+    function testBadToken() external {
+        vm.expectRevert(Engine.InvalidTokenOrder.selector);
+        engine.createPair(address(1), address(0), 0);
 
-    function testEngineEmit() internal {
+        vm.expectRevert(Engine.InvalidTokenOrder.selector);
+        engine.createPair(address(0), address(1), 0);
+
+        vm.expectRevert(Engine.InvalidTokenOrder.selector);
+        engine.createPair(address(2), address(1), 1);
+
+        vm.expectRevert(Engine.InvalidTokenOrder.selector);
+        engine.createPair(address(1), address(1), 1);
+    }
+
+    function testEngineEmit() external {
         vm.expectEmit(true, true, false, true);
         emit PairCreated(address(1), address(2), 4);
         engine.createPair(address(1), address(2), 4);
