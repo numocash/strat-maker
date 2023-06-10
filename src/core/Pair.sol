@@ -42,7 +42,8 @@ contract Pair {
 
     address public immutable token1;
 
-    uint8 public constant MAX_TIERS = 5;
+    uint8 private constant MAX_TIERS = 5;
+    int8 private constant MAX_OFFSET = int8(MAX_TIERS) - 1;
 
     /*//////////////////////////////////////////////////////////////
                                 STORAGE
@@ -50,7 +51,7 @@ contract Pair {
 
     uint128[MAX_TIERS] public compositions;
     int24 public tickCurrent;
-    int8 public maxOffset;
+    int8 public offset;
     bool private initialized;
 
     mapping(int24 => Ticks.Tick) public ticks;
@@ -131,7 +132,7 @@ contract Pair {
         uint256 liquidity;
         uint128 composition;
         int24 tickCurrent;
-        int8 maxOffset;
+        int8 offset;
         int256 amountDesired;
         // pool's balance change of the token which "amountDesired" refers to
         int256 amountA;
@@ -161,10 +162,10 @@ contract Pair {
         SwapState memory state;
         {
             int24 _tickCurrent = tickCurrent;
-            int8 _maxOffset = isSwap0To1 == (maxOffset > 0) ? maxOffset : int8(0);
+            int8 _offset = isSwap0To1 == (offset > 0) ? offset : int8(0);
             uint256 liquidity = 0;
 
-            for (int8 i = 0; i <= (_maxOffset >= 0 ? _maxOffset : -_maxOffset); i++) {
+            for (int8 i = 0; i <= (_offset >= 0 ? _offset : -_offset); i++) {
                 liquidity += ticks[isSwap0To1 ? _tickCurrent + i : _tickCurrent - i].getLiquidity(uint8(i));
             }
 
@@ -173,7 +174,7 @@ contract Pair {
                 liquidity: liquidity,
                 composition: compositions[0],
                 tickCurrent: _tickCurrent,
-                maxOffset: _maxOffset,
+                offset: _offset,
                 amountDesired: amountDesired,
                 amountA: 0,
                 amountB: 0
@@ -207,17 +208,24 @@ contract Pair {
             }
 
             if (isSwap0To1) {
+                int24 tickPrev = state.tickCurrent;
+                if (tickPrev == MIN_TICK) revert();
+                // state.tickCurrent = ticks[tickPrev].next0To1;
                 state.tickCurrent -= 1;
-                state.liquidity = 0;
-                if (state.maxOffset < int8(MAX_TIERS - 1)) state.maxOffset += 1;
 
-                for (int8 i = 0; i < state.maxOffset; i++) {
+                state.liquidity = 0;
+                if (state.offset < MAX_OFFSET) {
+                    int24 jump = tickPrev - state.tickCurrent;
+                    // state.offset = int24(state.offset) + jump >= MAX_OFFSET ? MAX_OFFSET : int8(state.offset + jump);
+                    state.offset += 1;
+                }
+
+                for (int8 i = 0; i < state.offset; i++) {
                     state.liquidity += ticks[state.tickCurrent + i].getLiquidity(uint8(i));
                 }
 
-                uint256 newLiquidity = ticks[state.tickCurrent + state.maxOffset].getLiquidity(uint8(state.maxOffset));
-
-                uint256 newComposition = compositions[uint8(state.maxOffset)];
+                uint256 newLiquidity = ticks[state.tickCurrent + state.offset].getLiquidity(uint8(state.offset));
+                uint256 newComposition = compositions[uint8(state.offset)];
 
                 state.liquidity += newLiquidity;
                 state.composition = type(uint128).max
@@ -229,15 +237,15 @@ contract Pair {
             } else {
                 state.tickCurrent += 1;
                 state.liquidity = 0;
-                if (state.maxOffset > -int8(MAX_TIERS - 1)) state.maxOffset -= 1;
+                if (state.offset > -MAX_OFFSET) state.offset -= 1;
 
-                for (int8 i = 0; i < -state.maxOffset; i++) {
+                for (int8 i = 0; i < -state.offset; i++) {
                     state.liquidity += ticks[state.tickCurrent - i].getLiquidity(uint8(i));
                 }
 
                 // solhint-disable-next-line max-line-length
-                uint256 newLiquidity = ticks[state.tickCurrent + state.maxOffset].getLiquidity(uint8(-state.maxOffset));
-                uint256 newComposition = compositions[uint8(-state.maxOffset)];
+                uint256 newLiquidity = ticks[state.tickCurrent + state.offset].getLiquidity(uint8(-state.offset));
+                uint256 newComposition = compositions[uint8(-state.offset)];
 
                 state.liquidity += newLiquidity;
                 state.composition =
@@ -253,11 +261,11 @@ contract Pair {
             amount1 = state.amountA;
         }
 
-        for (uint8 i = 0; i <= uint8(state.maxOffset >= 0 ? state.maxOffset : -state.maxOffset); i++) {
+        for (uint8 i = 0; i <= uint8(state.offset >= 0 ? state.offset : -state.offset); i++) {
             compositions[i] = state.composition;
         }
         tickCurrent = state.tickCurrent;
-        maxOffset = state.maxOffset;
+        offset = state.offset;
 
         // pay out
         if (isToken0 == isExactIn) {
@@ -312,7 +320,7 @@ contract Pair {
         updatePosition(to, tierID, tick, liquidity);
 
         // determine amounts
-        int24 tickCurrentForTier = getCurrentTickForTierFromOffset(tickCurrent, maxOffset, tierID);
+        int24 tickCurrentForTier = getCurrentTickForTierFromOffset(tickCurrent, offset, tierID);
 
         (amount0, amount1) = calcAmountsForLiquidity(
             tickCurrentForTier, compositions[tierID], tick, liquidity > 0 ? uint256(liquidity) : uint256(-liquidity)
@@ -322,6 +330,7 @@ contract Pair {
     /// @notice Update a tick
     /// @param liquidity The amount of liquidity being added or removed
     function updateTick(uint8 tier, int24 tick, int256 liquidity) internal {
+        // TODO: set the next 0To1 and 1To0 instead
         Ticks.Tick storage obj = ticks[tick];
 
         uint256 existingLiquidity = obj.tierLiquidity[tier];
@@ -378,7 +387,7 @@ contract Pair {
                 int24 below = tickMap1To0.nextBelow(tick1To0);
                 int24 above = obj.next1To0;
 
-                // todo should we clear out the obj next value
+                // TODO: should we clear out the obj next value
                 ticks[below].next1To0 = above;
                 tickMap1To0.unset(tick1To0);
             }

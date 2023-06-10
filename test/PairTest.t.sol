@@ -49,6 +49,15 @@ contract AddLiquidityTest is Test, PairHelper {
         assertEq(liquidity, 1e18);
     }
 
+    function testAddLiquidityNextTick() external {
+        pair.addLiquidity(address(this), 1, 0, 1e18, bytes(""));
+
+        (int24 next0To1, int24 next1To0,,) = pair.ticks(0);
+
+        assertEq(next0To1, 0);
+        // assertEq(next1To0, 0);
+    }
+
     function testAddLiquidityGasFreshTicks() external {
         pair.addLiquidity(address(this), 1, 0, 1e18, bytes(""));
     }
@@ -169,7 +178,7 @@ contract SwapTest is Test, PairHelper {
 
         assertApproxEqRel(pair.compositions(0), type(uint128).max, precision);
         assertEq(pair.tickCurrent(), 0);
-        assertEq(pair.maxOffset(), 0);
+        assertEq(pair.offset(), 0);
     }
 
     function testSwapToken0ExactOutBasic() external {
@@ -188,7 +197,7 @@ contract SwapTest is Test, PairHelper {
 
         assertApproxEqRel(pair.compositions(0), type(uint128).max, precision);
         assertEq(pair.tickCurrent(), 0);
-        assertEq(pair.maxOffset(), 0);
+        assertEq(pair.offset(), 0);
     }
 
     function testSwapToken0ExactInBasic() external {
@@ -208,7 +217,7 @@ contract SwapTest is Test, PairHelper {
 
         assertApproxEqRel(pair.compositions(0), 0, 1e9, "composition");
         assertEq(pair.tickCurrent(), -1, "tickCurrent");
-        assertEq(pair.maxOffset(), 1, "maxOffset");
+        assertEq(pair.offset(), 1, "offset");
     }
 
     function testSwapToken1ExactOutBasic() external {
@@ -229,7 +238,7 @@ contract SwapTest is Test, PairHelper {
 
         assertApproxEqRel(pair.compositions(0), 0, 1e9, "composition");
         assertEq(pair.tickCurrent(), -1, "tickCurrent");
-        assertEq(pair.maxOffset(), 1, "maxOffset");
+        assertEq(pair.offset(), 1, "offset");
     }
 
     function testSwapPartial0To1() external {
@@ -300,7 +309,7 @@ contract SwapTest is Test, PairHelper {
         assertApproxEqRel(pair.compositions(0), type(uint128).max / 2, 1e14, "composition 0");
         assertApproxEqRel(pair.compositions(1), type(uint128).max / 2, 1e14, "composition 1");
         assertEq(pair.tickCurrent(), 1);
-        assertEq(pair.maxOffset(), -1);
+        assertEq(pair.offset(), -1);
     }
 
     function testMultiTierUp() external {
@@ -312,7 +321,7 @@ contract SwapTest is Test, PairHelper {
         assertApproxEqRel(pair.compositions(0), type(uint128).max / 2, 1e15, "composition 0");
         assertApproxEqRel(pair.compositions(1), type(uint128).max / 2, 1e15, "composition 1");
         assertEq(pair.tickCurrent(), -2);
-        assertEq(pair.maxOffset(), 2);
+        assertEq(pair.offset(), 2);
     }
 
     function testInitialLiquidity() external {
@@ -327,7 +336,7 @@ contract SwapTest is Test, PairHelper {
         assertApproxEqRel(pair.compositions(0), (uint256(type(uint128).max) * 45) / 100, 1e15, "composition 0");
         assertApproxEqRel(pair.compositions(1), (uint256(type(uint128).max) * 45) / 100, 1e15, "composition 1");
         assertEq(pair.tickCurrent(), 1);
-        assertEq(pair.maxOffset(), -1);
+        assertEq(pair.offset(), -1);
     }
 
     function testTierComposition() external {
@@ -341,6 +350,6 @@ contract SwapTest is Test, PairHelper {
         assertApproxEqRel(pair.compositions(0), type(uint128).max / 2, 1e15, "composition 0");
         assertApproxEqRel(pair.compositions(1), type(uint128).max / 2, 1e15, "composition 1");
         assertEq(pair.tickCurrent(), -2);
-        assertEq(pair.maxOffset(), 2);
+        assertEq(pair.offset(), 2);
     }
 }
