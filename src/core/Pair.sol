@@ -54,8 +54,9 @@ contract Pair {
     bool private initialized;
 
     mapping(int24 => Ticks.Tick) public ticks;
-    mapping(uint256 => TickMaps.TickMap) tickMaps;
     mapping(bytes32 positionID => Positions.Position) public positions;
+    TickMaps.TickMap public tickMap0To1;
+    TickMaps.TickMap public tickMap1To0;
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -80,6 +81,9 @@ contract Pair {
     function initialize(int24 initialTick) external onlyUninitialized {
         tickCurrent = initialTick;
         initialized = true;
+
+        tickMap0To1.set(MIN_TICK);
+        tickMap1To0.set(MAX_TICK);
     }
 
     function addLiquidity(
@@ -315,8 +319,48 @@ contract Pair {
 
     /// @notice Update a tick
     /// @param liquidity The amount of liquidity being added or removed
-    function updateTick(uint8 tierID, int24 tick, int256 liquidity) internal {
-        ticks[tick].tierLiquidity[tierID] = addDelta(ticks[tick].tierLiquidity[tierID], liquidity);
+    function updateTick(uint8 tier, int24 tick, int256 liquidity) internal {
+        Ticks.Tick storage obj = ticks[tick];
+
+        uint256 existingLiquidity = obj.tierLiquidity[tier];
+
+        obj.tierLiquidity[tier] = addDelta(existingLiquidity, liquidity);
+
+        // if (existingLiquidity == 0 && liquidity > 0) {
+        //     int24 tick0To1 = tick - int8(tier);
+        //     int24 tick1To0 = tick + int8(tier);
+
+        //     int24 below0To1 = tickMap0To1.nextBelow(tick0To1);
+        //     int24 above0To1 = ticks[below0To1].next0To1;
+        //     int24 below1To0 = tickMap1To0.nextBelow(tick1To0);
+        //     int24 above1To0 = ticks[below1To0].next1To0;
+
+        //     obj.next0To1 = above0To1;
+        //     obj.next1To0 = above1To0;
+
+        //     ticks[below0To1].next0To1 = tick;
+        //     ticks[below1To0].next1To0 = tick;
+
+        //     tickMap0To1.set(tick0To1);
+        //     tickMap1To0.set(tick1To0);
+        // } else if (liquidity < 0 && existingLiquidity == uint256(-liquidity)) {
+        //     int24 tick0To1 = tick - int8(tier);
+        //     int24 tick1To0 = tick + int8(tier);
+
+        //     int24 below0To1 = tickMap0To1.nextBelow(tick0To1);
+        //     int24 above0To1 = obj.next0To1;
+        //     int24 below1To0 = tickMap1To0.nextBelow(tick1To0);
+        //     int24 above1To0 = obj.next1To0;
+
+        //     // TODO: when can we delete
+
+        //     ticks[below0To1].next0To1 = above0To1;
+        //     ticks[below1To0].next1To0 = above1To0;
+
+        //     // TODO: could we get into trouble unsetting a tick that another is referencing
+        //     tickMap0To1.unset(tick0To1);
+        //     tickMap1To0.unset(tick1To0);
+        // }
     }
 
     /// @notice Update a position
