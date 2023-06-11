@@ -32,6 +32,8 @@ contract Pair {
 
     error InsufficientInput();
 
+    error OutOfBounds();
+
     /*//////////////////////////////////////////////////////////////
                                IMMUTABLE
     //////////////////////////////////////////////////////////////*/
@@ -153,7 +155,6 @@ contract Pair {
     /// @param data Extra data passed back to the caller
     /// @return amount0 The delta of the balance of token0 of the pool
     /// @return amount1 The delta of the balance of token1 of the pool
-    /// @custom:team Better check for min and max tick
     function swap(
         address to,
         bool isToken0,
@@ -216,15 +217,13 @@ contract Pair {
 
             if (isSwap0To1) {
                 int24 tickPrev = state.tickCurrent;
-                if (tickPrev == MIN_TICK) revert();
+                if (tickPrev == MIN_TICK) revert OutOfBounds();
                 state.tickCurrent = ticks[tickPrev].next0To1;
-                // state.tickCurrent -= 1;
 
                 state.liquidity = 0;
                 if (state.offset < MAX_OFFSET) {
                     int24 jump = tickPrev - state.tickCurrent;
                     state.offset = int24(state.offset) + jump >= MAX_OFFSET ? MAX_OFFSET : int8(state.offset + jump);
-                    // state.offset += 1;
                 }
 
                 for (int8 i = 0; i < state.offset; i++) {
@@ -243,15 +242,13 @@ contract Pair {
                     );
             } else {
                 int24 tickPrev = state.tickCurrent;
-                if (tickPrev == MAX_TICK) revert();
+                if (tickPrev == MAX_TICK) revert OutOfBounds();
                 state.tickCurrent = ticks[tickPrev].next1To0;
-                // state.tickCurrent += 1;
 
                 state.liquidity = 0;
                 if (state.offset > -MAX_OFFSET) {
                     int24 jump = state.tickCurrent - tickPrev;
                     state.offset = int24(state.offset) - jump <= -MAX_OFFSET ? -MAX_OFFSET : int8(state.offset - jump);
-                    // state.offset -= 1;
                 }
 
                 for (int8 i = 0; i < -state.offset; i++) {
