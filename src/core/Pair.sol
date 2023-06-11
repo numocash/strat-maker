@@ -77,8 +77,8 @@ contract Pair {
                                   LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    /// @custom:team Need initialization function to set the tickCurrent
-
+    /// @custom:team Decision between always having initial tick as an extra step in the linked-lists or requiring
+    /// depositing liquidity on initialization
     function initialize(int24 initialTick) external onlyUninitialized {
         tickCurrent = initialTick;
         initialized = true;
@@ -91,6 +91,8 @@ contract Pair {
         ticks[MIN_TICK].next1To0 = initialTick;
         ticks[initialTick].next0To1 = MIN_TICK;
         ticks[initialTick].next1To0 = MAX_TICK;
+        ticks[initialTick].reference0To1 = 1;
+        ticks[initialTick].reference1To0 = 1;
     }
 
     function addLiquidity(
@@ -151,6 +153,7 @@ contract Pair {
     /// @param data Extra data passed back to the caller
     /// @return amount0 The delta of the balance of token0 of the pool
     /// @return amount1 The delta of the balance of token1 of the pool
+    /// @custom:team Better check for min and max tick
     function swap(
         address to,
         bool isToken0,
@@ -214,14 +217,14 @@ contract Pair {
             if (isSwap0To1) {
                 int24 tickPrev = state.tickCurrent;
                 if (tickPrev == MIN_TICK) revert();
-                // state.tickCurrent = ticks[tickPrev].next0To1;
-                state.tickCurrent -= 1;
+                state.tickCurrent = ticks[tickPrev].next0To1;
+                // state.tickCurrent -= 1;
 
                 state.liquidity = 0;
                 if (state.offset < MAX_OFFSET) {
                     int24 jump = tickPrev - state.tickCurrent;
-                    // state.offset = int24(state.offset) + jump >= MAX_OFFSET ? MAX_OFFSET : int8(state.offset + jump);
-                    state.offset += 1;
+                    state.offset = int24(state.offset) + jump >= MAX_OFFSET ? MAX_OFFSET : int8(state.offset + jump);
+                    // state.offset += 1;
                 }
 
                 for (int8 i = 0; i < state.offset; i++) {
@@ -239,9 +242,17 @@ contract Pair {
                             : uint128(mulDiv(type(uint128).max - newComposition, newLiquidity, state.liquidity))
                     );
             } else {
-                state.tickCurrent += 1;
+                int24 tickPrev = state.tickCurrent;
+                if (tickPrev == MAX_TICK) revert();
+                state.tickCurrent = ticks[tickPrev].next1To0;
+                // state.tickCurrent += 1;
+
                 state.liquidity = 0;
-                if (state.offset > -MAX_OFFSET) state.offset -= 1;
+                if (state.offset > -MAX_OFFSET) {
+                    int24 jump = state.tickCurrent - tickPrev;
+                    state.offset = int24(state.offset) - jump <= -MAX_OFFSET ? -MAX_OFFSET : int8(state.offset - jump);
+                    // state.offset -= 1;
+                }
 
                 for (int8 i = 0; i < -state.offset; i++) {
                     state.liquidity += ticks[state.tickCurrent - i].getLiquidity(uint8(i));
@@ -333,6 +344,7 @@ contract Pair {
 
     /// @notice Update a tick
     /// @param liquidity The amount of liquidity being added or removed
+    /// @custom:team make sure entirely removing the liquidity of the current tick doesn't break things
     function updateTick(uint8 tier, int24 tick, int256 liquidity) internal {
         uint256 existingLiquidity = ticks[tick].tierLiquidity[tier];
         ticks[tick].tierLiquidity[tier] = addDelta(existingLiquidity, liquidity);
