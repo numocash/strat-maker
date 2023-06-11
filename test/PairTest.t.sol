@@ -4,13 +4,13 @@ pragma solidity ^0.8.0;
 import {Test} from "forge-std/Test.sol";
 import {PairHelper} from "./helpers/PairHelper.sol";
 
-import {Pairs} from "src/core/Pairs.sol";
+import {Pairs, MAX_TIERS} from "src/core/Pairs.sol";
 import {Engine} from "src/core/Engine.sol";
-import {Tick} from "src/core/Tick.sol";
-import {Position} from "src/core/Position.sol";
+import {Ticks} from "src/core/Ticks.sol";
+import {Positions} from "src/core/Positions.sol";
 import {mulDiv} from "src/core/math/FullMath.sol";
 import {getRatioAtTick} from "src/core/math/TickMath.sol";
-import {Q128} from "src/core/math/TickMath.sol";
+import {MAX_TICK, MIN_TICK, Q128} from "src/core/math/TickMath.sol";
 
 contract InitializationTest is Test {
     Engine internal engine;
@@ -26,6 +26,20 @@ contract InitializationTest is Test {
 
         assertEq(tickCurrent, 5);
         assertEq(lock, 1);
+    }
+
+    function testInitializeTickMaps() external {
+        engine.createPair(address(1), address(2), 0);
+
+        Ticks.Tick memory tick = engine.getTick(address(1), address(2), 0);
+        assertEq(tick.next0To1, MIN_TICK);
+        assertEq(tick.next1To0, MAX_TICK);
+
+        tick = engine.getTick(address(1), address(2), MAX_TICK);
+        assertEq(tick.next0To1, 0);
+
+        tick = engine.getTick(address(1), address(2), MIN_TICK);
+        assertEq(tick.next1To0, 0);
     }
 
     function testInitializeDouble() external {
@@ -67,25 +81,105 @@ contract AddLiquidityTest is Test, PairHelper {
     function testLiquidityTicks() external {
         basicAddLiquidity();
 
-        Tick.Info memory tickInfo = engine.getTick(address(token0), address(token1), 0, 0);
-        assertEq(tickInfo.liquidity, 1e18);
+        Ticks.Tick memory tick = engine.getTick(address(token0), address(token1), 0);
+        assertEq(tick.liquidity[0], 1e18);
     }
 
     function testLiquidityPosition() external {
         basicAddLiquidity();
-        Position.Info memory positionInfo = engine.getPosition(address(token0), address(token1), address(this), 0, 0);
+        Positions.Position memory positionInfo =
+            engine.getPosition(address(token0), address(token1), address(this), 0, 0);
 
         assertEq(positionInfo.liquidity, 1e18);
     }
 
-    function testAddLiquidityBadTick() external {
+    function testAddLiquidityTickMapBasic() external {
+        basicAddLiquidity();
+
+        Ticks.Tick memory tick = engine.getTick(address(token0), address(token1), 0);
+        assertEq(tick.next0To1, MIN_TICK);
+        assertEq(tick.next1To0, MAX_TICK);
+
+        tick = engine.getTick(address(token0), address(token1), MAX_TICK);
+        assertEq(tick.next0To1, 0);
+
+        tick = engine.getTick(address(token0), address(token1), MIN_TICK);
+        assertEq(tick.next1To0, 0);
+    }
+
+    function testAddLiquidityTickMapWithTier() external {
+        engine.addLiquidity(
+            Engine.AddLiquidityParams({
+                token0: address(token0),
+                token1: address(token1),
+                to: address(this),
+                tier: 1,
+                tick: 0,
+                liquidity: 1e18,
+                data: bytes("")
+            })
+        );
+        Ticks.Tick memory tick = engine.getTick(address(token0), address(token1), 0);
+        assertEq(tick.next0To1, -1, "initial tick 0 to 1");
+        assertEq(tick.next1To0, 1, "initial tick 1 to 0");
+
+        tick = engine.getTick(address(token0), address(token1), -1);
+        assertEq(tick.next0To1, MIN_TICK, "0 to 1");
+
+        tick = engine.getTick(address(token0), address(token1), 1);
+        assertEq(tick.next1To0, MAX_TICK, "1 to 0");
+    }
+
+    function testAddLiquidityGasFreshTicks() external {
+        engine.addLiquidity(
+            Engine.AddLiquidityParams({
+                token0: address(token0),
+                token1: address(token1),
+                to: address(this),
+                tier: 1,
+                tick: 0,
+                liquidity: 1e18,
+                data: bytes("")
+            })
+        );
+    }
+
+    function testAddLiquidityGasHotTicks() external {
+        vm.pauseGasMetering();
+        engine.addLiquidity(
+            Engine.AddLiquidityParams({
+                token0: address(token0),
+                token1: address(token1),
+                to: address(this),
+                tier: 1,
+                tick: 0,
+                liquidity: 1e18,
+                data: bytes("")
+            })
+        );
+        vm.resumeGasMetering();
+
+        engine.addLiquidity(
+            Engine.AddLiquidityParams({
+                token0: address(token0),
+                token1: address(token1),
+                to: address(this),
+                tier: 1,
+                tick: 0,
+                liquidity: 1e18,
+                data: bytes("")
+            })
+        );
+    }
+
+    function testAddLiquidityBadTicks() external {
         vm.expectRevert(Pairs.InvalidTick.selector);
         engine.addLiquidity(
             Engine.AddLiquidityParams({
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: type(int24).min,
                 liquidity: 1e18,
                 data: bytes("")
@@ -98,7 +192,7 @@ contract AddLiquidityTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: type(int24).max,
                 liquidity: 1e18,
                 data: bytes("")
@@ -113,7 +207,7 @@ contract AddLiquidityTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 10,
+                tier: 10,
                 tick: 0,
                 liquidity: 1e18,
                 data: bytes("")
@@ -150,26 +244,159 @@ contract RemoveLiquidityTest is Test, PairHelper {
     function testRemoveLiquidityTicks() external {
         basicAddLiquidity();
         basicRemoveLiquidity();
-        Tick.Info memory tickInfo = engine.getTick(address(token0), address(token1), 0, 0);
-        assertEq(tickInfo.liquidity, 0);
+        Ticks.Tick memory tick = engine.getTick(address(token0), address(token1), 0);
+        assertEq(tick.liquidity[0], 0);
     }
 
     function testRemoveLiquidityPosition() external {
         basicAddLiquidity();
         basicRemoveLiquidity();
-        Position.Info memory positionInfo = engine.getPosition(address(token0), address(token1), address(this), 0, 0);
+        Positions.Position memory positionInfo =
+            engine.getPosition(address(token0), address(token1), address(this), 0, 0);
 
         assertEq(positionInfo.liquidity, 0);
     }
 
-    function testRemoveLiquidityBadTick() external {
+    function testRemoveLiquidityGasCloseTicks() external {
+        vm.pauseGasMetering();
+        engine.addLiquidity(
+            Engine.AddLiquidityParams({
+                token0: address(token0),
+                token1: address(token1),
+                to: address(this),
+                tier: 1,
+                tick: 0,
+                liquidity: 1e18,
+                data: bytes("")
+            })
+        );
+        vm.resumeGasMetering();
+
+        engine.removeLiquidity(
+            Engine.RemoveLiquidityParams({
+                token0: address(token0),
+                token1: address(token1),
+                to: address(this),
+                tier: 1,
+                tick: 0,
+                liquidity: 1e18
+            })
+        );
+    }
+
+    function testRemoveLiquidityGasOpenTicks() external {
+        vm.pauseGasMetering();
+        engine.addLiquidity(
+            Engine.AddLiquidityParams({
+                token0: address(token0),
+                token1: address(token1),
+                to: address(this),
+                tier: 1,
+                tick: 0,
+                liquidity: 2e18,
+                data: bytes("")
+            })
+        );
+        vm.resumeGasMetering();
+
+        engine.removeLiquidity(
+            Engine.RemoveLiquidityParams({
+                token0: address(token0),
+                token1: address(token1),
+                to: address(this),
+                tier: 1,
+                tick: 0,
+                liquidity: 1e18
+            })
+        );
+    }
+
+    function testRemoveLiquidityTickMapBasic() external {
+        engine.addLiquidity(
+            Engine.AddLiquidityParams({
+                token0: address(token0),
+                token1: address(token1),
+                to: address(this),
+                tier: 0,
+                tick: 0,
+                liquidity: 1e18,
+                data: bytes("")
+            })
+        );
+        engine.removeLiquidity(
+            Engine.RemoveLiquidityParams({
+                token0: address(token0),
+                token1: address(token1),
+                to: address(this),
+                tier: 0,
+                tick: 0,
+                liquidity: 1e18
+            })
+        );
+        Ticks.Tick memory tick = engine.getTick(address(token0), address(token1), 0);
+        assertEq(tick.next0To1, MIN_TICK);
+        assertEq(tick.next1To0, MAX_TICK);
+
+        tick = engine.getTick(address(token0), address(token1), MAX_TICK);
+        assertEq(tick.next0To1, 0);
+
+        tick = engine.getTick(address(token0), address(token1), MIN_TICK);
+        assertEq(tick.next1To0, 0);
+    }
+
+    function testRemoveLiquidityTickMapCurrentTick() external {
+        engine.addLiquidity(
+            Engine.AddLiquidityParams({
+                token0: address(token0),
+                token1: address(token1),
+                to: address(this),
+                tier: 1,
+                tick: 0,
+                liquidity: 1e18,
+                data: bytes("")
+            })
+        );
+        engine.swap(
+            Engine.SwapParams({
+                token0: address(token0),
+                token1: address(token1),
+                to: address(this),
+                isToken0: false,
+                amountDesired: 1e18 - 1,
+                data: bytes("")
+            })
+        );
+
+        engine.removeLiquidity(
+            Engine.RemoveLiquidityParams({
+                token0: address(token0),
+                token1: address(token1),
+                to: address(this),
+                tier: 1,
+                tick: 0,
+                liquidity: 1e18
+            })
+        );
+
+        Ticks.Tick memory tick = engine.getTick(address(token0), address(token1), 0);
+        assertEq(tick.next0To1, MIN_TICK);
+        assertEq(tick.next1To0, MAX_TICK);
+
+        tick = engine.getTick(address(token0), address(token1), MAX_TICK);
+        assertEq(tick.next0To1, 0);
+
+        tick = engine.getTick(address(token0), address(token1), MIN_TICK);
+        assertEq(tick.next1To0, 0);
+    }
+
+    function testRemoveLiquidityBadTicks() external {
         vm.expectRevert(Pairs.InvalidTick.selector);
         engine.removeLiquidity(
             Engine.RemoveLiquidityParams({
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: type(int24).min,
                 liquidity: 1e18
             })
@@ -181,7 +408,7 @@ contract RemoveLiquidityTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: type(int24).max,
                 liquidity: 1e18
             })
@@ -195,7 +422,7 @@ contract RemoveLiquidityTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 10,
+                tier: 10,
                 tick: 0,
                 liquidity: 1e18
             })
@@ -233,12 +460,12 @@ contract SwapTest is Test, PairHelper {
         assertApproxEqRel(token0.balanceOf(address(engine)), 0, precision);
         assertApproxEqRel(token1.balanceOf(address(engine)), 1e18, precision);
 
-        (uint128[5] memory compositions, int24 tickCurrent, int8 maxOffset,) =
+        (uint128[5] memory compositions, int24 tickCurrent, int8 offset,) =
             engine.getPair(address(token0), address(token1));
 
         assertApproxEqRel(compositions[0], type(uint128).max, 1e9);
         assertEq(tickCurrent, 0);
-        assertEq(maxOffset, 0);
+        assertEq(offset, 0);
     }
 
     function testSwapToken0ExactOutBasic() external {
@@ -264,12 +491,12 @@ contract SwapTest is Test, PairHelper {
         assertApproxEqRel(token0.balanceOf(address(engine)), 0, precision);
         assertApproxEqRel(token1.balanceOf(address(engine)), 1e18, precision);
 
-        (uint128[5] memory compositions, int24 tickCurrent, int8 maxOffset,) =
+        (uint128[5] memory compositions, int24 tickCurrent, int8 offset,) =
             engine.getPair(address(token0), address(token1));
 
         assertApproxEqRel(compositions[0], type(uint128).max, 1e9);
         assertEq(tickCurrent, 0);
-        assertEq(maxOffset, 0);
+        assertEq(offset, 0);
     }
 
     function testSwapToken0ExactInBasic() external {
@@ -278,7 +505,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: -1,
                 liquidity: 1e18,
                 data: bytes("")
@@ -306,12 +533,12 @@ contract SwapTest is Test, PairHelper {
         assertApproxEqAbs(token0.balanceOf(address(engine)), amountIn, precision);
         assertApproxEqAbs(token1.balanceOf(address(engine)), 0, precision);
 
-        (uint128[5] memory compositions, int24 tickCurrent, int8 maxOffset,) =
+        (uint128[5] memory compositions, int24 tickCurrent, int8 offset,) =
             engine.getPair(address(token0), address(token1));
 
         assertApproxEqRel(compositions[0], 0, 1e9);
         assertEq(tickCurrent, -1);
-        assertEq(maxOffset, 1);
+        assertEq(offset, 1);
     }
 
     function testSwapToken1ExactOutBasic() external {
@@ -320,7 +547,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: -1,
                 liquidity: 1e18,
                 data: bytes("")
@@ -350,12 +577,12 @@ contract SwapTest is Test, PairHelper {
         assertApproxEqAbs(token0.balanceOf(address(engine)), amountIn, precision, "balance0 pair");
         assertApproxEqAbs(token1.balanceOf(address(engine)), 0, precision, "balance1 pair");
 
-        (uint128[5] memory compositions, int24 tickCurrent, int8 maxOffset,) =
+        (uint128[5] memory compositions, int24 tickCurrent, int8 offset,) =
             engine.getPair(address(token0), address(token1));
 
         assertApproxEqRel(compositions[0], 0, 1e9);
         assertEq(tickCurrent, -1);
-        assertEq(maxOffset, 1);
+        assertEq(offset, 1);
     }
 
     function testSwapPartial0To1() external {
@@ -456,7 +683,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: 0,
                 liquidity: 1e18,
                 data: bytes("")
@@ -467,7 +694,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: 1,
                 liquidity: 1e18,
                 data: bytes("")
@@ -487,13 +714,14 @@ contract SwapTest is Test, PairHelper {
         );
     }
 
-    function testMultiTierDown() external {
+    function testSwapGasFarTicks() external {
+        vm.pauseGasMetering();
         engine.addLiquidity(
             Engine.AddLiquidityParams({
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: 0,
                 liquidity: 1e18,
                 data: bytes("")
@@ -504,7 +732,43 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 1,
+                tier: 0,
+                tick: 10,
+                liquidity: 1e18,
+                data: bytes("")
+            })
+        );
+        vm.resumeGasMetering();
+        engine.swap(
+            Engine.SwapParams({
+                token0: address(token0),
+                token1: address(token1),
+                to: address(this),
+                isToken0: false,
+                amountDesired: 1.5e18,
+                data: bytes("")
+            })
+        );
+    }
+
+    function testMultiTierDown() external {
+        engine.addLiquidity(
+            Engine.AddLiquidityParams({
+                token0: address(token0),
+                token1: address(token1),
+                to: address(this),
+                tier: 0,
+                tick: 0,
+                liquidity: 1e18,
+                data: bytes("")
+            })
+        );
+        engine.addLiquidity(
+            Engine.AddLiquidityParams({
+                token0: address(token0),
+                token1: address(token1),
+                to: address(this),
+                tier: 1,
                 tick: 0,
                 liquidity: 1e18,
                 data: bytes("")
@@ -521,13 +785,13 @@ contract SwapTest is Test, PairHelper {
             })
         );
 
-        (uint128[5] memory compositions, int24 tickCurrent, int8 maxOffset,) =
+        (uint128[5] memory compositions, int24 tickCurrent, int8 offset,) =
             engine.getPair(address(token0), address(token1));
 
         assertApproxEqRel(compositions[0], type(uint128).max / 2, 1e14, "composition 0");
         assertApproxEqRel(compositions[1], type(uint128).max / 2, 1e14, "composition 1");
         assertEq(tickCurrent, 1);
-        assertEq(maxOffset, -1);
+        assertEq(offset, -1);
     }
 
     function testMultiTierUp() external {
@@ -536,7 +800,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: -1,
                 liquidity: 1e18,
                 data: bytes("")
@@ -547,7 +811,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 1,
+                tier: 1,
                 tick: -1,
                 liquidity: 1e18,
                 data: bytes("")
@@ -564,13 +828,13 @@ contract SwapTest is Test, PairHelper {
             })
         );
 
-        (uint128[5] memory compositions, int24 tickCurrent, int8 maxOffset,) =
+        (uint128[5] memory compositions, int24 tickCurrent, int8 offset,) =
             engine.getPair(address(token0), address(token1));
 
         assertApproxEqRel(compositions[0], type(uint128).max / 2, 1e15, "composition 0");
         assertApproxEqRel(compositions[1], type(uint128).max / 2, 1e15, "composition 1");
         assertEq(tickCurrent, -2);
-        assertEq(maxOffset, 2);
+        assertEq(offset, 2);
     }
 
     function testInitialLiquidity() external {
@@ -579,7 +843,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: 0,
                 liquidity: 1e18,
                 data: bytes("")
@@ -590,7 +854,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: 1,
                 liquidity: 1e18,
                 data: bytes("")
@@ -602,7 +866,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 1,
+                tier: 1,
                 tick: 0,
                 liquidity: 1e18,
                 data: bytes("")
@@ -630,13 +894,13 @@ contract SwapTest is Test, PairHelper {
             })
         );
 
-        (uint128[5] memory compositions, int24 tickCurrent, int8 maxOffset,) =
+        (uint128[5] memory compositions, int24 tickCurrent, int8 offset,) =
             engine.getPair(address(token0), address(token1));
 
         assertApproxEqRel(compositions[0], (uint256(type(uint128).max) * 45) / 100, 1e15, "composition 0");
         assertApproxEqRel(compositions[1], (uint256(type(uint128).max) * 45) / 100, 1e15, "composition 1");
         assertEq(tickCurrent, 1);
-        assertEq(maxOffset, -1);
+        assertEq(offset, -1);
     }
 
     function testTierComposition() external {
@@ -645,7 +909,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: -1,
                 liquidity: 1e18,
                 data: bytes("")
@@ -656,7 +920,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: -2,
                 liquidity: 1e18,
                 data: bytes("")
@@ -668,7 +932,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 1,
+                tier: 1,
                 tick: 0,
                 liquidity: 1e18,
                 data: bytes("")
@@ -686,12 +950,12 @@ contract SwapTest is Test, PairHelper {
             })
         );
 
-        (uint128[5] memory compositions, int24 tickCurrent, int8 maxOffset,) =
+        (uint128[5] memory compositions, int24 tickCurrent, int8 offset,) =
             engine.getPair(address(token0), address(token1));
 
         assertApproxEqRel(compositions[0], type(uint128).max / 2, 1e15, "composition 0");
         assertApproxEqRel(compositions[1], type(uint128).max / 2, 1e15, "composition 1");
         assertEq(tickCurrent, -2);
-        assertEq(maxOffset, 2);
+        assertEq(offset, 2);
     }
 }

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
-import {Pairs} from "./Pairs.sol";
-import {Tick} from "./Tick.sol";
-import {Position} from "./Position.sol";
+import {Pairs, MAX_TIERS} from "./Pairs.sol";
+import {Ticks} from "./Ticks.sol";
+import {Positions} from "./Positions.sol";
 
 import {BalanceLib} from "src/libraries/BalanceLib.sol";
 import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
@@ -13,9 +13,9 @@ import {ISwapCallback} from "./interfaces/ISwapCallback.sol";
 
 /// @author Robert Leifke and Kyle Scott
 contract Engine {
-    using Tick for Tick.Info;
-    using Position for Position.Info;
+    using Ticks for Ticks.Tick;
     using Pairs for Pairs.Pair;
+    using Positions for Positions.Position;
     using Pairs for mapping(bytes32 => Pairs.Pair);
 
     event PairCreated(address indexed token0, address indexed token1, int24 tickInitial);
@@ -41,7 +41,7 @@ contract Engine {
         address token0;
         address token1;
         address to;
-        uint8 tierID;
+        uint8 tier;
         int24 tick;
         uint256 liquidity;
         bytes data;
@@ -49,7 +49,7 @@ contract Engine {
 
     function addLiquidity(AddLiquidityParams calldata params) external returns (uint256 amount0, uint256 amount1) {
         Pairs.Pair storage pair = pairs.getPair(params.token0, params.token1);
-        (amount0, amount1) = pair.updateLiquidity(params.to, params.tierID, params.tick, int256(params.liquidity));
+        (amount0, amount1) = pair.updateLiquidity(params.to, params.tier, params.tick, int256(params.liquidity));
 
         uint256 balance0 = BalanceLib.getBalance(params.token0);
         uint256 balance1 = BalanceLib.getBalance(params.token1);
@@ -64,7 +64,7 @@ contract Engine {
         address token0;
         address token1;
         address to;
-        uint8 tierID;
+        uint8 tier;
         int24 tick;
         uint256 liquidity;
     }
@@ -74,7 +74,7 @@ contract Engine {
         returns (uint256 amount0, uint256 amount1)
     {
         Pairs.Pair storage pair = pairs.getPair(params.token0, params.token1);
-        (amount0, amount1) = pair.updateLiquidity(params.to, params.tierID, params.tick, -int256(params.liquidity));
+        (amount0, amount1) = pair.updateLiquidity(params.to, params.tier, params.tick, -int256(params.liquidity));
 
         SafeTransferLib.safeTransfer(params.token0, params.to, amount0);
         SafeTransferLib.safeTransfer(params.token1, params.to, amount1);
@@ -116,36 +116,27 @@ contract Engine {
     )
         external
         view
-        returns (uint128[5] memory compositions, int24 tickCurrent, int8 maxOffset, uint8 lock)
+        returns (uint128[MAX_TIERS] memory compositions, int24 tickCurrent, int8 offset, uint8 lock)
     {
         Pairs.Pair storage pair = pairs.getPair(token0, token1);
-        (compositions, tickCurrent, maxOffset, lock) = (pair.compositions, pair.tickCurrent, pair.maxOffset, pair.lock);
+        (compositions, tickCurrent, offset, lock) = (pair.compositions, pair.tickCurrent, pair.offset, pair.lock);
     }
 
-    function getTick(
-        address token0,
-        address token1,
-        uint8 tierID,
-        int24 tick
-    )
-        external
-        view
-        returns (Tick.Info memory)
-    {
-        return Tick.get(pairs.getPair(token0, token1).ticks, tierID, tick);
+    function getTick(address token0, address token1, int24 tick) external view returns (Ticks.Tick memory) {
+        return pairs.getPair(token0, token1).ticks[tick];
     }
 
     function getPosition(
         address token0,
         address token1,
         address owner,
-        uint8 tierID,
+        uint8 tier,
         int24 tick
     )
         external
         view
-        returns (Position.Info memory)
+        returns (Positions.Position memory)
     {
-        return Position.get(pairs.getPair(token0, token1).positions, owner, tierID, tick);
+        return Positions.get(pairs.getPair(token0, token1).positions, owner, tier, tick);
     }
 }
