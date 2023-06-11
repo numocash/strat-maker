@@ -225,7 +225,7 @@ library Pairs {
     function updateLiquidity(
         Pair storage pair,
         address to,
-        uint8 tierID,
+        uint8 tier,
         int24 tick,
         int256 liquidity
     )
@@ -233,22 +233,19 @@ library Pairs {
         returns (uint256 amount0, uint256 amount1)
     {
         _checkTick(tick);
-        _checkTier(tierID);
+        _checkTier(tier);
 
         // update ticks
-        _updateTick(pair, tierID, tick, liquidity);
+        _updateTick(pair, tier, tick, liquidity);
 
         // update position
-        _updatePosition(pair, to, tierID, tick, liquidity);
+        _updatePosition(pair, to, tier, tick, liquidity);
 
         // determine amounts
-        int24 tickCurrentForTier = getCurrentTickForTierFromOffset(pair.tickCurrent, pair.offset, tierID);
+        int24 tickCurrentForTier = getCurrentTickForTierFromOffset(pair.tickCurrent, pair.offset, tier);
 
         (amount0, amount1) = calcAmountsForLiquidity(
-            tickCurrentForTier,
-            pair.compositions[tierID],
-            tick,
-            liquidity > 0 ? uint256(liquidity) : uint256(-liquidity)
+            tickCurrentForTier, pair.compositions[tier], tick, liquidity > 0 ? uint256(liquidity) : uint256(-liquidity)
         );
     }
 
@@ -334,8 +331,8 @@ library Pairs {
 
     /// @notice Update a position
     /// @param liquidity The amount of liquidity being added or removed
-    function _updatePosition(Pair storage pair, address to, uint8 tierID, int24 tick, int256 liquidity) internal {
-        Positions.Position storage positionInfo = Positions.get(pair.positions, to, tierID, tick);
+    function _updatePosition(Pair storage pair, address to, uint8 tier, int24 tick, int256 liquidity) internal {
+        Positions.Position storage positionInfo = Positions.get(pair.positions, to, tier, tick);
 
         positionInfo.liquidity = addDelta(positionInfo.liquidity, liquidity);
     }

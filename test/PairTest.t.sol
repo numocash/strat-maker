@@ -113,7 +113,7 @@ contract AddLiquidityTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 1,
+                tier: 1,
                 tick: 0,
                 liquidity: 1e18,
                 data: bytes("")
@@ -136,7 +136,7 @@ contract AddLiquidityTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 1,
+                tier: 1,
                 tick: 0,
                 liquidity: 1e18,
                 data: bytes("")
@@ -151,7 +151,7 @@ contract AddLiquidityTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 1,
+                tier: 1,
                 tick: 0,
                 liquidity: 1e18,
                 data: bytes("")
@@ -164,7 +164,7 @@ contract AddLiquidityTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 1,
+                tier: 1,
                 tick: 0,
                 liquidity: 1e18,
                 data: bytes("")
@@ -179,7 +179,7 @@ contract AddLiquidityTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: type(int24).min,
                 liquidity: 1e18,
                 data: bytes("")
@@ -192,7 +192,7 @@ contract AddLiquidityTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: type(int24).max,
                 liquidity: 1e18,
                 data: bytes("")
@@ -207,7 +207,7 @@ contract AddLiquidityTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 10,
+                tier: 10,
                 tick: 0,
                 liquidity: 1e18,
                 data: bytes("")
@@ -264,7 +264,7 @@ contract RemoveLiquidityTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 1,
+                tier: 1,
                 tick: 0,
                 liquidity: 1e18,
                 data: bytes("")
@@ -277,7 +277,7 @@ contract RemoveLiquidityTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 1,
+                tier: 1,
                 tick: 0,
                 liquidity: 1e18
             })
@@ -291,7 +291,7 @@ contract RemoveLiquidityTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 1,
+                tier: 1,
                 tick: 0,
                 liquidity: 2e18,
                 data: bytes("")
@@ -304,7 +304,7 @@ contract RemoveLiquidityTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 1,
+                tier: 1,
                 tick: 0,
                 liquidity: 1e18
             })
@@ -317,7 +317,7 @@ contract RemoveLiquidityTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: 0,
                 liquidity: 1e18,
                 data: bytes("")
@@ -328,7 +328,7 @@ contract RemoveLiquidityTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: 0,
                 liquidity: 1e18
             })
@@ -350,7 +350,7 @@ contract RemoveLiquidityTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 1,
+                tier: 1,
                 tick: 0,
                 liquidity: 1e18,
                 data: bytes("")
@@ -372,7 +372,7 @@ contract RemoveLiquidityTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 1,
+                tier: 1,
                 tick: 0,
                 liquidity: 1e18
             })
@@ -396,7 +396,7 @@ contract RemoveLiquidityTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: type(int24).min,
                 liquidity: 1e18
             })
@@ -408,7 +408,7 @@ contract RemoveLiquidityTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: type(int24).max,
                 liquidity: 1e18
             })
@@ -422,7 +422,7 @@ contract RemoveLiquidityTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 10,
+                tier: 10,
                 tick: 0,
                 liquidity: 1e18
             })
@@ -505,7 +505,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: -1,
                 liquidity: 1e18,
                 data: bytes("")
@@ -547,7 +547,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: -1,
                 liquidity: 1e18,
                 data: bytes("")
@@ -683,7 +683,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: 0,
                 liquidity: 1e18,
                 data: bytes("")
@@ -694,7 +694,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: 1,
                 liquidity: 1e18,
                 data: bytes("")
@@ -721,7 +721,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: 0,
                 liquidity: 1e18,
                 data: bytes("")
@@ -732,7 +732,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: 10,
                 liquidity: 1e18,
                 data: bytes("")
@@ -757,7 +757,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: 0,
                 liquidity: 1e18,
                 data: bytes("")
@@ -768,7 +768,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 1,
+                tier: 1,
                 tick: 0,
                 liquidity: 1e18,
                 data: bytes("")
@@ -800,7 +800,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: -1,
                 liquidity: 1e18,
                 data: bytes("")
@@ -811,7 +811,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 1,
+                tier: 1,
                 tick: -1,
                 liquidity: 1e18,
                 data: bytes("")
@@ -843,7 +843,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: 0,
                 liquidity: 1e18,
                 data: bytes("")
@@ -854,7 +854,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: 1,
                 liquidity: 1e18,
                 data: bytes("")
@@ -866,7 +866,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 1,
+                tier: 1,
                 tick: 0,
                 liquidity: 1e18,
                 data: bytes("")
@@ -909,7 +909,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: -1,
                 liquidity: 1e18,
                 data: bytes("")
@@ -920,7 +920,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: -2,
                 liquidity: 1e18,
                 data: bytes("")
@@ -932,7 +932,7 @@ contract SwapTest is Test, PairHelper {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 1,
+                tier: 1,
                 tick: 0,
                 liquidity: 1e18,
                 data: bytes("")

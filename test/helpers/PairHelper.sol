@@ -35,7 +35,7 @@ contract PairHelper is IAddLiquidityCallback, ISwapCallback {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: 0,
                 liquidity: 1e18,
                 data: bytes("")
@@ -49,7 +49,7 @@ contract PairHelper is IAddLiquidityCallback, ISwapCallback {
                 token0: address(token0),
                 token1: address(token1),
                 to: address(this),
-                tierID: 0,
+                tier: 0,
                 tick: 0,
                 liquidity: 1e18
             })

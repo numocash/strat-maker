@@ -9,13 +9,13 @@ library Positions {
     function get(
         mapping(bytes32 => Position) storage positions,
         address owner,
-        uint8 tierID,
+        uint8 tier,
         int24 tick
     )
         internal
         view
         returns (Position storage positionInfo)
     {
-        positionInfo = positions[keccak256(abi.encodePacked(owner, tierID, tick))];
+        positionInfo = positions[keccak256(abi.encodePacked(owner, tier, tick))];
     }
 }
