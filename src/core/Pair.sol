@@ -66,11 +66,6 @@ contract Pair {
     constructor() {
         factory = msg.sender;
         (token0, token1) = Factory(msg.sender).parameters();
-
-        tickMap0To1.set(MIN_TICK);
-        tickMap1To0.set(MIN_TICK);
-        ticks[MIN_TICK].next1To0 = MAX_TICK;
-        ticks[MIN_TICK].next1To0 = MAX_TICK;
     }
 
     modifier onlyUninitialized() {
@@ -87,6 +82,15 @@ contract Pair {
     function initialize(int24 initialTick) external onlyUninitialized {
         tickCurrent = initialTick;
         initialized = true;
+
+        tickMap0To1.set(MIN_TICK);
+        tickMap1To0.set(MIN_TICK);
+        tickMap0To1.set(-initialTick);
+        tickMap1To0.set(initialTick);
+        ticks[MAX_TICK].next0To1 = initialTick;
+        ticks[MIN_TICK].next1To0 = initialTick;
+        ticks[initialTick].next0To1 = MIN_TICK;
+        ticks[initialTick].next1To0 = MAX_TICK;
     }
 
     function addLiquidity(

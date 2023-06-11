@@ -18,6 +18,7 @@ contract PairHelper is IAddLiquidityCallback {
         MockERC20 tokenA = new MockERC20();
         MockERC20 tokenB = new MockERC20();
         pair = Pair(factory.createPair(address(tokenA), address(tokenB)));
+        pair.initialize(0);
 
         (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
     }

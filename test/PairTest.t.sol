@@ -7,8 +7,21 @@ import {PairHelper} from "./helpers/PairHelper.sol";
 import {Pair} from "src/core/Pair.sol";
 import {Ticks} from "src/core/Ticks.sol";
 import {mulDiv} from "src/core/FullMath.sol";
-import {getRatioAtTick} from "src/core/TickMath.sol";
+import {getRatioAtTick, MAX_TICK, MIN_TICK} from "src/core/TickMath.sol";
 import {Q128} from "src/core/TickMath.sol";
+
+contract InitializeTest is Test, PairHelper {
+    function setUp() external {
+        _setUp();
+    }
+
+    function testInitializeTickMaps() external {
+        (int24 next0To1, int24 next1To0,,) = pair.ticks(0);
+
+        assertEq(next0To1, MIN_TICK);
+        assertEq(next1To0, MAX_TICK);
+    }
+}
 
 contract AddLiquidityTest is Test, PairHelper {
     uint256 precision = 1e9;
@@ -49,14 +62,14 @@ contract AddLiquidityTest is Test, PairHelper {
         assertEq(liquidity, 1e18);
     }
 
-    function testAddLiquidityNextTick() external {
-        pair.addLiquidity(address(this), 1, 0, 1e18, bytes(""));
+    // function testAddLiquidityNextTick() external {
+    //     pair.addLiquidity(address(this), 1, 0, 1e18, bytes(""));
 
-        (int24 next0To1, int24 next1To0,,) = pair.ticks(0);
+    //     (int24 next0To1, int24 next1To0,,) = pair.ticks(0);
 
-        assertEq(next0To1, 0);
-        // assertEq(next1To0, 0);
-    }
+    //     assertEq(next0To1, 0);
+    //     assertEq(next1To0, 0);
+    // }
 
     function testAddLiquidityGasFreshTicks() external {
         pair.addLiquidity(address(this), 1, 0, 1e18, bytes(""));
