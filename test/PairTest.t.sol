@@ -178,6 +178,38 @@ contract RemoveLiquidityTest is Test, PairHelper {
         pair.removeLiquidity(address(this), 1, 0, 1e18);
     }
 
+    function testRemoveLiquidityTickMapBasic() external {
+        pair.addLiquidity(address(this), 0, 0, 1e18, bytes(""));
+        pair.removeLiquidity(address(this), 0, 0, 1e18);
+
+        (int24 next0To1, int24 next1To0,,) = pair.ticks(0);
+        assertEq(next0To1, MIN_TICK);
+        assertEq(next1To0, MAX_TICK);
+
+        (next0To1,,,) = pair.ticks(MAX_TICK);
+        assertEq(next0To1, 0);
+
+        (, next1To0,,) = pair.ticks(MIN_TICK);
+        assertEq(next1To0, 0);
+    }
+
+    function testRemoveLiquidityTickMapCurrentTick() external {
+        pair.addLiquidity(address(this), 1, 0, 1e18, bytes(""));
+        pair.swap(address(this), false, 1e18 - 1, bytes(""));
+
+        pair.removeLiquidity(address(this), 1, 0, 1e18);
+
+        (int24 next0To1, int24 next1To0,,) = pair.ticks(0);
+        assertEq(next0To1, MIN_TICK);
+        assertEq(next1To0, MAX_TICK);
+
+        (next0To1,,,) = pair.ticks(MAX_TICK);
+        assertEq(next0To1, 0);
+
+        (, next1To0,,) = pair.ticks(MIN_TICK);
+        assertEq(next1To0, 0);
+    }
+
     function testRemoveLiquidityBadTicks() external {
         vm.expectRevert(Pair.InvalidTick.selector);
         pair.removeLiquidity(address(this), 0, type(int24).min, 1e18);

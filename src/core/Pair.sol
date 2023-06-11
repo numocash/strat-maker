@@ -341,7 +341,7 @@ contract Pair {
 
     /// @notice Update a tick
     /// @param liquidity The amount of liquidity being added or removed
-    /// @custom:team make sure entirely removing the liquidity of the current tick doesn't break things
+    /// @custom:team Entirely removing the current tick is an edge case
     function updateTick(uint8 tier, int24 tick, int256 liquidity) internal {
         uint256 existingLiquidity = ticks[tick].tierLiquidity[tier];
         ticks[tick].tierLiquidity[tier] = addDelta(existingLiquidity, liquidity);
