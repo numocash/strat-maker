@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
-import {mulDiv, mulDivRoundingUp} from "./math/FullMath.sol";
+import {mulDiv} from "./math/FullMath.sol";
 import {addDelta, calcAmountsForLiquidity} from "./math/LiquidityMath.sol";
 import {computeSwapStep} from "./math/SwapMath.sol";
 import {getCurrentTickForTierFromOffset, getRatioAtTick, MAX_TICK, MIN_TICK, Q128} from "./math/TickMath.sol";
@@ -283,6 +283,7 @@ library Pairs {
             pair.ticks[tick1To0].reference1To0 = reference1To0 + 1;
 
             if (add0To1) {
+                // tick0To1s are in decreasing order, double negate to reuse nextBelow function
                 int24 below = -pair.tickMap0To1.nextBelow(-tick0To1);
                 int24 above = pair.ticks[below].next0To1;
 
