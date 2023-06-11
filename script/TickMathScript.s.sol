@@ -5,8 +5,8 @@ import {Script} from "forge-std/Script.sol";
 /* solhint-disable-next-line no-console */
 import {console2} from "forge-std/console2.sol";
 
-import {mulDiv} from "src/core/FullMath.sol";
-import {MAX_TICK, Q128} from "src/core/TickMath.sol";
+import {mulDiv} from "src/core/math/FullMath.sol";
+import {MAX_TICK, Q128} from "src/core/math/TickMath.sol";
 
 contract TickMathScript is Script {
     uint256 constant u = 0x100068DB8BAC710CB295F000000000000; // 1.0001 as a Q128.128
