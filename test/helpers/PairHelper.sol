@@ -1,26 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
-import {Factory} from "src/core/Factory.sol";
-import {Pair} from "src/periphery/PairAddress.sol";
+import {Engine} from "src/core/Engine.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
 import {IAddLiquidityCallback} from "src/core/interfaces/IAddLiquidityCallback.sol";
 import {ISwapCallback} from "src/core/interfaces/ISwapCallback.sol";
 
-contract PairHelper is IAddLiquidityCallback {
-    Factory internal factory;
+contract PairHelper is IAddLiquidityCallback, ISwapCallback {
+    Engine internal engine;
     MockERC20 internal token0;
     MockERC20 internal token1;
-    Pair internal pair;
 
     function _setUp() internal {
-        factory = new Factory();
+        engine = new Engine();
         MockERC20 tokenA = new MockERC20();
         MockERC20 tokenB = new MockERC20();
-        pair = Pair(factory.createPair(address(tokenA), address(tokenB)));
-        pair.initialize(0);
-
         (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
+        engine.createPair(address(token0), address(token1), 0);
     }
 
     function addLiquidityCallback(uint256 amount0, uint256 amount1, bytes calldata) external {
@@ -34,10 +30,29 @@ contract PairHelper is IAddLiquidityCallback {
     }
 
     function basicAddLiquidity() internal returns (uint256 amount0, uint256 amount1) {
-        (amount0, amount1) = pair.addLiquidity(address(this), 0, 0, 1e18, bytes(""));
+        (amount0, amount1) = engine.addLiquidity(
+            Engine.AddLiquidityParams({
+                token0: address(token0),
+                token1: address(token1),
+                to: address(this),
+                tierID: 0,
+                tick: 0,
+                liquidity: 1e18,
+                data: bytes("")
+            })
+        );
     }
 
     function basicRemoveLiquidity() internal returns (uint256 amount0, uint256 amount1) {
-        (amount0, amount1) = pair.removeLiquidity(address(this), 0, 0, 1e18);
+        (amount0, amount1) = engine.removeLiquidity(
+            Engine.RemoveLiquidityParams({
+                token0: address(token0),
+                token1: address(token1),
+                to: address(this),
+                tierID: 0,
+                tick: 0,
+                liquidity: 1e18
+            })
+        );
     }
 }
