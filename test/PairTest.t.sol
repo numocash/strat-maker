@@ -31,15 +31,15 @@ contract InitializationTest is Test {
     function testInitializeTickMaps() external {
         engine.createPair(address(1), address(2), 0);
 
-        (, int24 next0To1, int24 next1To0,,) = engine.getTick(address(1), address(2), 0);
-        assertEq(next0To1, MIN_TICK);
-        assertEq(next1To0, MAX_TICK);
+        Ticks.Tick memory tick = engine.getTick(address(1), address(2), 0);
+        assertEq(tick.next0To1, MIN_TICK);
+        assertEq(tick.next1To0, MAX_TICK);
 
-        (, next0To1,,,) = engine.getTick(address(1), address(2), MAX_TICK);
-        assertEq(next0To1, 0);
+        tick = engine.getTick(address(1), address(2), MAX_TICK);
+        assertEq(tick.next0To1, 0);
 
-        (,, next1To0,,) = engine.getTick(address(1), address(2), MIN_TICK);
-        assertEq(next1To0, 0);
+        tick = engine.getTick(address(1), address(2), MIN_TICK);
+        assertEq(tick.next1To0, 0);
     }
 
     function testInitializeDouble() external {
@@ -81,8 +81,8 @@ contract AddLiquidityTest is Test, PairHelper {
     function testLiquidityTicks() external {
         basicAddLiquidity();
 
-        (uint256[MAX_TIERS] memory liquidity,,,,) = engine.getTick(address(token0), address(token1), 0);
-        assertEq(liquidity[0], 1e18);
+        Ticks.Tick memory tick = engine.getTick(address(token0), address(token1), 0);
+        assertEq(tick.liquidity[0], 1e18);
     }
 
     function testLiquidityPosition() external {
@@ -96,15 +96,15 @@ contract AddLiquidityTest is Test, PairHelper {
     function testAddLiquidityTickMapBasic() external {
         basicAddLiquidity();
 
-        (, int24 next0To1, int24 next1To0,,) = engine.getTick(address(token0), address(token1), 0);
-        assertEq(next0To1, MIN_TICK);
-        assertEq(next1To0, MAX_TICK);
+        Ticks.Tick memory tick = engine.getTick(address(token0), address(token1), 0);
+        assertEq(tick.next0To1, MIN_TICK);
+        assertEq(tick.next1To0, MAX_TICK);
 
-        (, next0To1,,,) = engine.getTick(address(token0), address(token1), MAX_TICK);
-        assertEq(next0To1, 0);
+        tick = engine.getTick(address(token0), address(token1), MAX_TICK);
+        assertEq(tick.next0To1, 0);
 
-        (,, next1To0,,) = engine.getTick(address(token0), address(token1), MIN_TICK);
-        assertEq(next1To0, 0);
+        tick = engine.getTick(address(token0), address(token1), MIN_TICK);
+        assertEq(tick.next1To0, 0);
     }
 
     function testAddLiquidityTickMapWithTier() external {
@@ -119,15 +119,15 @@ contract AddLiquidityTest is Test, PairHelper {
                 data: bytes("")
             })
         );
-        (, int24 next0To1, int24 next1To0,,) = engine.getTick(address(token0), address(token1), 0);
-        assertEq(next0To1, -1, "initial tick 0 to 1");
-        assertEq(next1To0, 1, "initial tick 1 to 0");
+        Ticks.Tick memory tick = engine.getTick(address(token0), address(token1), 0);
+        assertEq(tick.next0To1, -1, "initial tick 0 to 1");
+        assertEq(tick.next1To0, 1, "initial tick 1 to 0");
 
-        (, next0To1,,,) = engine.getTick(address(token0), address(token1), -1);
-        assertEq(next0To1, MIN_TICK, "0 to 1");
+        tick = engine.getTick(address(token0), address(token1), -1);
+        assertEq(tick.next0To1, MIN_TICK, "0 to 1");
 
-        (,, next1To0,,) = engine.getTick(address(token0), address(token1), 1);
-        assertEq(next1To0, MAX_TICK, "1 to 0");
+        tick = engine.getTick(address(token0), address(token1), 1);
+        assertEq(tick.next1To0, MAX_TICK, "1 to 0");
     }
 
     function testAddLiquidityGasFreshTicks() external {
@@ -244,8 +244,8 @@ contract RemoveLiquidityTest is Test, PairHelper {
     function testRemoveLiquidityTicks() external {
         basicAddLiquidity();
         basicRemoveLiquidity();
-        (uint256[MAX_TIERS] memory liquidity,,,,) = engine.getTick(address(token0), address(token1), 0);
-        assertEq(liquidity[0], 0);
+        Ticks.Tick memory tick = engine.getTick(address(token0), address(token1), 0);
+        assertEq(tick.liquidity[0], 0);
     }
 
     function testRemoveLiquidityPosition() external {
@@ -333,15 +333,15 @@ contract RemoveLiquidityTest is Test, PairHelper {
                 liquidity: 1e18
             })
         );
-        (, int24 next0To1, int24 next1To0,,) = engine.getTick(address(token0), address(token1), 0);
-        assertEq(next0To1, MIN_TICK);
-        assertEq(next1To0, MAX_TICK);
+        Ticks.Tick memory tick = engine.getTick(address(token0), address(token1), 0);
+        assertEq(tick.next0To1, MIN_TICK);
+        assertEq(tick.next1To0, MAX_TICK);
 
-        (, next0To1,,,) = engine.getTick(address(token0), address(token1), MAX_TICK);
-        assertEq(next0To1, 0);
+        tick = engine.getTick(address(token0), address(token1), MAX_TICK);
+        assertEq(tick.next0To1, 0);
 
-        (,, next1To0,,) = engine.getTick(address(token0), address(token1), MIN_TICK);
-        assertEq(next1To0, 0);
+        tick = engine.getTick(address(token0), address(token1), MIN_TICK);
+        assertEq(tick.next1To0, 0);
     }
 
     function testRemoveLiquidityTickMapCurrentTick() external {
@@ -378,15 +378,15 @@ contract RemoveLiquidityTest is Test, PairHelper {
             })
         );
 
-        (, int24 next0To1, int24 next1To0,,) = engine.getTick(address(token0), address(token1), 0);
-        assertEq(next0To1, MIN_TICK);
-        assertEq(next1To0, MAX_TICK);
+        Ticks.Tick memory tick = engine.getTick(address(token0), address(token1), 0);
+        assertEq(tick.next0To1, MIN_TICK);
+        assertEq(tick.next1To0, MAX_TICK);
 
-        (, next0To1,,,) = engine.getTick(address(token0), address(token1), MAX_TICK);
-        assertEq(next0To1, 0);
+        tick = engine.getTick(address(token0), address(token1), MAX_TICK);
+        assertEq(tick.next0To1, 0);
 
-        (,, next1To0,,) = engine.getTick(address(token0), address(token1), MIN_TICK);
-        assertEq(next1To0, 0);
+        tick = engine.getTick(address(token0), address(token1), MIN_TICK);
+        assertEq(tick.next1To0, 0);
     }
 
     function testRemoveLiquidityBadTicks() external {

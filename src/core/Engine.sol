@@ -122,24 +122,8 @@ contract Engine {
         (compositions, tickCurrent, offset, lock) = (pair.compositions, pair.tickCurrent, pair.offset, pair.lock);
     }
 
-    function getTick(
-        address token0,
-        address token1,
-        int24 tick
-    )
-        external
-        view
-        returns (
-            uint256[MAX_TIERS] memory liquidity,
-            int24 next0To1,
-            int24 next1To0,
-            uint8 reference0To1,
-            uint8 reference1To0
-        )
-    {
-        Ticks.Tick storage tickObj = pairs.getPair(token0, token1).ticks[tick];
-        (liquidity, next0To1, next1To0, reference0To1, reference1To0) =
-            (tickObj.liquidity, tickObj.next0To1, tickObj.next1To0, tickObj.reference0To1, tickObj.reference1To0);
+    function getTick(address token0, address token1, int24 tick) external view returns (Ticks.Tick memory) {
+        return pairs.getPair(token0, token1).ticks[tick];
     }
 
     function getPosition(
