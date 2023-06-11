@@ -3,7 +3,7 @@
 [gha]: https://github.com/kyscott18/ilrta/actions
 [gha-badge]: https://github.com/kyscott18/ilrta/actions/workflows/main.yml/badge.svg
 
-An ethereum erc20 exchange protocol.
+An ERC20 exchange protocol on the Ethereum Virtual Machine.
 
 Features:
 
