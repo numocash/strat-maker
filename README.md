@@ -7,10 +7,19 @@ An ethereum erc20 exchange protocol.
 
 Features:
 
-- Limit orders
-- Custom fee settings within each pair
+- Aggregate of constant-sum liquidity pools with spaced strike prices
+- Custom fee settings within each pair with automatic routing between them
+- Single contract architecture
 
 ## Benchmarking
+
+|                   |Yikes   |Uniswap V3|LiquidityBook|Maverick|
+|-------------------|--------|----------|-------------|--------|
+|Loc                |        |          |             |        |
+|Fresh Add Liquidity|        |          |             |        |
+|Hot Add Liqudity   |        |          |             |        |
+|Large Swap         |        |          |             |        |
+|Small Swap         |        |          |             |        |
 
 ## Concepts and formulas
 
