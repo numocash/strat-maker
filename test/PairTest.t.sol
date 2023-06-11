@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {Test} from "forge-std/Test.sol";
 import {PairHelper} from "./helpers/PairHelper.sol";
 
-import {Pairs} from "src/core/Pairs.sol";
+import {Pairs, MAX_TIERS} from "src/core/Pairs.sol";
 import {Engine} from "src/core/Engine.sol";
 import {Ticks} from "src/core/Ticks.sol";
 import {Positions} from "src/core/Positions.sol";
@@ -31,14 +31,14 @@ contract InitializationTest is Test {
     function testInitializeTickMaps() external {
         engine.createPair(address(1), address(2), 0);
 
-        (int24 next0To1, int24 next1To0,,) = engine.getTick(address(1), address(2), 0);
+        (, int24 next0To1, int24 next1To0,,) = engine.getTick(address(1), address(2), 0);
         assertEq(next0To1, MIN_TICK);
         assertEq(next1To0, MAX_TICK);
 
-        (next0To1,,,) = engine.getTick(address(1), address(2), MAX_TICK);
+        (, next0To1,,,) = engine.getTick(address(1), address(2), MAX_TICK);
         assertEq(next0To1, 0);
 
-        (, next1To0,,) = engine.getTick(address(1), address(2), MIN_TICK);
+        (,, next1To0,,) = engine.getTick(address(1), address(2), MIN_TICK);
         assertEq(next1To0, 0);
     }
 
@@ -81,8 +81,8 @@ contract AddLiquidityTest is Test, PairHelper {
     function testLiquidityTicks() external {
         basicAddLiquidity();
 
-        uint256 liquidity = engine.getTickLiquidity(address(token0), address(token1), 0, 0);
-        assertEq(liquidity, 1e18);
+        (uint256[MAX_TIERS] memory liquidity,,,,) = engine.getTick(address(token0), address(token1), 0);
+        assertEq(liquidity[0], 1e18);
     }
 
     function testLiquidityPosition() external {
@@ -96,14 +96,14 @@ contract AddLiquidityTest is Test, PairHelper {
     function testAddLiquidityTickMapBasic() external {
         basicAddLiquidity();
 
-        (int24 next0To1, int24 next1To0,,) = engine.getTick(address(token0), address(token1), 0);
+        (, int24 next0To1, int24 next1To0,,) = engine.getTick(address(token0), address(token1), 0);
         assertEq(next0To1, MIN_TICK);
         assertEq(next1To0, MAX_TICK);
 
-        (next0To1,,,) = engine.getTick(address(token0), address(token1), MAX_TICK);
+        (, next0To1,,,) = engine.getTick(address(token0), address(token1), MAX_TICK);
         assertEq(next0To1, 0);
 
-        (, next1To0,,) = engine.getTick(address(token0), address(token1), MIN_TICK);
+        (,, next1To0,,) = engine.getTick(address(token0), address(token1), MIN_TICK);
         assertEq(next1To0, 0);
     }
 
@@ -119,14 +119,14 @@ contract AddLiquidityTest is Test, PairHelper {
                 data: bytes("")
             })
         );
-        (int24 next0To1, int24 next1To0,,) = engine.getTick(address(token0), address(token1), 0);
+        (, int24 next0To1, int24 next1To0,,) = engine.getTick(address(token0), address(token1), 0);
         assertEq(next0To1, -1, "initial tick 0 to 1");
         assertEq(next1To0, 1, "initial tick 1 to 0");
 
-        (next0To1,,,) = engine.getTick(address(token0), address(token1), -1);
+        (, next0To1,,,) = engine.getTick(address(token0), address(token1), -1);
         assertEq(next0To1, MIN_TICK, "0 to 1");
 
-        (, next1To0,,) = engine.getTick(address(token0), address(token1), 1);
+        (,, next1To0,,) = engine.getTick(address(token0), address(token1), 1);
         assertEq(next1To0, MAX_TICK, "1 to 0");
     }
 
@@ -244,8 +244,8 @@ contract RemoveLiquidityTest is Test, PairHelper {
     function testRemoveLiquidityTicks() external {
         basicAddLiquidity();
         basicRemoveLiquidity();
-        uint256 liquidity = engine.getTickLiquidity(address(token0), address(token1), 0, 0);
-        assertEq(liquidity, 0);
+        (uint256[MAX_TIERS] memory liquidity,,,,) = engine.getTick(address(token0), address(token1), 0);
+        assertEq(liquidity[0], 0);
     }
 
     function testRemoveLiquidityPosition() external {
@@ -333,14 +333,14 @@ contract RemoveLiquidityTest is Test, PairHelper {
                 liquidity: 1e18
             })
         );
-        (int24 next0To1, int24 next1To0,,) = engine.getTick(address(token0), address(token1), 0);
+        (, int24 next0To1, int24 next1To0,,) = engine.getTick(address(token0), address(token1), 0);
         assertEq(next0To1, MIN_TICK);
         assertEq(next1To0, MAX_TICK);
 
-        (next0To1,,,) = engine.getTick(address(token0), address(token1), MAX_TICK);
+        (, next0To1,,,) = engine.getTick(address(token0), address(token1), MAX_TICK);
         assertEq(next0To1, 0);
 
-        (, next1To0,,) = engine.getTick(address(token0), address(token1), MIN_TICK);
+        (,, next1To0,,) = engine.getTick(address(token0), address(token1), MIN_TICK);
         assertEq(next1To0, 0);
     }
 
@@ -378,14 +378,14 @@ contract RemoveLiquidityTest is Test, PairHelper {
             })
         );
 
-        (int24 next0To1, int24 next1To0,,) = engine.getTick(address(token0), address(token1), 0);
+        (, int24 next0To1, int24 next1To0,,) = engine.getTick(address(token0), address(token1), 0);
         assertEq(next0To1, MIN_TICK);
         assertEq(next1To0, MAX_TICK);
 
-        (next0To1,,,) = engine.getTick(address(token0), address(token1), MAX_TICK);
+        (, next0To1,,,) = engine.getTick(address(token0), address(token1), MAX_TICK);
         assertEq(next0To1, 0);
 
-        (, next1To0,,) = engine.getTick(address(token0), address(token1), MIN_TICK);
+        (,, next1To0,,) = engine.getTick(address(token0), address(token1), MIN_TICK);
         assertEq(next1To0, 0);
     }
 

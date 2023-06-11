@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
+import {Pairs} from "./Pairs.sol";
+
+uint8 constant MAX_TIERS = 5;
+
 library Ticks {
     struct Tick {
-        mapping(uint8 tier => uint256) tierLiquidity;
+        uint256[MAX_TIERS] liquidity;
         int24 next0To1;
         int24 next1To0;
         uint8 reference0To1;
@@ -11,6 +15,6 @@ library Ticks {
     }
 
     function getLiquidity(Tick storage self, uint8 tier) internal view returns (uint256 liquidity) {
-        return self.tierLiquidity[tier];
+        return self.liquidity[tier];
     }
 }

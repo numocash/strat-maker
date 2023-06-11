@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
-import {Pairs} from "./Pairs.sol";
+import {Pairs, MAX_TIERS} from "./Pairs.sol";
 import {Ticks} from "./Ticks.sol";
 import {Positions} from "./Positions.sol";
 
@@ -116,7 +116,7 @@ contract Engine {
     )
         external
         view
-        returns (uint128[5] memory compositions, int24 tickCurrent, int8 offset, uint8 lock)
+        returns (uint128[MAX_TIERS] memory compositions, int24 tickCurrent, int8 offset, uint8 lock)
     {
         Pairs.Pair storage pair = pairs.getPair(token0, token1);
         (compositions, tickCurrent, offset, lock) = (pair.compositions, pair.tickCurrent, pair.offset, pair.lock);
@@ -129,24 +129,17 @@ contract Engine {
     )
         external
         view
-        returns (int24 next0To1, int24 next1To0, uint8 reference0To1, uint8 reference1To0)
+        returns (
+            uint256[MAX_TIERS] memory liquidity,
+            int24 next0To1,
+            int24 next1To0,
+            uint8 reference0To1,
+            uint8 reference1To0
+        )
     {
         Ticks.Tick storage tickObj = pairs.getPair(token0, token1).ticks[tick];
-        (next0To1, next1To0, reference0To1, reference1To0) =
-            (tickObj.next0To1, tickObj.next1To0, tickObj.reference0To1, tickObj.reference1To0);
-    }
-
-    function getTickLiquidity(
-        address token0,
-        address token1,
-        uint8 tierID,
-        int24 tick
-    )
-        external
-        view
-        returns (uint256 liquidity)
-    {
-        return pairs.getPair(token0, token1).ticks[tick].getLiquidity(tierID);
+        (liquidity, next0To1, next1To0, reference0To1, reference1To0) =
+            (tickObj.liquidity, tickObj.next0To1, tickObj.next1To0, tickObj.reference0To1, tickObj.reference1To0);
     }
 
     function getPosition(

@@ -9,6 +9,9 @@ import {Positions} from "./Positions.sol";
 import {Ticks} from "./Ticks.sol";
 import {TickMaps} from "./TickMaps.sol";
 
+uint8 constant MAX_TIERS = 5;
+int8 constant MAX_OFFSET = int8(MAX_TIERS) - 1;
+
 /// @author Robert Leifke and Kyle Scott
 library Pairs {
     using Ticks for Ticks.Tick;
@@ -19,9 +22,6 @@ library Pairs {
     error InvalidTick();
     error InvalidTier();
     error OutOfBounds();
-
-    uint8 private constant MAX_TIERS = 5;
-    int8 private constant MAX_OFFSET = int8(MAX_TIERS) - 1;
 
     struct Pair {
         uint128[MAX_TIERS] compositions;
@@ -271,8 +271,8 @@ library Pairs {
     /// @notice Update a tick
     /// @param liquidity The amount of liquidity being added or removed
     function _updateTick(Pair storage pair, uint8 tier, int24 tick, int256 liquidity) internal {
-        uint256 existingLiquidity = pair.ticks[tick].tierLiquidity[tier];
-        pair.ticks[tick].tierLiquidity[tier] = addDelta(existingLiquidity, liquidity);
+        uint256 existingLiquidity = pair.ticks[tick].getLiquidity(tier);
+        pair.ticks[tick].liquidity[tier] = addDelta(existingLiquidity, liquidity);
 
         if (existingLiquidity == 0 && liquidity > 0) {
             int24 tick0To1 = tick - int8(tier);
