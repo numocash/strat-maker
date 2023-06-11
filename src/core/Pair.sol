@@ -334,11 +334,8 @@ contract Pair {
     /// @notice Update a tick
     /// @param liquidity The amount of liquidity being added or removed
     function updateTick(uint8 tier, int24 tick, int256 liquidity) internal {
-        // TODO: set the next 0To1 and 1To0 instead
-        Ticks.Tick storage obj = ticks[tick];
-
-        uint256 existingLiquidity = obj.tierLiquidity[tier];
-        obj.tierLiquidity[tier] = addDelta(existingLiquidity, liquidity);
+        uint256 existingLiquidity = ticks[tick].tierLiquidity[tier];
+        ticks[tick].tierLiquidity[tier] = addDelta(existingLiquidity, liquidity);
 
         if (existingLiquidity == 0 && liquidity > 0) {
             int24 tick0To1 = tick - int8(tier);
@@ -355,7 +352,7 @@ contract Pair {
                 int24 below = -tickMap0To1.nextBelow(-tick0To1);
                 int24 above = ticks[below].next0To1;
 
-                obj.next0To1 = above;
+                ticks[tick0To1].next0To1 = above;
                 ticks[below].next0To1 = tick0To1;
                 tickMap0To1.set(-tick0To1);
             }
@@ -364,7 +361,7 @@ contract Pair {
                 int24 below = tickMap1To0.nextBelow(tick1To0);
                 int24 above = ticks[below].next1To0;
 
-                obj.next1To0 = above;
+                ticks[tick1To0].next1To0 = above;
                 ticks[below].next1To0 = tick1To0;
                 tickMap1To0.set(tick1To0);
             }
@@ -381,7 +378,7 @@ contract Pair {
 
             if (remove0To1) {
                 int24 below = -tickMap0To1.nextBelow(-tick0To1);
-                int24 above = obj.next0To1;
+                int24 above = ticks[tick0To1].next0To1;
 
                 ticks[below].next0To1 = above;
                 tickMap0To1.unset(-tick0To1);
@@ -389,9 +386,9 @@ contract Pair {
 
             if (remove1To0) {
                 int24 below = tickMap1To0.nextBelow(tick1To0);
-                int24 above = obj.next1To0;
+                int24 above = ticks[tick1To0].next1To0;
 
-                // TODO: should we clear out the obj next value
+                // TODO: when to clear out with delete
                 ticks[below].next1To0 = above;
                 tickMap1To0.unset(tick1To0);
             }

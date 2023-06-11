@@ -17,9 +17,14 @@ contract InitializeTest is Test, PairHelper {
 
     function testInitializeTickMaps() external {
         (int24 next0To1, int24 next1To0,,) = pair.ticks(0);
-
         assertEq(next0To1, MIN_TICK);
         assertEq(next1To0, MAX_TICK);
+
+        (next0To1,,,) = pair.ticks(MAX_TICK);
+        assertEq(next0To1, 0);
+
+        (, next1To0,,) = pair.ticks(MIN_TICK);
+        assertEq(next1To0, 0);
     }
 }
 
@@ -62,14 +67,19 @@ contract AddLiquidityTest is Test, PairHelper {
         assertEq(liquidity, 1e18);
     }
 
-    // function testAddLiquidityNextTick() external {
-    //     pair.addLiquidity(address(this), 1, 0, 1e18, bytes(""));
+    function testAddLiquidityNextTick() external {
+        pair.addLiquidity(address(this), 1, 0, 1e18, bytes(""));
 
-    //     (int24 next0To1, int24 next1To0,,) = pair.ticks(0);
+        (int24 next0To1, int24 next1To0,,) = pair.ticks(0);
+        assertEq(next0To1, -1, "initial tick 0 to 1");
+        assertEq(next1To0, 1, "initial tick 1 to 0");
 
-    //     assertEq(next0To1, 0);
-    //     assertEq(next1To0, 0);
-    // }
+        (next0To1,,,) = pair.ticks(-1);
+        assertEq(next0To1, MIN_TICK, "0 to 1");
+
+        (, next1To0,,) = pair.ticks(1);
+        assertEq(next1To0, MAX_TICK, "1 to 0");
+    }
 
     function testAddLiquidityGasFreshTicks() external {
         pair.addLiquidity(address(this), 1, 0, 1e18, bytes(""));
