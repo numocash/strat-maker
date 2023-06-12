@@ -52,14 +52,7 @@ contract Engine is Positions {
 
         _mint(
             params.to,
-            abi.encode(
-                Positions.ILRTADataID({
-                    token0: params.token0,
-                    token1: params.token1,
-                    tick: params.tick,
-                    tier: params.tier
-                })
-            ),
+            dataID(abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.tick, params.tier))),
             params.liquidity
         );
 
@@ -93,14 +86,7 @@ contract Engine is Positions {
 
         _burn(
             msg.sender,
-            abi.encode(
-                Positions.ILRTADataID({
-                    token0: params.token0,
-                    token1: params.token1,
-                    tick: params.tick,
-                    tier: params.tier
-                })
-            ),
+            dataID(abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.tick, params.tier))),
             params.liquidity
         );
 
@@ -162,8 +148,6 @@ contract Engine is Positions {
         view
         returns (Positions.ILRTAData memory)
     {
-        return _dataOf[dataID(
-            owner, abi.encode(Positions.ILRTADataID({token0: token0, token1: token1, tick: tick, tier: tier}))
-        )];
+        return _dataOf[owner][dataID(abi.encode(Positions.ILRTADataID(token0, token1, tick, tier)))];
     }
 }

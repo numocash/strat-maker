@@ -1,18 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
-import {EIP712} from "ilrta/EIP712.sol";
 import {ILRTA} from "ilrta/ILRTA.sol";
 
-abstract contract Positions is EIP712, ILRTA {
-    string public constant name = "Yikes";
-    string public constant symbol = "YIKES";
-
-    mapping(bytes32 => ILRTAData data) public _dataOf;
+abstract contract Positions is ILRTA {
+    mapping(address owner => mapping(bytes32 id => ILRTAData data)) internal _dataOf;
 
     constructor()
-        ILRTA("TransferDetails(address token0,address token1,int24 tick,uint8 tier,uint256 amount)")
-        EIP712(keccak256(bytes(name)))
+        ILRTA("Yikes", "YIKES", "TransferDetails(address token0,address token1,int24 tick,uint8 tier,uint256 amount)")
     {}
 
     struct ILRTADataID {
@@ -27,18 +22,16 @@ abstract contract Positions is EIP712, ILRTA {
     }
 
     struct ILRTATransferDetails {
-        bytes idBytes;
+        bytes32 id;
         uint256 amount;
     }
 
-    // how to go from address + dataID to data
-
-    function dataID(address owner, bytes memory dataIDBytes) public pure returns (bytes32) {
-        return keccak256(abi.encodePacked(owner, dataIDBytes));
+    function dataID(bytes memory dataIDBytes) public pure override returns (bytes32) {
+        return keccak256(dataIDBytes);
     }
 
-    function dataOf(bytes32 id) external view override returns (bytes memory) {
-        return abi.encode(_dataOf[id]);
+    function dataOf(address owner, bytes32 id) external view override returns (bytes memory) {
+        return abi.encode(_dataOf[owner][id]);
     }
 
     function transfer(address to, bytes calldata transferDetailsBytes) external override returns (bool) {
@@ -71,11 +64,11 @@ abstract contract Positions is EIP712, ILRTA {
     }
 
     function _transfer(address from, address to, ILRTATransferDetails memory transferDetails) internal returns (bool) {
-        _dataOf[dataID(from, transferDetails.idBytes)].liquidity -= transferDetails.amount;
+        _dataOf[from][transferDetails.id].liquidity -= transferDetails.amount;
 
         // Cannot overflow because the sum of all user balances can't exceed the max uint256 value.
         unchecked {
-            _dataOf[dataID(from, transferDetails.idBytes)].liquidity += transferDetails.amount;
+            _dataOf[from][transferDetails.id].liquidity += transferDetails.amount;
         }
 
         emit Transfer(from, to, abi.encode(transferDetails));
@@ -83,18 +76,18 @@ abstract contract Positions is EIP712, ILRTA {
         return true;
     }
 
-    function _mint(address to, bytes memory id, uint256 amount) internal virtual {
+    function _mint(address to, bytes32 id, uint256 amount) internal virtual {
         // Cannot overflow because the sum of all user balances can't exceed the max uint256 value.
         unchecked {
-            _dataOf[dataID(to, id)].liquidity += amount;
+            _dataOf[to][id].liquidity += amount;
         }
 
-        emit Transfer(address(0), to, abi.encode(ILRTATransferDetails({amount: amount, idBytes: id})));
+        emit Transfer(address(0), to, abi.encode(ILRTATransferDetails({amount: amount, id: id})));
     }
 
-    function _burn(address from, bytes memory id, uint256 amount) internal virtual {
-        _dataOf[dataID(from, id)].liquidity -= amount;
+    function _burn(address from, bytes32 id, uint256 amount) internal virtual {
+        _dataOf[from][id].liquidity -= amount;
 
-        emit Transfer(from, address(0), abi.encode(ILRTATransferDetails({amount: amount, idBytes: id})));
+        emit Transfer(from, address(0), abi.encode(ILRTATransferDetails({amount: amount, id: id})));
     }
 }
