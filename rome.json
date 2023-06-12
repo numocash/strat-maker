@@ -6,7 +6,8 @@
       "CHANGELOG.md",
       "pnpm-lock.yaml",
       "cache",
-      "out"
+      "out",
+      "lib"
     ]
   },
   "organizeImports": {
