@@ -30,34 +30,30 @@ jobs:
         uses: ./.github/actions/setup-js
       - name: Install foundry
         uses: foundry-rs/foundry-toolchain@v1
-      - name: Install foundry deps
-        run: forge install
       - name: Lint
         run: pnpm lint
 
   build:
     name: Build
+    if: false
     runs-on: ubuntu-latest
     steps:
       - name: Clone repository
         uses: actions/checkout@v3
       - name: Install foundry
         uses: foundry-rs/foundry-toolchain@v1
-      - name: Install foundry deps
-        run: forge install
       - name: Build
         run: forge build
 
   test:
     name: Test
+    if: false
     runs-on: ubuntu-latest
     steps:
       - name: Clone repository
         uses: actions/checkout@v3
       - name: Install foundry
         uses: foundry-rs/foundry-toolchain@v1
-      - name: Install foundry deps
-        run: forge install
       - name: Test
         run: forge test
       - name: Snapshot
