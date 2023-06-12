@@ -32,7 +32,7 @@ Yikes is an automated market maker that allows for exchange between two assets b
 
 Yikes is uses the invariant `Liquidity = Price * amount0 + amount1` to determine if a trade should be rejected or accepted, with price having units `Price: token1 / token0`.
 
-### Aggregated Liquidity
+### Ticks
 
 ### Fee Tiers
 
