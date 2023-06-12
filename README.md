@@ -40,7 +40,7 @@ In order to allow for maximum simplicity and expressiveness, Yikes is an aggrega
 
 Yikes allows liquidity providers to impose a fee on their liquidity when used for a trade. Many popular AMM designs measure fees based on a fixed percentage of the input of every trade. Yikes takes a different approach and instead fees are described as a spread on the underlying liquidity. For example, liquidity placed at tick 10 with a spread of 1 is willing to swap 0 -> 1 (sell) at tick 11 and swap 1 -> 0 (buy) at tick 9.
 
-This design essentially allows for fees to be encoded in ticks. Yikes has multiple fee tiers per pair, and optimally route through all fee tiers.
+This design essentially allows for fees to be encoded in ticks. Yikes has multiple fee tiers per pair, and optimally routes trades through all fee tiers.
 
 ## Architecture
 
