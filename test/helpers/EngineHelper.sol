@@ -30,7 +30,7 @@ contract EngineHelper is IExecuteCallback {
                     token0.mint(msg.sender, uint256(balanceChange));
                 } else if (id == address(token1)) {
                     token1.mint(msg.sender, uint256(balanceChange));
-                } else {
+                } else if (ids[i] != bytes32(0)) {
                     engine.transfer(
                         msg.sender, abi.encode(Positions.ILRTATransferDetails(ids[i], uint256(balanceChange)))
                     );

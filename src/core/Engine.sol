@@ -110,7 +110,9 @@ contract Engine is Positions {
     {
         if (commands.length != inputs.length) revert CommandLengthMismatch();
 
-        Accounts.Account memory account = Accounts.newAccount(numAccounts);
+        Accounts.Account memory account;
+
+        if (numAccounts > 0) account = Accounts.newAccount(numAccounts);
 
         for (uint256 i = 0; i < commands.length;) {
             if (commands[i] == Commands.Swap) {
@@ -164,8 +166,6 @@ contract Engine is Positions {
             }
         }
 
-        uint256[] memory balancesBefore = new uint256[](numAccounts);
-
         for (uint256 i = 0; i < account.ids.length;) {
             int256 balanceChange = account.balanceChanges[i];
             bytes32 id = account.ids[i];
@@ -178,10 +178,6 @@ contract Engine is Positions {
                 } else {
                     SafeTransferLib.safeTransfer(address(uint160(uint256(id))), to, uint256(-balanceChange));
                 }
-            } else {
-                if (id & bytes32(0xFFFFFFFFFFFFFFFFFFFFFFFF0000000000000000000000000000000000000000) == 0) {
-                    balancesBefore[i] = BalanceLib.getBalance(address(uint160(uint256(id))));
-                }
             }
 
             unchecked {
@@ -189,7 +185,7 @@ contract Engine is Positions {
             }
         }
 
-        IExecuteCallback(msg.sender).executeCallback(account.ids, account.balanceChanges, data);
+        if (numAccounts > 0) IExecuteCallback(msg.sender).executeCallback(account.ids, account.balanceChanges, data);
 
         for (uint256 i = 0; i < account.ids.length;) {
             int256 balanceChange = account.balanceChanges[i];
@@ -202,7 +198,7 @@ contract Engine is Positions {
                     _burn(address(this), id, uint256(balanceChange));
                 } else {
                     uint256 balance = BalanceLib.getBalance(address(uint160(uint256(id))));
-                    if (balance < balancesBefore[i] + uint256(balanceChange)) revert InsufficientInput();
+                    if (balance < account.balances[i] + uint256(balanceChange)) revert InsufficientInput();
                 }
             }
 
