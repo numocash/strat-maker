@@ -87,13 +87,13 @@ contract Engine is Positions {
         Commands[] calldata commands,
         bytes[] calldata inputs,
         address to,
-        address[] calldata tokens,
-        bytes32[] calldata ids,
+        uint256 numTokens,
+        uint256 numILRTA,
         bytes calldata data
     )
         external
     {
-        _execute(commands, inputs, to, tokens, ids, data);
+        _execute(commands, inputs, to, numTokens, numILRTA, data);
     }
 
     /// @dev Set to address to 0 if creating a pair
@@ -101,8 +101,8 @@ contract Engine is Positions {
         Commands[] calldata commands,
         bytes[] calldata inputs,
         address to,
-        address[] calldata tokens,
-        bytes32[] calldata ids,
+        uint256 numTokens,
+        uint256 numILRTA,
         bytes calldata data
     )
         private
@@ -110,7 +110,7 @@ contract Engine is Positions {
     {
         if (commands.length != inputs.length) revert CommandLengthMismatch();
 
-        Accounts.Account memory account = Accounts.newAccount(tokens.length, ids.length);
+        Accounts.Account memory account = Accounts.newAccount(numTokens, numILRTA);
 
         for (uint256 i = 0; i < commands.length;) {
             if (commands[i] == Commands.Swap) {
@@ -119,8 +119,8 @@ contract Engine is Positions {
 
                 (int256 amount0, int256 amount1) = pair.swap(params.isToken0, params.amountDesired);
 
-                account.updateToken(tokens, params.token0, amount0);
-                account.updateToken(tokens, params.token1, amount1);
+                account.updateToken(params.token0, amount0);
+                account.updateToken(params.token1, amount1);
 
                 emit Swap(pairID);
             } else if (commands[i] == Commands.AddLiquidity) {
@@ -130,10 +130,9 @@ contract Engine is Positions {
                 (uint256 amount0, uint256 amount1) =
                     pair.updateLiquidity(params.tick, params.tier, int256(params.liquidity));
 
-                account.updateToken(tokens, params.token0, int256(amount0));
-                account.updateToken(tokens, params.token1, int256(amount1));
+                account.updateToken(params.token0, int256(amount0));
+                account.updateToken(params.token1, int256(amount1));
                 account.updateILRTA(
-                    ids,
                     dataID(abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.tick, params.tier))),
                     -int256(params.liquidity)
                 );
@@ -146,10 +145,9 @@ contract Engine is Positions {
                 (uint256 amount0, uint256 amount1) =
                     pair.updateLiquidity(params.tick, params.tier, -int256(params.liquidity));
 
-                account.updateToken(tokens, params.token0, -int256(amount0));
-                account.updateToken(tokens, params.token1, -int256(amount1));
+                account.updateToken(params.token0, -int256(amount0));
+                account.updateToken(params.token1, -int256(amount1));
                 account.updateILRTA(
-                    ids,
                     dataID(abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.tick, params.tier))),
                     int256(params.liquidity)
                 );
@@ -166,18 +164,14 @@ contract Engine is Positions {
             }
         }
 
-        uint256[] memory balances = new uint256[](tokens.length);
-
-        for (uint256 i = 0; i < tokens.length;) {
+        for (uint256 i = 0; i < numTokens;) {
             int256 delta = account.tokenDeltas[i];
-            address token = tokens[i];
+            address token = account.tokens[i];
 
             if (token == address(0)) break;
 
             if (delta < 0) {
                 SafeTransferLib.safeTransfer(token, to, uint256(-delta));
-            } else if (delta > 0) {
-                balances[i] = BalanceLib.getBalance(token);
             }
 
             unchecked {
@@ -185,9 +179,9 @@ contract Engine is Positions {
             }
         }
 
-        for (uint256 i = 0; i < ids.length;) {
+        for (uint256 i = 0; i < numILRTA;) {
             int256 delta = account.ilrtaDeltas[i];
-            bytes32 id = ids[i];
+            bytes32 id = account.ids[i];
 
             if (id == bytes32(0)) break;
 
@@ -200,19 +194,21 @@ contract Engine is Positions {
             }
         }
 
-        if (tokens.length > 0 || ids.length > 0) {
-            IExecuteCallback(msg.sender).executeCallback(tokens, account.tokenDeltas, ids, account.ilrtaDeltas, data);
+        if (numTokens > 0 || numILRTA > 0) {
+            IExecuteCallback(msg.sender).executeCallback(
+                account.tokens, account.tokenDeltas, account.ids, account.ilrtaDeltas, data
+            );
         }
 
-        for (uint256 i = 0; i < tokens.length;) {
+        for (uint256 i = 0; i < numTokens;) {
             int256 delta = account.tokenDeltas[i];
-            address token = tokens[i];
+            address token = account.tokens[i];
 
             if (token == address(0)) break;
 
             if (delta > 0) {
                 uint256 balance = BalanceLib.getBalance(token);
-                if (balance < balances[i] + uint256(delta)) revert InsufficientInput();
+                if (balance < account.balances[i] + uint256(delta)) revert InsufficientInput();
             }
 
             unchecked {
@@ -220,9 +216,9 @@ contract Engine is Positions {
             }
         }
 
-        for (uint256 i = 0; i < ids.length;) {
+        for (uint256 i = 0; i < numILRTA;) {
             int256 delta = account.ilrtaDeltas[i];
-            bytes32 id = ids[i];
+            bytes32 id = account.ids[i];
 
             if (id == bytes32(0)) break;
 

@@ -70,7 +70,7 @@ contract EngineHelper is IExecuteCallback {
         bytes[] memory inputs = new bytes[](1);
         inputs[0] = abi.encode(Engine.CreatePairParams(address(token0), address(token1), 0));
 
-        engine.execute(commands, inputs, address(0), new address[](0), new bytes32[](0), bytes(""));
+        engine.execute(commands, inputs, address(0), 0, 0, bytes(""));
     }
 
     function basicAddLiquidity() internal {
@@ -80,14 +80,7 @@ contract EngineHelper is IExecuteCallback {
         bytes[] memory inputs = new bytes[](1);
         inputs[0] = abi.encode(Engine.AddLiquidityParams(address(token0), address(token1), 0, 0, 1e18));
 
-        address[] memory tokens = new address[](2);
-        tokens[0] = address(token0);
-        tokens[1] = address(token1);
-
-        bytes32[] memory ids = new bytes32[](1);
-        ids[0] = engine.dataID(abi.encode(Positions.ILRTADataID(address(token0), address(token1), 0, 0)));
-
-        engine.execute(commands, inputs, address(this), tokens, ids, bytes(""));
+        engine.execute(commands, inputs, address(this), 1, 1, bytes(""));
     }
 
     function basicRemoveLiquidity() internal {
@@ -97,13 +90,6 @@ contract EngineHelper is IExecuteCallback {
         bytes[] memory inputs = new bytes[](1);
         inputs[0] = abi.encode(Engine.RemoveLiquidityParams(address(token0), address(token1), 0, 0, 1e18));
 
-        address[] memory tokens = new address[](2);
-        tokens[0] = address(token0);
-        tokens[1] = address(token1);
-
-        bytes32[] memory ids = new bytes32[](1);
-        ids[0] = engine.dataID(abi.encode(Positions.ILRTADataID(address(token0), address(token1), 0, 0)));
-
-        engine.execute(commands, inputs, address(this), tokens, ids, bytes(""));
+        engine.execute(commands, inputs, address(this), 1, 1, bytes(""));
     }
 }
