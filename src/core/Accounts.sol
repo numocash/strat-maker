@@ -7,7 +7,6 @@ library Accounts {
     /// otherwise represents a token address
     /// @param balanceChanges The change in balance for the engine
     /// @custom:team why can't this be implemented in memory
-    /// @custom:team make sure balance change is non-zero
     struct Account {
         mapping(bytes32 => uint256) indexes;
         bytes32[] ids;
@@ -15,7 +14,7 @@ library Accounts {
     }
 
     function update(Account storage account, bytes32 id, int256 balanceChange) internal {
-        // if (balanceChange == 0) return;
+        if (balanceChange == 0) return;
 
         uint256 index = account.indexes[id];
         if (index == 0) {
