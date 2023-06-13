@@ -133,9 +133,8 @@ contract EngineTest is Test, EngineHelper {
         bytes[] memory inputs = new bytes[](1);
         inputs[0] = abi.encode(Engine.AddLiquidityParams(address(token0), address(token1), 0, 1, 1e18));
 
-        address[] memory tokens = new address[](2);
+        address[] memory tokens = new address[](1);
         tokens[0] = address(token0);
-        tokens[1] = address(token1);
 
         bytes32[] memory ids = new bytes32[](1);
         ids[0] = engine.dataID(abi.encode(Positions.ILRTADataID(address(token0), address(token1), 0, 1)));
@@ -154,9 +153,8 @@ contract EngineTest is Test, EngineHelper {
         bytes[] memory inputs = new bytes[](1);
         inputs[0] = abi.encode(Engine.AddLiquidityParams(address(token0), address(token1), 0, 1, 1e18));
 
-        address[] memory tokens = new address[](2);
+        address[] memory tokens = new address[](1);
         tokens[0] = address(token0);
-        tokens[1] = address(token1);
 
         bytes32[] memory ids = new bytes32[](1);
         ids[0] = engine.dataID(abi.encode(Positions.ILRTADataID(address(token0), address(token1), 0, 1)));
