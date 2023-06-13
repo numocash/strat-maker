@@ -5,7 +5,6 @@ import {mulDiv, mulDivRoundingUp} from "./math/FullMath.sol";
 import {addDelta, calcAmountsForLiquidity} from "./math/LiquidityMath.sol";
 import {computeSwapStep} from "./math/SwapMath.sol";
 import {getCurrentTickForTierFromOffset, getRatioAtTick, MAX_TICK, MIN_TICK, Q128} from "./math/TickMath.sol";
-import {Positions} from "./Positions.sol";
 import {Ticks} from "./Ticks.sol";
 import {TickMaps} from "./TickMaps.sol";
 
@@ -16,7 +15,6 @@ int8 constant MAX_OFFSET = int8(MAX_TIERS) - 1;
 library Pairs {
     using Ticks for Ticks.Tick;
     using TickMaps for TickMaps.TickMap;
-    using Positions for Positions.Position;
 
     error Initialized();
     error InvalidTick();
@@ -29,7 +27,6 @@ library Pairs {
         int8 offset;
         uint8 lock; // 2 == locked, 1 == unlocked, 0 == uninitialized
         mapping(int24 => Ticks.Tick) ticks;
-        mapping(bytes32 positionID => Positions.Position) positions;
         TickMaps.TickMap tickMap0To1;
         TickMaps.TickMap tickMap1To0;
     }
@@ -224,7 +221,6 @@ library Pairs {
     /// @param liquidity The amount of liquidity being added or removed
     function updateLiquidity(
         Pair storage pair,
-        address to,
         uint8 tier,
         int24 tick,
         int256 liquidity
@@ -237,9 +233,6 @@ library Pairs {
 
         // update ticks
         _updateTick(pair, tier, tick, liquidity);
-
-        // update position
-        _updatePosition(pair, to, tier, tick, liquidity);
 
         // determine amounts
         int24 tickCurrentForTier = getCurrentTickForTierFromOffset(pair.tickCurrent, pair.offset, tier);
@@ -327,13 +320,5 @@ library Pairs {
                 pair.tickMap1To0.unset(tick1To0);
             }
         }
-    }
-
-    /// @notice Update a position
-    /// @param liquidity The amount of liquidity being added or removed
-    function _updatePosition(Pair storage pair, address to, uint8 tier, int24 tick, int256 liquidity) internal {
-        Positions.Position storage positionInfo = Positions.get(pair.positions, to, tier, tick);
-
-        positionInfo.liquidity = addDelta(positionInfo.liquidity, liquidity);
     }
 }

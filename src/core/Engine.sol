@@ -12,10 +12,9 @@ import {IAddLiquidityCallback} from "./interfaces/IAddLiquidityCallback.sol";
 import {ISwapCallback} from "./interfaces/ISwapCallback.sol";
 
 /// @author Robert Leifke and Kyle Scott
-contract Engine {
+contract Engine is Positions {
     using Ticks for Ticks.Tick;
     using Pairs for Pairs.Pair;
-    using Positions for Positions.Position;
     using Pairs for mapping(bytes32 => Pairs.Pair);
 
     event PairCreated(address indexed token0, address indexed token1, int24 tickInitial);
@@ -49,7 +48,13 @@ contract Engine {
 
     function addLiquidity(AddLiquidityParams calldata params) external returns (uint256 amount0, uint256 amount1) {
         Pairs.Pair storage pair = pairs.getPair(params.token0, params.token1);
-        (amount0, amount1) = pair.updateLiquidity(params.to, params.tier, params.tick, int256(params.liquidity));
+        (amount0, amount1) = pair.updateLiquidity(params.tier, params.tick, int256(params.liquidity));
+
+        _mint(
+            params.to,
+            dataID(abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.tick, params.tier))),
+            params.liquidity
+        );
 
         uint256 balance0 = BalanceLib.getBalance(params.token0);
         uint256 balance1 = BalanceLib.getBalance(params.token1);
@@ -74,10 +79,16 @@ contract Engine {
         returns (uint256 amount0, uint256 amount1)
     {
         Pairs.Pair storage pair = pairs.getPair(params.token0, params.token1);
-        (amount0, amount1) = pair.updateLiquidity(params.to, params.tier, params.tick, -int256(params.liquidity));
+        (amount0, amount1) = pair.updateLiquidity(params.tier, params.tick, -int256(params.liquidity));
 
         SafeTransferLib.safeTransfer(params.token0, params.to, amount0);
         SafeTransferLib.safeTransfer(params.token1, params.to, amount1);
+
+        _burn(
+            msg.sender,
+            dataID(abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.tick, params.tier))),
+            params.liquidity
+        );
 
         emit RemoveLiquidity();
     }
@@ -135,8 +146,8 @@ contract Engine {
     )
         external
         view
-        returns (Positions.Position memory)
+        returns (Positions.ILRTAData memory)
     {
-        return Positions.get(pairs.getPair(token0, token1).positions, owner, tier, tick);
+        return _dataOf[owner][dataID(abi.encode(Positions.ILRTADataID(token0, token1, tick, tier)))];
     }
 }
