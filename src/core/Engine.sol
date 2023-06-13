@@ -12,6 +12,10 @@ import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
 import {IExecuteCallback} from "./interfaces/IExecuteCallback.sol";
 
 /// @author Robert Leifke and Kyle Scott
+/// @custom:team id could be an issue is someone mines an ilrta id with 24 trailing zeros
+/// @custom:team add execute by signature
+/// @custom:team check if a function that only does one action is worth it
+/// @custom:team pass in token addresses in an array and copy it to memory, so that we dont have to store in storage
 contract Engine is Positions {
     using Ticks for Ticks.Tick;
     using Pairs for Pairs.Pair;
@@ -83,21 +87,14 @@ contract Engine is Positions {
         int24 tickInitial;
     }
 
-    /// @custom:team add execute by signature
-    /// @custom:team add function for single function execution
-    /// @custom:team pass in token addresses in an array and copy it to memory, so that we dont have to store in storage
-    /// @custom:team id could be an issue is someone mines an ilrta id with 24 trailing zeros
-
-    /// @dev Set to address to 0 if creating a pair
     function execute(Commands[] calldata commands, bytes[] calldata inputs, address to, bytes calldata data) external {
-        _execute(commands, inputs, msg.sender, to, data);
+        _execute(commands, inputs, to, data);
     }
 
-    /// @custom:team check whether burning from from address or burning from self is better
+    /// @dev Set to address to 0 if creating a pair
     function _execute(
         Commands[] calldata commands,
         bytes[] calldata inputs,
-        address from,
         address to,
         bytes calldata data
     )
@@ -190,7 +187,7 @@ contract Engine is Positions {
                 bytes32 id = account.ids[i];
 
                 if (id & bytes32(0xFFFFFFFFFFFFFFFFFFFFFFFF0000000000000000000000000000000000000000) > 0) {
-                    _burn(from, id, uint256(balanceChange));
+                    _burn(address(this), id, uint256(balanceChange));
                 } else {
                     uint256 balance = BalanceLib.getBalance(address(uint160(uint256(id))));
                     if (balance < balancesBefore[i] + uint256(balanceChange)) revert InsufficientInput();

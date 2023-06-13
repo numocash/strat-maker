@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {Engine} from "src/core/Engine.sol";
+import {Positions} from "src/core/Positions.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
 
 import {IExecuteCallback} from "src/core/interfaces/IExecuteCallback.sol";
@@ -20,13 +21,20 @@ contract EngineHelper is IExecuteCallback {
 
     function executeCallback(bytes32[] calldata ids, int256[] calldata balanceChanges, bytes calldata) external {
         for (uint256 i = 0; i < ids.length;) {
-            address id = address(uint160(uint256(ids[i])));
             int256 balanceChange = balanceChanges[i];
 
-            if (id == address(token0) && balanceChange > 0) {
-                token0.mint(msg.sender, uint256(balanceChange));
-            } else if (id == address(token1) && balanceChange > 0) {
-                token1.mint(msg.sender, uint256(balanceChange));
+            if (balanceChange > 0) {
+                address id = address(uint160(uint256(ids[i])));
+
+                if (id == address(token0)) {
+                    token0.mint(msg.sender, uint256(balanceChange));
+                } else if (id == address(token1)) {
+                    token1.mint(msg.sender, uint256(balanceChange));
+                } else {
+                    engine.transfer(
+                        msg.sender, abi.encode(Positions.ILRTATransferDetails(ids[i], uint256(balanceChange)))
+                    );
+                }
             }
 
             unchecked {

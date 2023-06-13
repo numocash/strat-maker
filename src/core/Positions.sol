@@ -73,7 +73,7 @@ abstract contract Positions is ILRTA {
 
         // Cannot overflow because the sum of all user balances can't exceed the max uint256 value.
         unchecked {
-            _dataOf[from][transferDetails.id].liquidity += transferDetails.amount;
+            _dataOf[to][transferDetails.id].liquidity += transferDetails.amount;
         }
 
         emit Transfer(from, to, abi.encode(transferDetails));

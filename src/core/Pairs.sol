@@ -21,6 +21,7 @@ library Pairs {
     error InvalidTier();
     error OutOfBounds();
 
+    /// @custom:team use the tickmap to check if pair is initialized
     struct Pair {
         uint128[MAX_TIERS] compositions;
         int24 tickCurrent;
