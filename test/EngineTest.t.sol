@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {EngineHelper} from "./helpers/EngineHelper.sol";
 
 import {Engine} from "src/core/Engine.sol";
+import {Positions} from "src/core/Positions.sol";
 import {Pairs} from "src/core/Pairs.sol";
 
 contract EngineTest is Test, EngineHelper {
@@ -21,7 +22,7 @@ contract EngineTest is Test, EngineHelper {
         bytes[] memory inputs = new bytes[](1);
         inputs[0] = abi.encode(Engine.CreatePairParams(address(1), address(2), 1));
 
-        engine.execute(commands, inputs, address(0), 0, 0, bytes(""));
+        engine.execute(commands, inputs, address(0), new address[](0), new bytes32[](0), bytes(""));
 
         (, int24 tickCurrent,, uint8 initialized) = engine.getPair(address(1), address(2));
         assertEq(initialized, 1);
@@ -36,22 +37,22 @@ contract EngineTest is Test, EngineHelper {
         inputs[0] = abi.encode(Engine.CreatePairParams(address(0), address(1), 1));
 
         vm.expectRevert(Engine.InvalidTokenOrder.selector);
-        engine.execute(commands, inputs, address(0), 0, 0, bytes(""));
+        engine.execute(commands, inputs, address(0), new address[](0), new bytes32[](0), bytes(""));
 
         inputs[0] = abi.encode(Engine.CreatePairParams(address(1), address(0), 1));
 
         vm.expectRevert(Engine.InvalidTokenOrder.selector);
-        engine.execute(commands, inputs, address(0), 0, 0, bytes(""));
+        engine.execute(commands, inputs, address(0), new address[](0), new bytes32[](0), bytes(""));
 
         inputs[0] = abi.encode(Engine.CreatePairParams(address(2), address(1), 1));
 
         vm.expectRevert(Engine.InvalidTokenOrder.selector);
-        engine.execute(commands, inputs, address(0), 0, 0, bytes(""));
+        engine.execute(commands, inputs, address(0), new address[](0), new bytes32[](0), bytes(""));
 
         inputs[0] = abi.encode(Engine.CreatePairParams(address(1), address(1), 1));
 
         vm.expectRevert(Engine.InvalidTokenOrder.selector);
-        engine.execute(commands, inputs, address(0), 0, 0, bytes(""));
+        engine.execute(commands, inputs, address(0), new address[](0), new bytes32[](0), bytes(""));
     }
 
     function testCreatePairEmit() external {
@@ -63,7 +64,7 @@ contract EngineTest is Test, EngineHelper {
 
         vm.expectEmit(true, true, false, true);
         emit PairCreated(address(1), address(2), 1);
-        engine.execute(commands, inputs, address(0), 0, 0, bytes(""));
+        engine.execute(commands, inputs, address(0), new address[](0), new bytes32[](0), bytes(""));
     }
 
     function testCreatePairDoubleInit() external {
@@ -73,10 +74,10 @@ contract EngineTest is Test, EngineHelper {
         bytes[] memory inputs = new bytes[](1);
         inputs[0] = abi.encode(Engine.CreatePairParams(address(1), address(2), 0));
 
-        engine.execute(commands, inputs, address(0), 0, 0, bytes(""));
+        engine.execute(commands, inputs, address(0), new address[](0), new bytes32[](0), bytes(""));
 
         vm.expectRevert(Pairs.Initialized.selector);
-        engine.execute(commands, inputs, address(0), 0, 0, bytes(""));
+        engine.execute(commands, inputs, address(0), new address[](0), new bytes32[](0), bytes(""));
     }
 
     function testCreatePairBadTick() external {
@@ -87,7 +88,7 @@ contract EngineTest is Test, EngineHelper {
         inputs[0] = abi.encode(Engine.CreatePairParams(address(1), address(2), type(int24).max));
 
         vm.expectRevert(Pairs.InvalidTick.selector);
-        engine.execute(commands, inputs, address(0), 0, 0, bytes(""));
+        engine.execute(commands, inputs, address(0), new address[](0), new bytes32[](0), bytes(""));
     }
 
     function testAddLiquidity() external {
@@ -115,31 +116,66 @@ contract EngineTest is Test, EngineHelper {
         bytes[] memory inputs = new bytes[](1);
         inputs[0] = abi.encode(Engine.SwapParams(address(token0), address(token1), false, 1e18 - 1));
 
-        engine.execute(commands, inputs, address(this), 2, 0, bytes(""));
+        address[] memory tokens = new address[](2);
+        tokens[0] = address(token0);
+        tokens[1] = address(token1);
+
+        engine.execute(commands, inputs, address(this), tokens, new bytes32[](0), bytes(""));
     }
 
     function testGasAddLiquidity() external {
         vm.pauseGasMetering();
         basicCreate();
+
+        Engine.Commands[] memory commands = new Engine.Commands[](1);
+        commands[0] = Engine.Commands.AddLiquidity;
+
+        bytes[] memory inputs = new bytes[](1);
+        inputs[0] = abi.encode(Engine.AddLiquidityParams(address(token0), address(token1), 0, 1, 1e18));
+
+        address[] memory tokens = new address[](2);
+        tokens[0] = address(token0);
+        tokens[1] = address(token1);
+
+        bytes32[] memory ids = new bytes32[](1);
+        ids[0] = engine.dataID(abi.encode(Positions.ILRTADataID(address(token0), address(token1), 0, 1)));
+
         vm.resumeGasMetering();
 
-        basicAddLiquidity();
+        engine.execute(commands, inputs, address(this), tokens, ids, bytes(""));
     }
 
     function testGasRemoveLiquidity() external {
         vm.pauseGasMetering();
         basicCreate();
-        basicAddLiquidity();
+        Engine.Commands[] memory commands = new Engine.Commands[](1);
+        commands[0] = Engine.Commands.AddLiquidity;
+
+        bytes[] memory inputs = new bytes[](1);
+        inputs[0] = abi.encode(Engine.AddLiquidityParams(address(token0), address(token1), 0, 1, 1e18));
+
+        address[] memory tokens = new address[](2);
+        tokens[0] = address(token0);
+        tokens[1] = address(token1);
+
+        bytes32[] memory ids = new bytes32[](1);
+        ids[0] = engine.dataID(abi.encode(Positions.ILRTADataID(address(token0), address(token1), 0, 1)));
+
+        engine.execute(commands, inputs, address(this), tokens, ids, bytes(""));
+
+        commands[0] = Engine.Commands.RemoveLiquidity;
+
+        inputs[0] = abi.encode(Engine.RemoveLiquidityParams(address(token0), address(token1), 0, 1, 1e18));
+
         vm.resumeGasMetering();
 
-        basicRemoveLiquidity();
+        engine.execute(commands, inputs, address(this), tokens, ids, bytes(""));
     }
 
     function testGasSwap() external {
         vm.pauseGasMetering();
         basicCreate();
         basicAddLiquidity();
-        vm.resumeGasMetering();
 
         Engine.Commands[] memory commands = new Engine.Commands[](1);
         commands[0] = Engine.Commands.Swap;
@@ -147,6 +183,12 @@ contract EngineTest is Test, EngineHelper {
         bytes[] memory inputs = new bytes[](1);
         inputs[0] = abi.encode(Engine.SwapParams(address(token0), address(token1), false, 1e18 - 1));
 
-        engine.execute(commands, inputs, address(this), 2, 0, bytes(""));
+        address[] memory tokens = new address[](2);
+        tokens[0] = address(token0);
+        tokens[1] = address(token1);
+
+        vm.resumeGasMetering();
+
+        engine.execute(commands, inputs, address(this), tokens, new bytes32[](0), bytes(""));
     }
 }
