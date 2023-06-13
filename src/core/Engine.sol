@@ -33,8 +33,6 @@ contract Engine is Positions {
     error CommandLengthMismatch();
     error InvalidCommand();
 
-    Accounts.Account private account;
-
     /// @dev this should be checked when reading any `get` function from another contract to prevent read-only
     /// reentrancy
     uint256 public locked = 1;
@@ -87,8 +85,16 @@ contract Engine is Positions {
         int24 tickInitial;
     }
 
-    function execute(Commands[] calldata commands, bytes[] calldata inputs, address to, bytes calldata data) external {
-        _execute(commands, inputs, to, data);
+    function execute(
+        Commands[] calldata commands,
+        bytes[] calldata inputs,
+        address to,
+        uint256 numAccounts,
+        bytes calldata data
+    )
+        external
+    {
+        _execute(commands, inputs, to, numAccounts, data);
     }
 
     /// @dev Set to address to 0 if creating a pair
@@ -96,12 +102,15 @@ contract Engine is Positions {
         Commands[] calldata commands,
         bytes[] calldata inputs,
         address to,
+        uint256 numAccounts,
         bytes calldata data
     )
         private
         nonReentrant
     {
         if (commands.length != inputs.length) revert CommandLengthMismatch();
+
+        Accounts.Account memory account = Accounts.newAccount(numAccounts);
 
         for (uint256 i = 0; i < commands.length;) {
             if (commands[i] == Commands.Swap) {
@@ -155,11 +164,13 @@ contract Engine is Positions {
             }
         }
 
-        uint256[] memory balancesBefore = new uint256[](account.ids.length);
+        uint256[] memory balancesBefore = new uint256[](numAccounts);
 
         for (uint256 i = 0; i < account.ids.length;) {
             int256 balanceChange = account.balanceChanges[i];
             bytes32 id = account.ids[i];
+
+            if (id == bytes32(0)) break;
 
             if (balanceChange < 0) {
                 if (id & bytes32(0xFFFFFFFFFFFFFFFFFFFFFFFF0000000000000000000000000000000000000000) > 0) {
@@ -182,10 +193,11 @@ contract Engine is Positions {
 
         for (uint256 i = 0; i < account.ids.length;) {
             int256 balanceChange = account.balanceChanges[i];
+            bytes32 id = account.ids[i];
+
+            if (id == bytes32(0)) break;
 
             if (balanceChange > 0) {
-                bytes32 id = account.ids[i];
-
                 if (id & bytes32(0xFFFFFFFFFFFFFFFFFFFFFFFF0000000000000000000000000000000000000000) > 0) {
                     _burn(address(this), id, uint256(balanceChange));
                 } else {
@@ -194,15 +206,10 @@ contract Engine is Positions {
                 }
             }
 
-            account.indexes[account.ids[i]] = 0;
-
             unchecked {
                 i++;
             }
         }
-
-        delete account.ids;
-        delete account.balanceChanges;
     }
 
     function createPair(CreatePairParams memory params) private {
