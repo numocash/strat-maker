@@ -68,7 +68,7 @@ abstract contract Positions is ILRTA {
         _transfer(from, requestedTransfer.to, abi.decode(requestedTransfer.transferDetails, (ILRTATransferDetails)));
     }
 
-    function _transfer(address from, address to, ILRTATransferDetails memory transferDetails) internal returns (bool) {
+    function _transfer(address from, address to, ILRTATransferDetails memory transferDetails) private returns (bool) {
         _dataOf[from][transferDetails.id].liquidity -= transferDetails.amount;
 
         // Cannot overflow because the sum of all user balances can't exceed the max uint256 value.

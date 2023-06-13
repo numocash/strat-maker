@@ -117,4 +117,36 @@ contract EngineTest is Test, EngineHelper {
 
         engine.execute(commands, inputs, address(this), bytes(""));
     }
+
+    function testGasAddLiquidity() external {
+        vm.pauseGasMetering();
+        basicCreate();
+        vm.resumeGasMetering();
+
+        basicAddLiquidity();
+    }
+
+    function testGasRemoveLiquidity() external {
+        vm.pauseGasMetering();
+        basicCreate();
+        basicAddLiquidity();
+        vm.resumeGasMetering();
+
+        basicRemoveLiquidity();
+    }
+
+    function testGasSwap() external {
+        vm.pauseGasMetering();
+        basicCreate();
+        basicAddLiquidity();
+        vm.resumeGasMetering();
+
+        Engine.Commands[] memory commands = new Engine.Commands[](1);
+        commands[0] = Engine.Commands.Swap;
+
+        bytes[] memory inputs = new bytes[](1);
+        inputs[0] = abi.encode(Engine.SwapParams(address(token0), address(token1), false, 1e18 - 1));
+
+        engine.execute(commands, inputs, address(this), bytes(""));
+    }
 }
