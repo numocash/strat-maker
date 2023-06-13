@@ -7,7 +7,6 @@ import {Positions} from "./Positions.sol";
 import {Accounts} from "./Accounts.sol";
 
 import {BalanceLib} from "src/libraries/BalanceLib.sol";
-import {Bytes32AddressLib} from "solmate/utils/Bytes32AddressLib.sol";
 import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
 
 import {IExecuteCallback} from "./interfaces/IExecuteCallback.sol";
@@ -79,6 +78,7 @@ contract Engine is Positions {
     /// @custom:team add execute by signature
     /// @custom:team add function for single function execution
     /// @custom:team pass in token addresses in an array and copy it to memory, so that we dont have to store in storage
+    /// @custom:team id could be an issue is someone mines an ilrta id with 24 trailing zeros
 
     /// @dev Set to address to 0 if creating a pair
     function execute(Commands[] calldata commands, bytes[] calldata inputs, address to, bytes calldata data) external {
@@ -107,8 +107,8 @@ contract Engine is Positions {
 
                 (int256 amount0, int256 amount1) = pair.swap(params.isToken0, params.amountDesired);
 
-                account.update(Bytes32AddressLib.fillLast12Bytes(params.token0), amount0);
-                account.update(Bytes32AddressLib.fillLast12Bytes(params.token1), amount1);
+                account.update(bytes32(uint256(uint160(params.token0))), amount0);
+                account.update(bytes32(uint256(uint160(params.token1))), amount1);
 
                 emit Swap(pairID);
             } else if (commands[i] == Commands.AddLiquidity) {
@@ -118,8 +118,8 @@ contract Engine is Positions {
                 (uint256 amount0, uint256 amount1) =
                     pair.updateLiquidity(params.tick, params.tier, int256(params.liquidity));
 
-                account.update(Bytes32AddressLib.fillLast12Bytes(params.token0), int256(amount0));
-                account.update(Bytes32AddressLib.fillLast12Bytes(params.token1), int256(amount1));
+                account.update(bytes32(uint256(uint160(params.token0))), int256(amount0));
+                account.update(bytes32(uint256(uint160(params.token1))), int256(amount1));
                 account.update(
                     dataID(abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.tick, params.tier))),
                     -int256(params.liquidity)
@@ -133,8 +133,8 @@ contract Engine is Positions {
                 (uint256 amount0, uint256 amount1) =
                     pair.updateLiquidity(params.tick, params.tier, -int256(params.liquidity));
 
-                account.update(Bytes32AddressLib.fillLast12Bytes(params.token0), -int256(amount0));
-                account.update(Bytes32AddressLib.fillLast12Bytes(params.token1), -int256(amount1));
+                account.update(bytes32(uint256(uint160(params.token0))), -int256(amount0));
+                account.update(bytes32(uint256(uint160(params.token1))), -int256(amount1));
                 account.update(
                     dataID(abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.tick, params.tier))),
                     int256(params.liquidity)
@@ -159,14 +159,14 @@ contract Engine is Positions {
             bytes32 id = account.ids[i];
 
             if (balanceChange < 0) {
-                if (id & bytes32(0x0000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF) > 0) {
+                if (id & bytes32(0xFFFFFFFFFFFFFFFFFFFFFFFF0000000000000000000000000000000000000000) > 0) {
                     _mint(to, id, uint256(-balanceChange));
                 } else {
-                    SafeTransferLib.safeTransfer(Bytes32AddressLib.fromLast20Bytes(id), to, uint256(-balanceChange));
+                    SafeTransferLib.safeTransfer(address(uint160(uint256(id))), to, uint256(-balanceChange));
                 }
             } else {
-                if (id & bytes32(0x0000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF) == 0) {
-                    balancesBefore[i] = BalanceLib.getBalance(Bytes32AddressLib.fromLast20Bytes(id));
+                if (id & bytes32(0xFFFFFFFFFFFFFFFFFFFFFFFF0000000000000000000000000000000000000000) == 0) {
+                    balancesBefore[i] = BalanceLib.getBalance(address(uint160(uint256(id))));
                 }
             }
 
@@ -183,10 +183,10 @@ contract Engine is Positions {
             if (balanceChange > 0) {
                 bytes32 id = account.ids[i];
 
-                if (id & bytes32(0x0000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF) > 0) {
+                if (id & bytes32(0xFFFFFFFFFFFFFFFFFFFFFFFF0000000000000000000000000000000000000000) > 0) {
                     _burn(from, id, uint256(balanceChange));
                 } else {
-                    uint256 balance = BalanceLib.getBalance(Bytes32AddressLib.fromLast20Bytes(id));
+                    uint256 balance = BalanceLib.getBalance(address(uint160(uint256(id))));
                     if (balance < balancesBefore[i] + uint256(balanceChange)) revert InsufficientInput();
                 }
             }
@@ -220,10 +220,11 @@ contract Engine is Positions {
     )
         external
         view
-        returns (uint128[MAX_TIERS] memory compositions, int24 tickCurrent, int8 offset, uint8 lock)
+        returns (uint128[MAX_TIERS] memory compositions, int24 tickCurrent, int8 offset, uint8 initialized)
     {
         (, Pairs.Pair storage pair) = pairs.getPairAndID(token0, token1);
-        (compositions, tickCurrent, offset, lock) = (pair.compositions, pair.tickCurrent, pair.offset, pair.lock);
+        (compositions, tickCurrent, offset, initialized) =
+            (pair.compositions, pair.tickCurrent, pair.offset, pair.initialized);
     }
 
     function getTick(address token0, address token1, int24 tick) external view returns (Ticks.Tick memory) {
