@@ -8,37 +8,57 @@ library Accounts {
     /// otherwise represents a token address
     /// @param balanceChanges The change in balance for the engine
     struct Account {
-        bytes32[] ids;
-        int256[] balanceChanges;
+        address[] tokens;
+        int256[] tokenDeltas;
         uint256[] balances;
+        bytes32[] ids;
+        int256[] ilrtaDeltas;
     }
 
-    function newAccount(uint256 numAccounts) internal pure returns (Account memory) {
-        bytes32[] memory ids = new bytes32[](numAccounts);
-        int256[] memory balanceChanges = new int256[](numAccounts);
-        uint256[] memory balances = new uint256[](numAccounts);
+    function newAccount(uint256 numTokens, uint256 numILRTA) internal pure returns (Account memory account) {
+        if (numTokens > 0) {
+            account.tokens = new address[](numTokens);
+            account.tokenDeltas = new int256[](numTokens);
+            account.balances = new uint256[](numTokens);
+        }
 
-        return Account(ids, balanceChanges, balances);
+        if (numILRTA > 0) {
+            account.ids = new bytes32[](numILRTA);
+            account.ilrtaDeltas = new int256[](numILRTA);
+        }
     }
 
-    function update(Account memory account, bytes32 id, int256 balanceChange) internal view {
-        if (balanceChange == 0) return;
+    /// @custom:team pack balances tighter
+    function updateToken(Account memory account, address token, int256 delta) internal view {
+        if (delta == 0) return;
+
+        for (uint256 i = 0; i < account.tokens.length;) {
+            if (account.tokens[i] == token) {
+                account.tokenDeltas[i] = account.tokenDeltas[i] + delta;
+            } else if (account.tokens[i] == address(0)) {
+                account.tokens[i] = token;
+                account.tokenDeltas[i] = delta;
+
+                if (delta > 0) account.balances[i] = BalanceLib.getBalance(token);
+
+                break;
+            }
+
+            unchecked {
+                i++;
+            }
+        }
+    }
+
+    function updateILRTA(Account memory account, bytes32 id, int256 delta) internal pure {
+        if (delta == 0) return;
 
         for (uint256 i = 0; i < account.ids.length;) {
             if (account.ids[i] == id) {
-                account.balanceChanges[i] = account.balanceChanges[i] + balanceChange;
+                account.ilrtaDeltas[i] = account.ilrtaDeltas[i] + delta;
             } else if (account.ids[i] == bytes32(0)) {
                 account.ids[i] = id;
-                account.balanceChanges[i] = balanceChange;
-
-                if (
-                    balanceChange > 0
-                        && id & bytes32(0xFFFFFFFFFFFFFFFFFFFFFFFF0000000000000000000000000000000000000000) == 0
-                ) {
-                    account.balances[i] = BalanceLib.getBalance(address(uint160(uint256(id))));
-                }
-
-                break;
+                account.ilrtaDeltas[i] = delta;
             }
 
             unchecked {

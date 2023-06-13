@@ -12,10 +12,8 @@ import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
 import {IExecuteCallback} from "./interfaces/IExecuteCallback.sol";
 
 /// @author Robert Leifke and Kyle Scott
-/// @custom:team id could be an issue is someone mines an ilrta id with 24 trailing zeros
 /// @custom:team add execute by signature
 /// @custom:team check if a function that only does one action is worth it
-/// @custom:team pass in token addresses in an array and copy it to memory, so that we dont have to store in storage
 contract Engine is Positions {
     using Ticks for Ticks.Tick;
     using Pairs for Pairs.Pair;
@@ -89,12 +87,13 @@ contract Engine is Positions {
         Commands[] calldata commands,
         bytes[] calldata inputs,
         address to,
-        uint256 numAccounts,
+        uint256 numTokens,
+        uint256 numILRTA,
         bytes calldata data
     )
         external
     {
-        _execute(commands, inputs, to, numAccounts, data);
+        _execute(commands, inputs, to, numTokens, numILRTA, data);
     }
 
     /// @dev Set to address to 0 if creating a pair
@@ -102,7 +101,8 @@ contract Engine is Positions {
         Commands[] calldata commands,
         bytes[] calldata inputs,
         address to,
-        uint256 numAccounts,
+        uint256 numTokens,
+        uint256 numILRTA,
         bytes calldata data
     )
         private
@@ -110,9 +110,7 @@ contract Engine is Positions {
     {
         if (commands.length != inputs.length) revert CommandLengthMismatch();
 
-        Accounts.Account memory account;
-
-        if (numAccounts > 0) account = Accounts.newAccount(numAccounts);
+        Accounts.Account memory account = Accounts.newAccount(numTokens, numILRTA);
 
         for (uint256 i = 0; i < commands.length;) {
             if (commands[i] == Commands.Swap) {
@@ -121,8 +119,8 @@ contract Engine is Positions {
 
                 (int256 amount0, int256 amount1) = pair.swap(params.isToken0, params.amountDesired);
 
-                account.update(bytes32(uint256(uint160(params.token0))), amount0);
-                account.update(bytes32(uint256(uint160(params.token1))), amount1);
+                account.updateToken(params.token0, amount0);
+                account.updateToken(params.token1, amount1);
 
                 emit Swap(pairID);
             } else if (commands[i] == Commands.AddLiquidity) {
@@ -132,9 +130,9 @@ contract Engine is Positions {
                 (uint256 amount0, uint256 amount1) =
                     pair.updateLiquidity(params.tick, params.tier, int256(params.liquidity));
 
-                account.update(bytes32(uint256(uint160(params.token0))), int256(amount0));
-                account.update(bytes32(uint256(uint160(params.token1))), int256(amount1));
-                account.update(
+                account.updateToken(params.token0, int256(amount0));
+                account.updateToken(params.token1, int256(amount1));
+                account.updateILRTA(
                     dataID(abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.tick, params.tier))),
                     -int256(params.liquidity)
                 );
@@ -147,9 +145,9 @@ contract Engine is Positions {
                 (uint256 amount0, uint256 amount1) =
                     pair.updateLiquidity(params.tick, params.tier, -int256(params.liquidity));
 
-                account.update(bytes32(uint256(uint160(params.token0))), -int256(amount0));
-                account.update(bytes32(uint256(uint160(params.token1))), -int256(amount1));
-                account.update(
+                account.updateToken(params.token0, -int256(amount0));
+                account.updateToken(params.token1, -int256(amount1));
+                account.updateILRTA(
                     dataID(abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.tick, params.tier))),
                     int256(params.liquidity)
                 );
@@ -166,18 +164,14 @@ contract Engine is Positions {
             }
         }
 
-        for (uint256 i = 0; i < account.ids.length;) {
-            int256 balanceChange = account.balanceChanges[i];
-            bytes32 id = account.ids[i];
+        for (uint256 i = 0; i < numTokens;) {
+            int256 delta = account.tokenDeltas[i];
+            address token = account.tokens[i];
 
-            if (id == bytes32(0)) break;
+            if (token == address(0)) break;
 
-            if (balanceChange < 0) {
-                if (id & bytes32(0xFFFFFFFFFFFFFFFFFFFFFFFF0000000000000000000000000000000000000000) > 0) {
-                    _mint(to, id, uint256(-balanceChange));
-                } else {
-                    SafeTransferLib.safeTransfer(address(uint160(uint256(id))), to, uint256(-balanceChange));
-                }
+            if (delta < 0) {
+                SafeTransferLib.safeTransfer(token, to, uint256(-delta));
             }
 
             unchecked {
@@ -185,21 +179,51 @@ contract Engine is Positions {
             }
         }
 
-        if (numAccounts > 0) IExecuteCallback(msg.sender).executeCallback(account.ids, account.balanceChanges, data);
-
-        for (uint256 i = 0; i < account.ids.length;) {
-            int256 balanceChange = account.balanceChanges[i];
+        for (uint256 i = 0; i < numILRTA;) {
+            int256 delta = account.ilrtaDeltas[i];
             bytes32 id = account.ids[i];
 
             if (id == bytes32(0)) break;
 
-            if (balanceChange > 0) {
-                if (id & bytes32(0xFFFFFFFFFFFFFFFFFFFFFFFF0000000000000000000000000000000000000000) > 0) {
-                    _burn(address(this), id, uint256(balanceChange));
-                } else {
-                    uint256 balance = BalanceLib.getBalance(address(uint160(uint256(id))));
-                    if (balance < account.balances[i] + uint256(balanceChange)) revert InsufficientInput();
-                }
+            if (delta < 0) {
+                _mint(to, id, uint256(-delta));
+            }
+
+            unchecked {
+                i++;
+            }
+        }
+
+        if (numTokens > 0 || numILRTA > 0) {
+            IExecuteCallback(msg.sender).executeCallback(
+                account.tokens, account.tokenDeltas, account.ids, account.ilrtaDeltas, data
+            );
+        }
+
+        for (uint256 i = 0; i < numTokens;) {
+            int256 delta = account.tokenDeltas[i];
+            address token = account.tokens[i];
+
+            if (token == address(0)) break;
+
+            if (delta > 0) {
+                uint256 balance = BalanceLib.getBalance(token);
+                if (balance < account.balances[i] + uint256(delta)) revert InsufficientInput();
+            }
+
+            unchecked {
+                i++;
+            }
+        }
+
+        for (uint256 i = 0; i < numILRTA;) {
+            int256 delta = account.ilrtaDeltas[i];
+            bytes32 id = account.ids[i];
+
+            if (id == bytes32(0)) break;
+
+            if (delta > 0) {
+                _burn(address(this), id, uint256(delta));
             }
 
             unchecked {
