@@ -25,7 +25,7 @@ library Pairs {
         uint128[MAX_TIERS] compositions;
         int24 tickCurrent;
         int8 offset;
-        uint8 lock; // 2 == locked, 1 == unlocked, 0 == uninitialized
+        uint8 initialized; // 1 == initialized, 0 == uninitialized
         mapping(int24 => Ticks.Tick) ticks;
         TickMaps.TickMap tickMap0To1;
         TickMaps.TickMap tickMap1To0;
@@ -53,11 +53,11 @@ library Pairs {
     //////////////////////////////////////////////////////////////*/
 
     function initialize(Pair storage pair, int24 tickInitial) internal {
-        if (pair.lock != 0) revert Initialized();
+        if (pair.initialized != 0) revert Initialized();
         _checkTick(tickInitial);
 
         pair.tickCurrent = tickInitial;
-        pair.lock = 1;
+        pair.initialized = 1;
 
         pair.tickMap0To1.set(MIN_TICK);
         pair.tickMap1To0.set(MIN_TICK);
@@ -101,6 +101,7 @@ library Pairs {
         internal
         returns (int256 amount0, int256 amount1)
     {
+        if (pair.initialized != 1) revert Initialized();
         bool isExactIn = amountDesired > 0;
         bool isSwap0To1 = isToken0 == isExactIn;
 
@@ -232,6 +233,7 @@ library Pairs {
         internal
         returns (uint256 amount0, uint256 amount1)
     {
+        if (pair.initialized != 1) revert Initialized();
         _checkTick(tick);
         _checkTier(tier);
 

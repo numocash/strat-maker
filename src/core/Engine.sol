@@ -24,6 +24,7 @@ contract Engine is Positions {
     event RemoveLiquidity(bytes32 indexed pairID, int24 indexed tick, uint8 indexed tier, uint256 liquidity);
     event Swap(bytes32 indexed pairID);
 
+    error Reentrancy();
     error InvalidTokenOrder();
     error InsufficientInput();
     error CommandLengthMismatch();
@@ -31,7 +32,19 @@ contract Engine is Positions {
 
     Accounts.Account private account;
 
-    mapping(bytes32 => Pairs.Pair) internal pairs;
+    uint256 private locked = 1;
+
+    modifier nonReentrant() {
+        if (locked != 1) revert Reentrancy();
+
+        locked = 2;
+
+        _;
+
+        locked = 1;
+    }
+
+    mapping(bytes32 => Pairs.Pair) private pairs;
 
     enum Commands {
         Swap,
@@ -67,6 +80,7 @@ contract Engine is Positions {
     /// @custom:team add function for single function execution
     /// @custom:team pass in token addresses in an array and copy it to memory, so that we dont have to store in storage
 
+    /// @dev Set to address to 0 if creating a pair
     function execute(Commands[] calldata commands, bytes[] calldata inputs, address to, bytes calldata data) external {
         _execute(commands, inputs, msg.sender, to, data);
     }
@@ -82,6 +96,7 @@ contract Engine is Positions {
         bytes calldata data
     )
         private
+        nonReentrant
     {
         if (commands.length != inputs.length) revert CommandLengthMismatch();
 
