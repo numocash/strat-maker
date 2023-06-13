@@ -6,6 +6,7 @@ library Accounts {
     /// @param ids The id of the token. If any of the last 12 bytes are flipped, this represents a ILRTA positions id,
     /// otherwise represents a token address
     /// @param balanceChanges The change in balance for the engine
+    /// @custom:team why can't this be implemented in memory
     struct Account {
         mapping(bytes32 => uint256) indexes;
         bytes32[] ids;

@@ -137,17 +137,22 @@ contract Engine is Positions {
             }
         }
 
+        uint256[] memory balancesBefore = new uint256[](account.ids.length);
+
         for (uint256 i = 0; i < account.ids.length;) {
-            if (account.balanceChanges[i] < 0) {
-                if (account.ids[i] & bytes32(0x0000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF) > 0) {
-                    _mint(to, account.ids[i], uint256(-account.balanceChanges[i]));
+            int256 balanceChange = account.balanceChanges[i];
+            bytes32 id = account.ids[i];
+
+            if (balanceChange < 0) {
+                if (id & bytes32(0x0000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF) > 0) {
+                    _mint(to, id, uint256(-balanceChange));
                 } else {
-                    SafeTransferLib.safeTransfer(
-                        Bytes32AddressLib.fromLast20Bytes(account.ids[i]), to, uint256(-account.balanceChanges[i])
-                    );
+                    SafeTransferLib.safeTransfer(Bytes32AddressLib.fromLast20Bytes(id), to, uint256(-balanceChange));
                 }
             } else {
-                // read and save balances
+                if (id & bytes32(0x0000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF) == 0) {
+                    balancesBefore[i] = BalanceLib.getBalance(Bytes32AddressLib.fromLast20Bytes(id));
+                }
             }
 
             unchecked {
@@ -157,7 +162,24 @@ contract Engine is Positions {
 
         IExecuteCallback(msg.sender).executeCallback(account.ids, account.balanceChanges, data);
 
-        // check input received
+        for (uint256 i = 0; i < account.ids.length;) {
+            int256 balanceChange = account.balanceChanges[i];
+
+            if (balanceChange > 0) {
+                bytes32 id = account.ids[i];
+
+                if (id & bytes32(0x0000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF) > 0) {
+                    _burn(from, id, uint256(balanceChange));
+                } else {
+                    uint256 balance = BalanceLib.getBalance(Bytes32AddressLib.fromLast20Bytes(id));
+                    if (balance < balancesBefore[i] + uint256(balanceChange)) revert InsufficientInput();
+                }
+            }
+
+            unchecked {
+                i++;
+            }
+        }
 
         delete account;
     }
