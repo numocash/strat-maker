@@ -31,16 +31,20 @@ library Pairs {
         TickMaps.TickMap tickMap1To0;
     }
 
-    function getPair(
+    function getPairID(address token0, address token1) internal pure returns (bytes32 pairID) {
+        return keccak256(abi.encodePacked(token0, token1));
+    }
+
+    function getPairAndID(
         mapping(bytes32 => Pair) storage pairs,
         address token0,
         address token1
     )
         internal
         view
-        returns (Pair storage pair)
+        returns (bytes32 pairID, Pair storage pair)
     {
-        bytes32 pairID = keccak256(abi.encode(token0, token1));
+        pairID = getPairID(token0, token1);
         pair = pairs[pairID];
     }
 
@@ -86,9 +90,9 @@ library Pairs {
 
     /// @notice Swap between the two tokens in the pair
     /// @param isToken0 True if amountDesired refers to token0
-    /// @param amountDesired The desired amount change on the pool
-    /// @return amount0 The delta of the balance of token0 of the pool
-    /// @return amount1 The delta of the balance of token1 of the pool
+    /// @param amountDesired The desired amount change on the pair
+    /// @return amount0 The delta of the balance of token0 of the pair
+    /// @return amount1 The delta of the balance of token1 of the pair
     function swap(
         Pair storage pair,
         bool isToken0,
@@ -221,8 +225,8 @@ library Pairs {
     /// @param liquidity The amount of liquidity being added or removed
     function updateLiquidity(
         Pair storage pair,
-        uint8 tier,
         int24 tick,
+        uint8 tier,
         int256 liquidity
     )
         internal
@@ -232,7 +236,7 @@ library Pairs {
         _checkTier(tier);
 
         // update ticks
-        _updateTick(pair, tier, tick, liquidity);
+        _updateTick(pair, tick, tier, liquidity);
 
         // determine amounts
         int24 tickCurrentForTier = getCurrentTickForTierFromOffset(pair.tickCurrent, pair.offset, tier);
@@ -247,20 +251,20 @@ library Pairs {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Check the validiity of ticks
-    function _checkTick(int24 tick) internal pure {
+    function _checkTick(int24 tick) private pure {
         if (MIN_TICK > tick || tick > MAX_TICK) {
             revert InvalidTick();
         }
     }
 
     /// @notice Check the validity of the tier
-    function _checkTier(uint8 tier) internal pure {
+    function _checkTier(uint8 tier) private pure {
         if (tier > MAX_TIERS) revert InvalidTier();
     }
 
     /// @notice Update a tick
     /// @param liquidity The amount of liquidity being added or removed
-    function _updateTick(Pair storage pair, uint8 tier, int24 tick, int256 liquidity) internal {
+    function _updateTick(Pair storage pair, int24 tick, uint8 tier, int256 liquidity) private {
         uint256 existingLiquidity = pair.ticks[tick].getLiquidity(tier);
         pair.ticks[tick].liquidity[tier] = addDelta(existingLiquidity, liquidity);
 
