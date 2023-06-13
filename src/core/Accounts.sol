@@ -7,6 +7,7 @@ library Accounts {
     /// otherwise represents a token address
     /// @param balanceChanges The change in balance for the engine
     /// @custom:team why can't this be implemented in memory
+    /// @custom:team deleting this doesn't clear out indexes
     struct Account {
         mapping(bytes32 => uint256) indexes;
         bytes32[] ids;

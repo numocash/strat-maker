@@ -106,7 +106,7 @@ contract MockPair is Positions {
         return pair.ticks[tick];
     }
 
-    function getPosition(address owner, uint8 tier, int24 tick) external view returns (Positions.ILRTAData memory) {
+    function getPosition(address owner, int24 tick, uint8 tier) external view returns (Positions.ILRTAData memory) {
         return _dataOf[owner][dataID(abi.encode(Positions.ILRTADataID(token0, token1, tick, tier)))];
     }
 }

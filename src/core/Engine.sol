@@ -31,7 +31,9 @@ contract Engine is Positions {
 
     Accounts.Account private account;
 
-    uint256 private locked = 1;
+    /// @dev this should be checked when reading any `get` function from another contract to prevent read-only
+    /// reentrancy
+    uint256 public locked = 1;
 
     modifier nonReentrant() {
         if (locked != 1) revert Reentrancy();
@@ -75,6 +77,12 @@ contract Engine is Positions {
         uint256 liquidity;
     }
 
+    struct CreatePairParams {
+        address token0;
+        address token1;
+        int24 tickInitial;
+    }
+
     /// @custom:team add execute by signature
     /// @custom:team add function for single function execution
     /// @custom:team pass in token addresses in an array and copy it to memory, so that we dont have to store in storage
@@ -84,8 +92,6 @@ contract Engine is Positions {
     function execute(Commands[] calldata commands, bytes[] calldata inputs, address to, bytes calldata data) external {
         _execute(commands, inputs, msg.sender, to, data);
     }
-
-    // function executeBySignature
 
     /// @custom:team check whether burning from from address or burning from self is better
     function _execute(
@@ -191,18 +197,15 @@ contract Engine is Positions {
                 }
             }
 
+            account.indexes[account.ids[i]] = 0;
+
             unchecked {
                 i++;
             }
         }
 
-        delete account;
-    }
-
-    struct CreatePairParams {
-        address token0;
-        address token1;
-        int24 tickInitial;
+        delete account.ids;
+        delete account.balanceChanges;
     }
 
     function createPair(CreatePairParams memory params) private {
@@ -237,8 +240,8 @@ contract Engine is Positions {
         address token0,
         address token1,
         address owner,
-        uint8 tier,
-        int24 tick
+        int24 tick,
+        uint8 tier
     )
         external
         view

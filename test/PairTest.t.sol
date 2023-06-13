@@ -11,6 +11,24 @@ import {mulDiv} from "src/core/math/FullMath.sol";
 import {getRatioAtTick} from "src/core/math/TickMath.sol";
 import {MAX_TICK, MIN_TICK, Q128} from "src/core/math/TickMath.sol";
 
+contract InitializationTest is Test, PairHelper {
+    function setUp() external {
+        _setUp();
+    }
+
+    function testInitializeTickMaps() external {
+        Ticks.Tick memory tick = pair.getTick(0);
+        assertEq(tick.next0To1, MIN_TICK);
+        assertEq(tick.next1To0, MAX_TICK);
+
+        tick = pair.getTick(MAX_TICK);
+        assertEq(tick.next0To1, 0);
+
+        tick = pair.getTick(MIN_TICK);
+        assertEq(tick.next1To0, 0);
+    }
+}
+
 contract AddLiquidityTest is Test, PairHelper {
     uint256 precision = 1e9;
 
