@@ -21,7 +21,6 @@ library Pairs {
     error InvalidTier();
     error OutOfBounds();
 
-    /// @custom:team use the tickmap to check if pair is initialized
     struct Pair {
         uint128[MAX_TIERS] compositions;
         int24 tickCurrent;
@@ -238,12 +237,9 @@ library Pairs {
         _checkTick(tick);
         _checkTier(tier);
 
-        // update ticks
         _updateTick(pair, tick, tier, liquidity);
 
-        // determine amounts
         int24 tickCurrentForTier = getCurrentTickForTierFromOffset(pair.tickCurrent, pair.offset, tier);
-
         (amount0, amount1) = calcAmountsForLiquidity(
             tickCurrentForTier, pair.compositions[tier], tick, liquidity > 0 ? uint256(liquidity) : uint256(-liquidity)
         );
