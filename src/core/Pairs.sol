@@ -4,31 +4,33 @@ pragma solidity ^0.8.19;
 import {mulDiv, mulDivRoundingUp} from "./math/FullMath.sol";
 import {addDelta, calcAmountsForLiquidity} from "./math/LiquidityMath.sol";
 import {computeSwapStep} from "./math/SwapMath.sol";
-import {getCurrentTickForTierFromOffset, getRatioAtTick, MAX_TICK, MIN_TICK, Q128} from "./math/TickMath.sol";
-import {Ticks} from "./Ticks.sol";
-import {TickMaps} from "./TickMaps.sol";
+import {
+    getCurrentStrikeForTierFromOffset, getRatioAtStrike, MAX_STRIKE, MIN_STRIKE, Q128
+} from "./math/StrikeMath.sol";
+import {Strikes} from "./Strikes.sol";
+import {BitMaps} from "./BitMaps.sol";
 
 uint8 constant MAX_TIERS = 5;
 int8 constant MAX_OFFSET = int8(MAX_TIERS) - 1;
 
 /// @author Robert Leifke and Kyle Scott
 library Pairs {
-    using Ticks for Ticks.Tick;
-    using TickMaps for TickMaps.TickMap;
+    using Strikes for Strikes.Strike;
+    using BitMaps for BitMaps.BitMap;
 
     error Initialized();
-    error InvalidTick();
+    error InvalidStrike();
     error InvalidTier();
     error OutOfBounds();
 
     struct Pair {
         uint128[MAX_TIERS] compositions;
-        int24 tickCurrent;
+        int24 strikeCurrent;
         int8 offset;
         uint8 initialized; // 1 == initialized, 0 == uninitialized
-        mapping(int24 => Ticks.Tick) ticks;
-        TickMaps.TickMap tickMap0To1;
-        TickMaps.TickMap tickMap1To0;
+        mapping(int24 => Strikes.Strike) strikes;
+        BitMaps.BitMap bitMap0To1;
+        BitMaps.BitMap bitMap1To0;
     }
 
     function getPairID(address token0, address token1) internal pure returns (bytes32 pairID) {
@@ -52,23 +54,23 @@ library Pairs {
                               INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
-    function initialize(Pair storage pair, int24 tickInitial) internal {
+    function initialize(Pair storage pair, int24 strikeInitial) internal {
         if (pair.initialized != 0) revert Initialized();
-        _checkTick(tickInitial);
+        _checkStrike(strikeInitial);
 
-        pair.tickCurrent = tickInitial;
+        pair.strikeCurrent = strikeInitial;
         pair.initialized = 1;
 
-        pair.tickMap0To1.set(MIN_TICK);
-        pair.tickMap1To0.set(MIN_TICK);
-        pair.tickMap0To1.set(-tickInitial);
-        pair.tickMap1To0.set(tickInitial);
-        pair.ticks[MAX_TICK].next0To1 = tickInitial;
-        pair.ticks[MIN_TICK].next1To0 = tickInitial;
-        pair.ticks[tickInitial].next0To1 = MIN_TICK;
-        pair.ticks[tickInitial].next1To0 = MAX_TICK;
-        pair.ticks[tickInitial].reference0To1 = 1;
-        pair.ticks[tickInitial].reference1To0 = 1;
+        pair.bitMap0To1.set(MIN_STRIKE);
+        pair.bitMap1To0.set(MIN_STRIKE);
+        pair.bitMap0To1.set(-strikeInitial);
+        pair.bitMap1To0.set(strikeInitial);
+        pair.strikes[MAX_STRIKE].next0To1 = strikeInitial;
+        pair.strikes[MIN_STRIKE].next1To0 = strikeInitial;
+        pair.strikes[strikeInitial].next0To1 = MIN_STRIKE;
+        pair.strikes[strikeInitial].next1To0 = MAX_STRIKE;
+        pair.strikes[strikeInitial].reference0To1 = 1;
+        pair.strikes[strikeInitial].reference1To0 = 1;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -79,7 +81,7 @@ library Pairs {
     struct SwapState {
         uint256 liquidity;
         uint128 composition;
-        int24 tickCurrent;
+        int24 strikeCurrent;
         int8 offset;
         int256 amountDesired;
         // pool's balance change of the token which "amountDesired" refers to
@@ -107,19 +109,19 @@ library Pairs {
 
         SwapState memory state;
         {
-            int24 _tickCurrent = pair.tickCurrent;
+            int24 _strikeCurrent = pair.strikeCurrent;
             int8 _offset = isSwap0To1 == (pair.offset > 0) ? pair.offset : int8(0);
             uint256 liquidity = 0;
 
             for (int8 i = 0; i <= (_offset >= 0 ? _offset : -_offset); i++) {
-                liquidity += pair.ticks[isSwap0To1 ? _tickCurrent + i : _tickCurrent - i].getLiquidity(uint8(i));
+                liquidity += pair.strikes[isSwap0To1 ? _strikeCurrent + i : _strikeCurrent - i].getLiquidity(uint8(i));
             }
 
             // TODO: could we cache liquidity
             state = SwapState({
                 liquidity: liquidity,
                 composition: pair.compositions[0],
-                tickCurrent: _tickCurrent,
+                strikeCurrent: _strikeCurrent,
                 offset: _offset,
                 amountDesired: amountDesired,
                 amountA: 0,
@@ -128,7 +130,7 @@ library Pairs {
         }
 
         while (true) {
-            uint256 ratioX128 = getRatioAtTick(state.tickCurrent);
+            uint256 ratioX128 = getRatioAtStrike(state.strikeCurrent);
 
             (uint256 amountIn, uint256 amountOut, uint256 amountRemaining) =
                 computeSwapStep(ratioX128, state.composition, state.liquidity, isToken0, state.amountDesired);
@@ -154,21 +156,22 @@ library Pairs {
             }
 
             if (isSwap0To1) {
-                int24 tickPrev = state.tickCurrent;
-                if (tickPrev == MIN_TICK) revert OutOfBounds();
-                state.tickCurrent = pair.ticks[tickPrev].next0To1;
+                int24 strikePrev = state.strikeCurrent;
+                if (strikePrev == MIN_STRIKE) revert OutOfBounds();
+                state.strikeCurrent = pair.strikes[strikePrev].next0To1;
 
                 state.liquidity = 0;
                 if (state.offset < MAX_OFFSET) {
-                    int24 jump = tickPrev - state.tickCurrent;
+                    int24 jump = strikePrev - state.strikeCurrent;
                     state.offset = int24(state.offset) + jump >= MAX_OFFSET ? MAX_OFFSET : int8(state.offset + jump);
                 }
 
                 for (int8 i = 0; i < state.offset; i++) {
-                    state.liquidity += pair.ticks[state.tickCurrent + i].getLiquidity(uint8(i));
+                    state.liquidity += pair.strikes[state.strikeCurrent + i].getLiquidity(uint8(i));
                 }
 
-                uint256 newLiquidity = pair.ticks[state.tickCurrent + state.offset].getLiquidity(uint8(state.offset));
+                uint256 newLiquidity =
+                    pair.strikes[state.strikeCurrent + state.offset].getLiquidity(uint8(state.offset));
                 uint256 newComposition = pair.compositions[uint8(state.offset)];
 
                 state.liquidity += newLiquidity;
@@ -179,22 +182,23 @@ library Pairs {
                             : uint128(mulDiv(type(uint128).max - newComposition, newLiquidity, state.liquidity))
                     );
             } else {
-                int24 tickPrev = state.tickCurrent;
-                if (tickPrev == MAX_TICK) revert OutOfBounds();
-                state.tickCurrent = pair.ticks[tickPrev].next1To0;
+                int24 strikePrev = state.strikeCurrent;
+                if (strikePrev == MAX_STRIKE) revert OutOfBounds();
+                state.strikeCurrent = pair.strikes[strikePrev].next1To0;
 
                 state.liquidity = 0;
                 if (state.offset > -MAX_OFFSET) {
-                    int24 jump = state.tickCurrent - tickPrev;
+                    int24 jump = state.strikeCurrent - strikePrev;
                     state.offset = int24(state.offset) - jump <= -MAX_OFFSET ? -MAX_OFFSET : int8(state.offset - jump);
                 }
 
                 for (int8 i = 0; i < -state.offset; i++) {
-                    state.liquidity += pair.ticks[state.tickCurrent - i].getLiquidity(uint8(i));
+                    state.liquidity += pair.strikes[state.strikeCurrent - i].getLiquidity(uint8(i));
                 }
 
                 // solhint-disable-next-line max-line-length
-                uint256 newLiquidity = pair.ticks[state.tickCurrent + state.offset].getLiquidity(uint8(-state.offset));
+                uint256 newLiquidity =
+                    pair.strikes[state.strikeCurrent + state.offset].getLiquidity(uint8(-state.offset));
                 uint256 newComposition = pair.compositions[uint8(-state.offset)];
 
                 state.liquidity += newLiquidity;
@@ -214,7 +218,7 @@ library Pairs {
         for (uint8 i = 0; i <= uint8(state.offset >= 0 ? state.offset : -state.offset); i++) {
             pair.compositions[i] = state.composition;
         }
-        pair.tickCurrent = state.tickCurrent;
+        pair.strikeCurrent = state.strikeCurrent;
         pair.offset = state.offset;
     }
 
@@ -226,7 +230,7 @@ library Pairs {
     /// @param liquidity The amount of liquidity being added or removed
     function updateLiquidity(
         Pair storage pair,
-        int24 tick,
+        int24 strike,
         uint8 tier,
         int256 liquidity
     )
@@ -234,14 +238,17 @@ library Pairs {
         returns (uint256 amount0, uint256 amount1)
     {
         if (pair.initialized != 1) revert Initialized();
-        _checkTick(tick);
+        _checkStrike(strike);
         _checkTier(tier);
 
-        _updateTick(pair, tick, tier, liquidity);
+        _updateStrike(pair, strike, tier, liquidity);
 
-        int24 tickCurrentForTier = getCurrentTickForTierFromOffset(pair.tickCurrent, pair.offset, tier);
+        int24 strikeCurrentForTier = getCurrentStrikeForTierFromOffset(pair.strikeCurrent, pair.offset, tier);
         (amount0, amount1) = calcAmountsForLiquidity(
-            tickCurrentForTier, pair.compositions[tier], tick, liquidity > 0 ? uint256(liquidity) : uint256(-liquidity)
+            strikeCurrentForTier,
+            pair.compositions[tier],
+            strike,
+            liquidity > 0 ? uint256(liquidity) : uint256(-liquidity)
         );
     }
 
@@ -249,10 +256,10 @@ library Pairs {
                              INTERNAL LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Check the validiity of ticks
-    function _checkTick(int24 tick) private pure {
-        if (MIN_TICK > tick || tick > MAX_TICK) {
-            revert InvalidTick();
+    /// @notice Check the validiity of strikes
+    function _checkStrike(int24 strike) private pure {
+        if (MIN_STRIKE > strike || strike > MAX_STRIKE) {
+            revert InvalidStrike();
         }
     }
 
@@ -261,66 +268,66 @@ library Pairs {
         if (tier > MAX_TIERS) revert InvalidTier();
     }
 
-    /// @notice Update a tick
+    /// @notice Update a strike
     /// @param liquidity The amount of liquidity being added or removed
-    function _updateTick(Pair storage pair, int24 tick, uint8 tier, int256 liquidity) private {
-        uint256 existingLiquidity = pair.ticks[tick].getLiquidity(tier);
-        pair.ticks[tick].liquidity[tier] = addDelta(existingLiquidity, liquidity);
+    function _updateStrike(Pair storage pair, int24 strike, uint8 tier, int256 liquidity) private {
+        uint256 existingLiquidity = pair.strikes[strike].getLiquidity(tier);
+        pair.strikes[strike].liquidity[tier] = addDelta(existingLiquidity, liquidity);
 
         if (existingLiquidity == 0 && liquidity > 0) {
-            int24 tick0To1 = tick - int8(tier);
-            int24 tick1To0 = tick + int8(tier);
-            uint8 reference0To1 = pair.ticks[tick0To1].reference0To1;
-            uint8 reference1To0 = pair.ticks[tick1To0].reference1To0;
+            int24 strike0To1 = strike - int8(tier);
+            int24 strike1To0 = strike + int8(tier);
+            uint8 reference0To1 = pair.strikes[strike0To1].reference0To1;
+            uint8 reference1To0 = pair.strikes[strike1To0].reference1To0;
 
             bool add0To1 = reference0To1 == 0;
             bool add1To0 = reference1To0 == 0;
-            pair.ticks[tick0To1].reference0To1 = reference0To1 + 1;
-            pair.ticks[tick1To0].reference1To0 = reference1To0 + 1;
+            pair.strikes[strike0To1].reference0To1 = reference0To1 + 1;
+            pair.strikes[strike1To0].reference1To0 = reference1To0 + 1;
 
             if (add0To1) {
-                int24 below = -pair.tickMap0To1.nextBelow(-tick0To1);
-                int24 above = pair.ticks[below].next0To1;
+                int24 below = -pair.bitMap0To1.nextBelow(-strike0To1);
+                int24 above = pair.strikes[below].next0To1;
 
-                pair.ticks[tick0To1].next0To1 = above;
-                pair.ticks[below].next0To1 = tick0To1;
-                pair.tickMap0To1.set(-tick0To1);
+                pair.strikes[strike0To1].next0To1 = above;
+                pair.strikes[below].next0To1 = strike0To1;
+                pair.bitMap0To1.set(-strike0To1);
             }
 
             if (add1To0) {
-                int24 below = pair.tickMap1To0.nextBelow(tick1To0);
-                int24 above = pair.ticks[below].next1To0;
+                int24 below = pair.bitMap1To0.nextBelow(strike1To0);
+                int24 above = pair.strikes[below].next1To0;
 
-                pair.ticks[tick1To0].next1To0 = above;
-                pair.ticks[below].next1To0 = tick1To0;
-                pair.tickMap1To0.set(tick1To0);
+                pair.strikes[strike1To0].next1To0 = above;
+                pair.strikes[below].next1To0 = strike1To0;
+                pair.bitMap1To0.set(strike1To0);
             }
         } else if (liquidity < 0 && existingLiquidity == uint256(-liquidity)) {
-            int24 tick0To1 = tick - int8(tier);
-            int24 tick1To0 = tick + int8(tier);
-            uint8 reference0To1 = pair.ticks[tick0To1].reference0To1;
-            uint8 reference1To0 = pair.ticks[tick1To0].reference1To0;
+            int24 strike0To1 = strike - int8(tier);
+            int24 strike1To0 = strike + int8(tier);
+            uint8 reference0To1 = pair.strikes[strike0To1].reference0To1;
+            uint8 reference1To0 = pair.strikes[strike1To0].reference1To0;
 
             bool remove0To1 = reference0To1 == 1;
             bool remove1To0 = reference1To0 == 1;
-            pair.ticks[tick0To1].reference0To1 = reference0To1 - 1;
-            pair.ticks[tick1To0].reference1To0 = reference1To0 - 1;
+            pair.strikes[strike0To1].reference0To1 = reference0To1 - 1;
+            pair.strikes[strike1To0].reference1To0 = reference1To0 - 1;
 
             if (remove0To1) {
-                int24 below = -pair.tickMap0To1.nextBelow(-tick0To1);
-                int24 above = pair.ticks[tick0To1].next0To1;
+                int24 below = -pair.bitMap0To1.nextBelow(-strike0To1);
+                int24 above = pair.strikes[strike0To1].next0To1;
 
-                pair.ticks[below].next0To1 = above;
-                pair.tickMap0To1.unset(-tick0To1);
+                pair.strikes[below].next0To1 = above;
+                pair.bitMap0To1.unset(-strike0To1);
             }
 
             if (remove1To0) {
-                int24 below = pair.tickMap1To0.nextBelow(tick1To0);
-                int24 above = pair.ticks[tick1To0].next1To0;
+                int24 below = pair.bitMap1To0.nextBelow(strike1To0);
+                int24 above = pair.strikes[strike1To0].next1To0;
 
                 // TODO: when to clear out with delete
-                pair.ticks[below].next1To0 = above;
-                pair.tickMap1To0.unset(tick1To0);
+                pair.strikes[below].next1To0 = above;
+                pair.bitMap1To0.unset(strike1To0);
             }
         }
     }

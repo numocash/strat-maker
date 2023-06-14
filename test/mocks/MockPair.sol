@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 import {Pairs, MAX_TIERS} from "src/core/Pairs.sol";
 import {Positions} from "src/core/Positions.sol";
-import {Ticks} from "src/core/Ticks.sol";
+import {Strikes} from "src/core/Strikes.sol";
 
 import {BalanceLib} from "src/libraries/BalanceLib.sol";
 import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
@@ -18,23 +18,23 @@ contract MockPair is Positions {
 
     Pairs.Pair private pair;
 
-    constructor(address _token0, address _token1, int24 tickInitial) {
+    constructor(address _token0, address _token1, int24 strikeInitial) {
         token0 = _token0;
         token1 = _token1;
-        pair.initialize(tickInitial);
+        pair.initialize(strikeInitial);
     }
 
     function addLiquidity(
-        int24 tick,
+        int24 strike,
         uint8 tier,
         uint256 liquidity
     )
         public
         returns (uint256 amount0, uint256 amount1)
     {
-        (amount0, amount1) = pair.updateLiquidity(tick, tier, int256(liquidity));
+        (amount0, amount1) = pair.updateLiquidity(strike, tier, int256(liquidity));
 
-        _mint(msg.sender, dataID(abi.encode(Positions.ILRTADataID(token0, token1, tick, tier))), liquidity);
+        _mint(msg.sender, dataID(abi.encode(Positions.ILRTADataID(token0, token1, strike, tier))), liquidity);
 
         address[] memory tokens = new address[](2);
         tokens[0] = token0;
@@ -54,19 +54,19 @@ contract MockPair is Positions {
     }
 
     function removeLiquidity(
-        int24 tick,
+        int24 strike,
         uint8 tier,
         uint256 liquidity
     )
         public
         returns (uint256 amount0, uint256 amount1)
     {
-        (amount0, amount1) = pair.updateLiquidity(tick, tier, -int256(liquidity));
+        (amount0, amount1) = pair.updateLiquidity(strike, tier, -int256(liquidity));
 
         SafeTransferLib.safeTransfer(token0, msg.sender, amount0);
         SafeTransferLib.safeTransfer(token1, msg.sender, amount1);
 
-        _burn(msg.sender, dataID(abi.encode(Positions.ILRTADataID(token0, token1, tick, tier))), liquidity);
+        _burn(msg.sender, dataID(abi.encode(Positions.ILRTADataID(token0, token1, strike, tier))), liquidity);
     }
 
     function swap(bool isToken0, int256 amountDesired) public returns (int256 amount0, int256 amount1) {
@@ -100,17 +100,17 @@ contract MockPair is Positions {
     function getPair()
         external
         view
-        returns (uint128[MAX_TIERS] memory compositions, int24 tickCurrent, int8 offset, uint8 initialized)
+        returns (uint128[MAX_TIERS] memory compositions, int24 strikeCurrent, int8 offset, uint8 initialized)
     {
-        (compositions, tickCurrent, offset, initialized) =
-            (pair.compositions, pair.tickCurrent, pair.offset, pair.initialized);
+        (compositions, strikeCurrent, offset, initialized) =
+            (pair.compositions, pair.strikeCurrent, pair.offset, pair.initialized);
     }
 
-    function getTick(int24 tick) external view returns (Ticks.Tick memory) {
-        return pair.ticks[tick];
+    function getStrike(int24 strike) external view returns (Strikes.Strike memory) {
+        return pair.strikes[strike];
     }
 
-    function getPosition(address owner, int24 tick, uint8 tier) external view returns (Positions.ILRTAData memory) {
-        return _dataOf[owner][dataID(abi.encode(Positions.ILRTADataID(token0, token1, tick, tier)))];
+    function getPosition(address owner, int24 strike, uint8 tier) external view returns (Positions.ILRTAData memory) {
+        return _dataOf[owner][dataID(abi.encode(Positions.ILRTADataID(token0, token1, strike, tier)))];
     }
 }

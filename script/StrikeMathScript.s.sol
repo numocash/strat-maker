@@ -6,9 +6,9 @@ import {Script} from "forge-std/Script.sol";
 import {console2} from "forge-std/console2.sol";
 
 import {mulDiv} from "src/core/math/FullMath.sol";
-import {MAX_TICK, Q128} from "src/core/math/TickMath.sol";
+import {MAX_STRIKE, Q128} from "src/core/math/StrikeMath.sol";
 
-contract TickMathScript is Script {
+contract StrikeMathScript is Script {
     uint256 constant u = 0x100068DB8BAC710CB295F000000000000; // 1.0001 as a Q128.128
 
     function run() external pure {
@@ -17,7 +17,7 @@ contract TickMathScript is Script {
         /* solhint-disable-next-line no-console */
         console2.log("if (x & %x > 0) ratioX128 = (ratioX128 * %x) >> 128;", 1 << 0, type(uint256).max / u_i);
 
-        for (uint8 i = 1; (1 << i) < uint24(MAX_TICK); i++) {
+        for (uint8 i = 1; (1 << i) < uint24(MAX_STRIKE); i++) {
             u_i = mulDiv(u_i, u_i, Q128);
 
             /* solhint-disable-next-line no-console */

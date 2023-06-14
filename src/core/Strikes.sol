@@ -5,8 +5,8 @@ import {Pairs} from "./Pairs.sol";
 
 uint8 constant MAX_TIERS = 5;
 
-library Ticks {
-    struct Tick {
+library Strikes {
+    struct Strike {
         uint256[MAX_TIERS] liquidity;
         int24 next0To1;
         int24 next1To0;
@@ -14,7 +14,7 @@ library Ticks {
         uint8 reference1To0;
     }
 
-    function getLiquidity(Tick storage self, uint8 tier) internal view returns (uint256 liquidity) {
+    function getLiquidity(Strike storage self, uint8 tier) internal view returns (uint256 liquidity) {
         return self.liquidity[tier];
     }
 }

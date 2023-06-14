@@ -3,14 +3,14 @@ pragma solidity ^0.8.19;
 
 import {mulDiv, mulDivRoundingUp} from "./FullMath.sol";
 import {getAmount0FromComposition, getAmount1FromComposition} from "./LiquidityMath.sol";
-import {Q128} from "./TickMath.sol";
+import {Q128} from "./StrikeMath.sol";
 
-/// @notice Compoutes the result of a swap within a tick
+/// @notice Compoutes the result of a swap within a strike
 /// @param isToken0 True if amountDesired refers to token0
 /// @param amountDesired The desired amount change on the pool
 /// @return amountIn The amount of tokens to be swapped in
 /// @return amountOut The amount of tokens to be swapped out
-/// @return amountRemaining The amount of output token still remaining in the tick
+/// @return amountRemaining The amount of output token still remaining in the strike
 /// @custom:team when do we need to round up and when can we use unchecked math
 function computeSwapStep(
     uint256 ratioX128,

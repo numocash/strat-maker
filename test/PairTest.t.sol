@@ -5,27 +5,27 @@ import {Test} from "forge-std/Test.sol";
 import {PairHelper} from "./helpers/PairHelper.sol";
 
 import {Pairs, MAX_TIERS} from "src/core/Pairs.sol";
-import {Ticks} from "src/core/Ticks.sol";
+import {Strikes} from "src/core/Strikes.sol";
 import {Positions} from "src/core/Positions.sol";
 import {mulDiv} from "src/core/math/FullMath.sol";
-import {getRatioAtTick} from "src/core/math/TickMath.sol";
-import {MAX_TICK, MIN_TICK, Q128} from "src/core/math/TickMath.sol";
+import {getRatioAtStrike} from "src/core/math/StrikeMath.sol";
+import {MAX_STRIKE, MIN_STRIKE, Q128} from "src/core/math/StrikeMath.sol";
 
 contract InitializationTest is Test, PairHelper {
     function setUp() external {
         _setUp();
     }
 
-    function testInitializeTickMaps() external {
-        Ticks.Tick memory tick = pair.getTick(0);
-        assertEq(tick.next0To1, MIN_TICK);
-        assertEq(tick.next1To0, MAX_TICK);
+    function testInitializeStrikeMaps() external {
+        Strikes.Strike memory strike = pair.getStrike(0);
+        assertEq(strike.next0To1, MIN_STRIKE);
+        assertEq(strike.next1To0, MAX_STRIKE);
 
-        tick = pair.getTick(MAX_TICK);
-        assertEq(tick.next0To1, 0);
+        strike = pair.getStrike(MAX_STRIKE);
+        assertEq(strike.next0To1, 0);
 
-        tick = pair.getTick(MIN_TICK);
-        assertEq(tick.next1To0, 0);
+        strike = pair.getStrike(MIN_STRIKE);
+        assertEq(strike.next1To0, 0);
     }
 }
 
@@ -53,11 +53,11 @@ contract AddLiquidityTest is Test, PairHelper {
         assertEq(token1.balanceOf(address(pair)), 0);
     }
 
-    function testLiquidityTicks() external {
+    function testLiquidityStrikes() external {
         basicAddLiquidity();
 
-        Ticks.Tick memory tick = pair.getTick(0);
-        assertEq(tick.liquidity[0], 1e18);
+        Strikes.Strike memory strike = pair.getStrike(0);
+        assertEq(strike.liquidity[0], 1e18);
     }
 
     function testLiquidityPosition() external {
@@ -67,39 +67,39 @@ contract AddLiquidityTest is Test, PairHelper {
         assertEq(positionInfo.liquidity, 1e18);
     }
 
-    function testAddLiquidityTickMapBasic() external {
+    function testAddLiquidityStrikeMapBasic() external {
         basicAddLiquidity();
 
-        Ticks.Tick memory tick = pair.getTick(0);
-        assertEq(tick.next0To1, MIN_TICK);
-        assertEq(tick.next1To0, MAX_TICK);
+        Strikes.Strike memory strike = pair.getStrike(0);
+        assertEq(strike.next0To1, MIN_STRIKE);
+        assertEq(strike.next1To0, MAX_STRIKE);
 
-        tick = pair.getTick(MAX_TICK);
-        assertEq(tick.next0To1, 0);
+        strike = pair.getStrike(MAX_STRIKE);
+        assertEq(strike.next0To1, 0);
 
-        tick = pair.getTick(MIN_TICK);
-        assertEq(tick.next1To0, 0);
+        strike = pair.getStrike(MIN_STRIKE);
+        assertEq(strike.next1To0, 0);
     }
 
-    function testAddLiquidityTickMapWithTier() external {
+    function testAddLiquidityStrikeMapWithTier() external {
         pair.addLiquidity(0, 1, 1e18);
 
-        Ticks.Tick memory tick = pair.getTick(0);
-        assertEq(tick.next0To1, -1, "initial tick 0 to 1");
-        assertEq(tick.next1To0, 1, "initial tick 1 to 0");
+        Strikes.Strike memory strike = pair.getStrike(0);
+        assertEq(strike.next0To1, -1, "initial strike 0 to 1");
+        assertEq(strike.next1To0, 1, "initial strike 1 to 0");
 
-        tick = pair.getTick(-1);
-        assertEq(tick.next0To1, MIN_TICK, "0 to 1");
+        strike = pair.getStrike(-1);
+        assertEq(strike.next0To1, MIN_STRIKE, "0 to 1");
 
-        tick = pair.getTick(1);
-        assertEq(tick.next1To0, MAX_TICK, "1 to 0");
+        strike = pair.getStrike(1);
+        assertEq(strike.next1To0, MAX_STRIKE, "1 to 0");
     }
 
-    function testGasAddLiquidityFreshTicks() external {
+    function testGasAddLiquidityFreshStrikes() external {
         pair.addLiquidity(0, 1, 1e18);
     }
 
-    function testGasAddLiquidityHotTicks() external {
+    function testGasAddLiquidityHotStrikes() external {
         vm.pauseGasMetering();
         pair.addLiquidity(0, 1, 1e18);
         vm.resumeGasMetering();
@@ -107,11 +107,11 @@ contract AddLiquidityTest is Test, PairHelper {
         pair.addLiquidity(0, 1, 1e18);
     }
 
-    function testAddLiquidityBadTicks() external {
-        vm.expectRevert(Pairs.InvalidTick.selector);
+    function testAddLiquidityBadStrikes() external {
+        vm.expectRevert(Pairs.InvalidStrike.selector);
         pair.addLiquidity(type(int24).min, 0, 1e18);
 
-        vm.expectRevert(Pairs.InvalidTick.selector);
+        vm.expectRevert(Pairs.InvalidStrike.selector);
         pair.addLiquidity(type(int24).max, 0, 1e18);
     }
 
@@ -146,11 +146,11 @@ contract RemoveLiquidityTest is Test, PairHelper {
         assertEq(token1.balanceOf(address(pair)), 0);
     }
 
-    function testRemoveLiquidityTicks() external {
+    function testRemoveLiquidityStrikes() external {
         basicAddLiquidity();
         basicRemoveLiquidity();
-        Ticks.Tick memory tick = pair.getTick(0);
-        assertEq(tick.liquidity[0], 0);
+        Strikes.Strike memory strike = pair.getStrike(0);
+        assertEq(strike.liquidity[0], 0);
     }
 
     function testRemoveLiquidityPosition() external {
@@ -161,7 +161,7 @@ contract RemoveLiquidityTest is Test, PairHelper {
         assertEq(positionInfo.liquidity, 0);
     }
 
-    function testGasRemoveLiquidityCloseTicks() external {
+    function testGasRemoveLiquidityCloseStrikes() external {
         vm.pauseGasMetering();
         pair.addLiquidity(0, 1, 1e18);
 
@@ -170,7 +170,7 @@ contract RemoveLiquidityTest is Test, PairHelper {
         pair.removeLiquidity(0, 1, 1e18);
     }
 
-    function testGasRemoveLiquidityOpenTicks() external {
+    function testGasRemoveLiquidityOpenStrikes() external {
         vm.pauseGasMetering();
         pair.addLiquidity(0, 1, 2e18);
         vm.resumeGasMetering();
@@ -178,42 +178,42 @@ contract RemoveLiquidityTest is Test, PairHelper {
         pair.removeLiquidity(0, 1, 1e18);
     }
 
-    function testRemoveLiquidityTickMapBasic() external {
+    function testRemoveLiquidityStrikeMapBasic() external {
         pair.addLiquidity(0, 0, 1e18);
         pair.removeLiquidity(0, 0, 1e18);
-        Ticks.Tick memory tick = pair.getTick(0);
-        assertEq(tick.next0To1, MIN_TICK);
-        assertEq(tick.next1To0, MAX_TICK);
+        Strikes.Strike memory strike = pair.getStrike(0);
+        assertEq(strike.next0To1, MIN_STRIKE);
+        assertEq(strike.next1To0, MAX_STRIKE);
 
-        tick = pair.getTick(MAX_TICK);
-        assertEq(tick.next0To1, 0);
+        strike = pair.getStrike(MAX_STRIKE);
+        assertEq(strike.next0To1, 0);
 
-        tick = pair.getTick(MIN_TICK);
-        assertEq(tick.next1To0, 0);
+        strike = pair.getStrike(MIN_STRIKE);
+        assertEq(strike.next1To0, 0);
     }
 
-    function testRemoveLiquidityTickMapCurrentTick() external {
+    function testRemoveLiquidityStrikeMapCurrentStrike() external {
         pair.addLiquidity(0, 1, 1e18);
         pair.swap(false, 1e18 - 1);
 
         pair.removeLiquidity(0, 1, 1e18);
 
-        Ticks.Tick memory tick = pair.getTick(0);
-        assertEq(tick.next0To1, MIN_TICK);
-        assertEq(tick.next1To0, MAX_TICK);
+        Strikes.Strike memory strike = pair.getStrike(0);
+        assertEq(strike.next0To1, MIN_STRIKE);
+        assertEq(strike.next1To0, MAX_STRIKE);
 
-        tick = pair.getTick(MAX_TICK);
-        assertEq(tick.next0To1, 0);
+        strike = pair.getStrike(MAX_STRIKE);
+        assertEq(strike.next0To1, 0);
 
-        tick = pair.getTick(MIN_TICK);
-        assertEq(tick.next1To0, 0);
+        strike = pair.getStrike(MIN_STRIKE);
+        assertEq(strike.next1To0, 0);
     }
 
-    function testRemoveLiquidityBadTicks() external {
-        vm.expectRevert(Pairs.InvalidTick.selector);
+    function testRemoveLiquidityBadStrikes() external {
+        vm.expectRevert(Pairs.InvalidStrike.selector);
         pair.removeLiquidity(type(int24).min, 0, 1e18);
 
-        vm.expectRevert(Pairs.InvalidTick.selector);
+        vm.expectRevert(Pairs.InvalidStrike.selector);
         pair.removeLiquidity(type(int24).max, 0, 1e18);
     }
 
@@ -244,10 +244,10 @@ contract SwapTest is Test, PairHelper {
         assertApproxEqRel(token0.balanceOf(address(pair)), 0, precision);
         assertApproxEqRel(token1.balanceOf(address(pair)), 1e18, precision);
 
-        (uint128[5] memory compositions, int24 tickCurrent, int8 offset,) = pair.getPair();
+        (uint128[5] memory compositions, int24 strikeCurrent, int8 offset,) = pair.getPair();
 
         assertApproxEqRel(compositions[0], type(uint128).max, 1e9);
-        assertEq(tickCurrent, 0);
+        assertEq(strikeCurrent, 0);
         assertEq(offset, 0);
     }
 
@@ -265,17 +265,17 @@ contract SwapTest is Test, PairHelper {
         assertApproxEqRel(token0.balanceOf(address(pair)), 0, precision);
         assertApproxEqRel(token1.balanceOf(address(pair)), 1e18, precision);
 
-        (uint128[5] memory compositions, int24 tickCurrent, int8 offset,) = pair.getPair();
+        (uint128[5] memory compositions, int24 strikeCurrent, int8 offset,) = pair.getPair();
 
         assertApproxEqRel(compositions[0], type(uint128).max, 1e9);
-        assertEq(tickCurrent, 0);
+        assertEq(strikeCurrent, 0);
         assertEq(offset, 0);
     }
 
     function testSwapToken0ExactInBasic() external {
         pair.addLiquidity(-1, 0, 1e18);
         // 0->1
-        uint256 amountIn = mulDiv(1e18, Q128, getRatioAtTick(-1));
+        uint256 amountIn = mulDiv(1e18, Q128, getRatioAtStrike(-1));
         (int256 amount0, int256 amount1) = pair.swap(true, int256(amountIn));
 
         assertApproxEqAbs(amount0, int256(amountIn), precision, "amount0");
@@ -287,10 +287,10 @@ contract SwapTest is Test, PairHelper {
         assertApproxEqAbs(token0.balanceOf(address(pair)), amountIn, precision);
         assertApproxEqAbs(token1.balanceOf(address(pair)), 0, precision);
 
-        (uint128[5] memory compositions, int24 tickCurrent, int8 offset,) = pair.getPair();
+        (uint128[5] memory compositions, int24 strikeCurrent, int8 offset,) = pair.getPair();
 
         assertApproxEqRel(compositions[0], 0, 1e9);
-        assertEq(tickCurrent, -1);
+        assertEq(strikeCurrent, -1);
         assertEq(offset, 1);
     }
 
@@ -300,7 +300,7 @@ contract SwapTest is Test, PairHelper {
 
         (int256 amount0, int256 amount1) = pair.swap(false, -1e18 + 1);
 
-        uint256 amountIn = mulDiv(1e18, Q128, getRatioAtTick(-1));
+        uint256 amountIn = mulDiv(1e18, Q128, getRatioAtStrike(-1));
 
         assertApproxEqAbs(amount0, int256(amountIn), precision, "amount0");
         assertApproxEqAbs(amount1, -1e18, precision, "amount1");
@@ -311,10 +311,10 @@ contract SwapTest is Test, PairHelper {
         assertApproxEqAbs(token0.balanceOf(address(pair)), amountIn, precision, "balance0 pair");
         assertApproxEqAbs(token1.balanceOf(address(pair)), 0, precision, "balance1 pair");
 
-        (uint128[5] memory compositions, int24 tickCurrent, int8 offset,) = pair.getPair();
+        (uint128[5] memory compositions, int24 strikeCurrent, int8 offset,) = pair.getPair();
 
         assertApproxEqRel(compositions[0], 0, 1e9);
-        assertEq(tickCurrent, -1);
+        assertEq(strikeCurrent, -1);
         assertEq(offset, 1);
     }
 
@@ -347,7 +347,7 @@ contract SwapTest is Test, PairHelper {
 
     function testSwapStartPartial1To0() external {}
 
-    function testGasSwapSameTick() external {
+    function testGasSwapSameStrike() external {
         vm.pauseGasMetering();
         basicAddLiquidity();
         vm.resumeGasMetering();
@@ -364,7 +364,7 @@ contract SwapTest is Test, PairHelper {
         pair.swap(false, 0.2e18);
     }
 
-    function testGasSwapTwoTicks() external {
+    function testGasSwapTwoStrikes() external {
         vm.pauseGasMetering();
         pair.addLiquidity(0, 0, 1e18);
         pair.addLiquidity(1, 0, 1e18);
@@ -373,7 +373,7 @@ contract SwapTest is Test, PairHelper {
         pair.swap(false, 1.5e18);
     }
 
-    function testGasSwapFarTicks() external {
+    function testGasSwapFarStrikes() external {
         vm.pauseGasMetering();
         pair.addLiquidity(0, 0, 1e18);
         pair.addLiquidity(10, 0, 1e18);
@@ -386,11 +386,11 @@ contract SwapTest is Test, PairHelper {
         pair.addLiquidity(0, 1, 1e18);
         pair.swap(false, 1.5e18);
 
-        (uint128[5] memory compositions, int24 tickCurrent, int8 offset,) = pair.getPair();
+        (uint128[5] memory compositions, int24 strikeCurrent, int8 offset,) = pair.getPair();
 
         assertApproxEqRel(compositions[0], type(uint128).max / 2, 1e14, "composition 0");
         assertApproxEqRel(compositions[1], type(uint128).max / 2, 1e14, "composition 1");
-        assertEq(tickCurrent, 1);
+        assertEq(strikeCurrent, 1);
         assertEq(offset, -1);
     }
 
@@ -399,11 +399,11 @@ contract SwapTest is Test, PairHelper {
         pair.addLiquidity(-1, 1, 1e18);
         pair.swap(true, 1.5e18);
 
-        (uint128[5] memory compositions, int24 tickCurrent, int8 offset,) = pair.getPair();
+        (uint128[5] memory compositions, int24 strikeCurrent, int8 offset,) = pair.getPair();
 
         assertApproxEqRel(compositions[0], type(uint128).max / 2, 1e15, "composition 0");
         assertApproxEqRel(compositions[1], type(uint128).max / 2, 1e15, "composition 1");
-        assertEq(tickCurrent, -2);
+        assertEq(strikeCurrent, -2);
         assertEq(offset, 2);
     }
 
@@ -416,11 +416,11 @@ contract SwapTest is Test, PairHelper {
         pair.swap(false, 1.5e18);
         pair.swap(false, 0.4e18);
 
-        (uint128[5] memory compositions, int24 tickCurrent, int8 offset,) = pair.getPair();
+        (uint128[5] memory compositions, int24 strikeCurrent, int8 offset,) = pair.getPair();
 
         assertApproxEqRel(compositions[0], (uint256(type(uint128).max) * 45) / 100, 1e15, "composition 0");
         assertApproxEqRel(compositions[1], (uint256(type(uint128).max) * 45) / 100, 1e15, "composition 1");
-        assertEq(tickCurrent, 1);
+        assertEq(strikeCurrent, 1);
         assertEq(offset, -1);
     }
 
@@ -432,11 +432,11 @@ contract SwapTest is Test, PairHelper {
 
         pair.swap(true, 1.5e18);
 
-        (uint128[5] memory compositions, int24 tickCurrent, int8 offset,) = pair.getPair();
+        (uint128[5] memory compositions, int24 strikeCurrent, int8 offset,) = pair.getPair();
 
         assertApproxEqRel(compositions[0], type(uint128).max / 2, 1e15, "composition 0");
         assertApproxEqRel(compositions[1], type(uint128).max / 2, 1e15, "composition 1");
-        assertEq(tickCurrent, -2);
+        assertEq(strikeCurrent, -2);
         assertEq(offset, 2);
     }
 }

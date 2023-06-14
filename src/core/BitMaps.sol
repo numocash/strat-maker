@@ -1,44 +1,45 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
-import {MAX_TICK, MIN_TICK} from "./math/TickMath.sol";
+import {MAX_STRIKE, MIN_STRIKE} from "./math/StrikeMath.sol";
 
-library TickMaps {
-    struct TickMap {
+library BitMaps {
+    struct BitMap {
         uint256 blockMap; //                    stores which blocks are initialized
         mapping(uint256 => uint256) blocks; //  stores which words are initialized
-        mapping(uint256 => uint256) words; //   stores which ticks are initialized
+        mapping(uint256 => uint256) words; //   stores which strikes are initialized
     }
 
-    /// @dev Compress and convert tick into an unsigned integer, then compute the indices of the block and word that the
-    /// compressed tick uses. Assume tick >= MIN_TICK
-    function _indices(int24 tick) internal pure returns (uint256 blockIdx, uint256 wordIdx, uint256 compressed) {
+    /// @dev Compress and convert strike into an unsigned integer, then compute the indices of the block and word that
+    /// the
+    /// compressed strike uses. Assume strike >= MIN_STRIKE
+    function _indices(int24 strike) internal pure returns (uint256 blockIdx, uint256 wordIdx, uint256 compressed) {
         unchecked {
-            compressed = uint256(int256((tick - MIN_TICK)));
+            compressed = uint256(int256((strike - MIN_STRIKE)));
             blockIdx = compressed >> 16;
             wordIdx = compressed >> 8;
             assert(blockIdx < 256);
         }
     }
 
-    /// @dev Convert the unsigned integer back to a tick. Assume "compressed" is a valid value, computed by _indices
+    /// @dev Convert the unsigned integer back to a strike. Assume "compressed" is a valid value, computed by _indices
     /// function.
-    function _decompress(uint256 compressed) internal pure returns (int24 tick) {
+    function _decompress(uint256 compressed) internal pure returns (int24 strike) {
         unchecked {
-            tick = int24(int256(compressed) + MIN_TICK);
+            strike = int24(int256(compressed) + MIN_STRIKE);
         }
     }
 
-    function set(TickMap storage self, int24 tick) internal {
-        (uint256 blockIdx, uint256 wordIdx, uint256 compressed) = _indices(tick);
+    function set(BitMap storage self, int24 strike) internal {
+        (uint256 blockIdx, uint256 wordIdx, uint256 compressed) = _indices(strike);
 
         self.words[wordIdx] |= 1 << (compressed & 0xFF);
         self.blocks[blockIdx] |= 1 << (wordIdx & 0xFF);
         self.blockMap |= 1 << blockIdx;
     }
 
-    function unset(TickMap storage self, int24 tick) internal {
-        (uint256 blockIdx, uint256 wordIdx, uint256 compressed) = _indices(tick);
+    function unset(BitMap storage self, int24 strike) internal {
+        (uint256 blockIdx, uint256 wordIdx, uint256 compressed) = _indices(strike);
 
         self.words[wordIdx] &= ~(1 << (compressed & 0xFF));
         if (self.words[wordIdx] == 0) {
@@ -49,7 +50,7 @@ library TickMaps {
         }
     }
 
-    /// @dev Find the next initialized tick below the given tick. Assume tick >= MIN_TICK
+    /// @dev Find the next initialized strike below the given strike. Assume strike >= MIN_STRIKE
     // How to find the next initialized bit below the i-th bit inside a word (e.g. i = 8)?
     // 1)  Mask _off_ the word from the 8th bit to the 255th bit (zero-indexed)
     // 2)  Find the most significant bit of the masked word
@@ -60,10 +61,10 @@ library TickMaps {
     //     masked: 0000 0000 0010 1100
     //                         ↑
     //                  msb(masked) = 5
-    /// @custom:team could we assume MIN_TICK in some cases to save gas
-    function nextBelow(TickMap storage self, int24 tick) internal view returns (int24 tickBelow) {
+    /// @custom:team could we assume MIN_STRIKE in some cases to save gas
+    function nextBelow(BitMap storage self, int24 strike) internal view returns (int24 strikeBelow) {
         unchecked {
-            (uint256 blockIdx, uint256 wordIdx, uint256 compressed) = _indices(tick);
+            (uint256 blockIdx, uint256 wordIdx, uint256 compressed) = _indices(strike);
 
             uint256 word = self.words[wordIdx] & ((1 << (compressed & 0xFF)) - 1);
             if (word == 0) {
@@ -79,7 +80,7 @@ library TickMaps {
                 word = self.words[wordIdx];
             }
 
-            tickBelow = _decompress((wordIdx << 8) | _msb(word));
+            strikeBelow = _decompress((wordIdx << 8) | _msb(word));
         }
     }
 
