@@ -60,20 +60,20 @@ function getRatioAtStrike(int24 strike) pure returns (uint256 ratioX128) {
 /// @dev Find strike = floor(log_1.0001(ratioX128))
 function getStrikeAtRatio(uint256 ratioX128) pure returns (int24 strike) {}
 
-/// @notice Calculates the strike that a tier is currently at
-function getCurrentStrikeForTierFromOffset(
+/// @notice Calculates the strike that a spread is currently at
+function getCurrentStrikeForSpreadFromOffset(
     int24 strikeCurrent,
     int8 offset,
-    uint8 tier
+    uint8 spread
 )
     pure
-    returns (int24 strikeCurrentForTier)
+    returns (int24 strikeCurrentForSpread)
 {
     bool swap0To1Last = offset > 0;
     int8 absOffset = offset >= 0 ? offset : -offset;
 
-    if (absOffset > int8(tier)) {
-        return swap0To1Last ? strikeCurrent + int8(tier) : strikeCurrent - int8(tier);
+    if (absOffset > int8(spread)) {
+        return swap0To1Last ? strikeCurrent + int8(spread) : strikeCurrent - int8(spread);
     } else {
         return strikeCurrent + offset;
     }

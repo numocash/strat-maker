@@ -5,13 +5,13 @@ import {mulDiv, mulDivRoundingUp} from "./math/FullMath.sol";
 import {addDelta, calcAmountsForLiquidity} from "./math/LiquidityMath.sol";
 import {computeSwapStep} from "./math/SwapMath.sol";
 import {
-    getCurrentStrikeForTierFromOffset, getRatioAtStrike, MAX_STRIKE, MIN_STRIKE, Q128
+    getCurrentStrikeForSpreadFromOffset, getRatioAtStrike, MAX_STRIKE, MIN_STRIKE, Q128
 } from "./math/StrikeMath.sol";
 import {Strikes} from "./Strikes.sol";
 import {BitMaps} from "./BitMaps.sol";
 
-uint8 constant MAX_TIERS = 5;
-int8 constant MAX_OFFSET = int8(MAX_TIERS) - 1;
+uint8 constant MAX_SPREADS = 5;
+int8 constant MAX_OFFSET = int8(MAX_SPREADS) - 1;
 
 /// @author Robert Leifke and Kyle Scott
 library Pairs {
@@ -20,11 +20,11 @@ library Pairs {
 
     error Initialized();
     error InvalidStrike();
-    error InvalidTier();
+    error InvalidSpread();
     error OutOfBounds();
 
     struct Pair {
-        uint128[MAX_TIERS] compositions;
+        uint128[MAX_SPREADS] compositions;
         int24 strikeCurrent;
         int8 offset;
         uint8 initialized; // 1 == initialized, 0 == uninitialized
@@ -231,7 +231,7 @@ library Pairs {
     function updateLiquidity(
         Pair storage pair,
         int24 strike,
-        uint8 tier,
+        uint8 spread,
         int256 liquidity
     )
         internal
@@ -239,14 +239,14 @@ library Pairs {
     {
         if (pair.initialized != 1) revert Initialized();
         _checkStrike(strike);
-        _checkTier(tier);
+        _checkSpread(spread);
 
-        _updateStrike(pair, strike, tier, liquidity);
+        _updateStrike(pair, strike, spread, liquidity);
 
-        int24 strikeCurrentForTier = getCurrentStrikeForTierFromOffset(pair.strikeCurrent, pair.offset, tier);
+        int24 strikeCurrentForSpread = getCurrentStrikeForSpreadFromOffset(pair.strikeCurrent, pair.offset, spread);
         (amount0, amount1) = calcAmountsForLiquidity(
-            strikeCurrentForTier,
-            pair.compositions[tier],
+            strikeCurrentForSpread,
+            pair.compositions[spread],
             strike,
             liquidity > 0 ? uint256(liquidity) : uint256(-liquidity)
         );
@@ -263,20 +263,20 @@ library Pairs {
         }
     }
 
-    /// @notice Check the validity of the tier
-    function _checkTier(uint8 tier) private pure {
-        if (tier > MAX_TIERS) revert InvalidTier();
+    /// @notice Check the validity of the spread
+    function _checkSpread(uint8 spread) private pure {
+        if (spread > MAX_SPREADS) revert InvalidSpread();
     }
 
     /// @notice Update a strike
     /// @param liquidity The amount of liquidity being added or removed
-    function _updateStrike(Pair storage pair, int24 strike, uint8 tier, int256 liquidity) private {
-        uint256 existingLiquidity = pair.strikes[strike].getLiquidity(tier);
-        pair.strikes[strike].liquidity[tier] = addDelta(existingLiquidity, liquidity);
+    function _updateStrike(Pair storage pair, int24 strike, uint8 spread, int256 liquidity) private {
+        uint256 existingLiquidity = pair.strikes[strike].getLiquidity(spread);
+        pair.strikes[strike].liquidity[spread] = addDelta(existingLiquidity, liquidity);
 
         if (existingLiquidity == 0 && liquidity > 0) {
-            int24 strike0To1 = strike - int8(tier);
-            int24 strike1To0 = strike + int8(tier);
+            int24 strike0To1 = strike - int8(spread);
+            int24 strike1To0 = strike + int8(spread);
             uint8 reference0To1 = pair.strikes[strike0To1].reference0To1;
             uint8 reference1To0 = pair.strikes[strike1To0].reference1To0;
 
@@ -303,8 +303,8 @@ library Pairs {
                 pair.bitMap1To0.set(strike1To0);
             }
         } else if (liquidity < 0 && existingLiquidity == uint256(-liquidity)) {
-            int24 strike0To1 = strike - int8(tier);
-            int24 strike1To0 = strike + int8(tier);
+            int24 strike0To1 = strike - int8(spread);
+            int24 strike1To0 = strike + int8(spread);
             uint8 reference0To1 = pair.strikes[strike0To1].reference0To1;
             uint8 reference1To0 = pair.strikes[strike1To0].reference1To0;
 

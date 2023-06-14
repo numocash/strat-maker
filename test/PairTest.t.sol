@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {Test} from "forge-std/Test.sol";
 import {PairHelper} from "./helpers/PairHelper.sol";
 
-import {Pairs, MAX_TIERS} from "src/core/Pairs.sol";
+import {Pairs, MAX_SPREADS} from "src/core/Pairs.sol";
 import {Strikes} from "src/core/Strikes.sol";
 import {Positions} from "src/core/Positions.sol";
 import {mulDiv} from "src/core/math/FullMath.sol";
@@ -81,7 +81,7 @@ contract AddLiquidityTest is Test, PairHelper {
         assertEq(strike.next1To0, 0);
     }
 
-    function testAddLiquidityStrikeMapWithTier() external {
+    function testAddLiquidityStrikeMapWithSpread() external {
         pair.addLiquidity(0, 1, 1e18);
 
         Strikes.Strike memory strike = pair.getStrike(0);
@@ -115,8 +115,8 @@ contract AddLiquidityTest is Test, PairHelper {
         pair.addLiquidity(type(int24).max, 0, 1e18);
     }
 
-    function testAddLiquidityBadTier() external {
-        vm.expectRevert(Pairs.InvalidTier.selector);
+    function testAddLiquidityBadSpread() external {
+        vm.expectRevert(Pairs.InvalidSpread.selector);
         pair.addLiquidity(0, 10, 1e18);
     }
 }
@@ -217,8 +217,8 @@ contract RemoveLiquidityTest is Test, PairHelper {
         pair.removeLiquidity(type(int24).max, 0, 1e18);
     }
 
-    function testRemoveLiquidityBadTier() external {
-        vm.expectRevert(Pairs.InvalidTier.selector);
+    function testRemoveLiquidityBadSpread() external {
+        vm.expectRevert(Pairs.InvalidSpread.selector);
         pair.removeLiquidity(0, 10, 1e18);
     }
 }
@@ -381,7 +381,7 @@ contract SwapTest is Test, PairHelper {
         pair.swap(false, 1.5e18);
     }
 
-    function testMultiTierDown() external {
+    function testMultiSpreadDown() external {
         pair.addLiquidity(0, 0, 1e18);
         pair.addLiquidity(0, 1, 1e18);
         pair.swap(false, 1.5e18);
@@ -394,7 +394,7 @@ contract SwapTest is Test, PairHelper {
         assertEq(offset, -1);
     }
 
-    function testMultiTierUp() external {
+    function testMultiSpreadUp() external {
         pair.addLiquidity(-1, 0, 1e18);
         pair.addLiquidity(-1, 1, 1e18);
         pair.swap(true, 1.5e18);
@@ -424,7 +424,7 @@ contract SwapTest is Test, PairHelper {
         assertEq(offset, -1);
     }
 
-    function testTierComposition() external {
+    function testSpreadComposition() external {
         pair.addLiquidity(-1, 0, 1e18);
         pair.addLiquidity(-2, 0, 1e18);
 

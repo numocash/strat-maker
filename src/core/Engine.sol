@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
-import {Pairs, MAX_TIERS} from "./Pairs.sol";
+import {Pairs, MAX_SPREADS} from "./Pairs.sol";
 import {Strikes} from "./Strikes.sol";
 import {Positions} from "./Positions.sol";
 import {Accounts} from "./Accounts.sol";
@@ -20,8 +20,8 @@ contract Engine is Positions {
     using Pairs for mapping(bytes32 => Pairs.Pair);
 
     event PairCreated(address indexed token0, address indexed token1, int24 strikeInitial);
-    event AddLiquidity(bytes32 indexed pairID, int24 indexed strike, uint8 indexed tier, uint256 liquidity);
-    event RemoveLiquidity(bytes32 indexed pairID, int24 indexed strike, uint8 indexed tier, uint256 liquidity);
+    event AddLiquidity(bytes32 indexed pairID, int24 indexed strike, uint8 indexed spread, uint256 liquidity);
+    event RemoveLiquidity(bytes32 indexed pairID, int24 indexed strike, uint8 indexed spread, uint256 liquidity);
     event Swap(bytes32 indexed pairID);
 
     error Reentrancy();
@@ -64,7 +64,7 @@ contract Engine is Positions {
         address token0;
         address token1;
         int24 strike;
-        uint8 tier;
+        uint8 spread;
         uint256 liquidity;
     }
 
@@ -72,7 +72,7 @@ contract Engine is Positions {
         address token0;
         address token1;
         int24 strike;
-        uint8 tier;
+        uint8 spread;
         uint256 liquidity;
     }
 
@@ -127,31 +127,35 @@ contract Engine is Positions {
                 (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
 
                 (uint256 amount0, uint256 amount1) =
-                    pair.updateLiquidity(params.strike, params.tier, int256(params.liquidity));
+                    pair.updateLiquidity(params.strike, params.spread, int256(params.liquidity));
 
                 account.updateToken(params.token0, int256(amount0));
                 account.updateToken(params.token1, int256(amount1));
                 account.updateILRTA(
-                    dataID(abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.strike, params.tier))),
+                    dataID(
+                        abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.strike, params.spread))
+                    ),
                     -int256(params.liquidity)
                 );
 
-                emit AddLiquidity(pairID, params.strike, params.tier, params.liquidity);
+                emit AddLiquidity(pairID, params.strike, params.spread, params.liquidity);
             } else if (commands[i] == Commands.RemoveLiquidity) {
                 RemoveLiquidityParams memory params = abi.decode(inputs[i], (RemoveLiquidityParams));
                 (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
 
                 (uint256 amount0, uint256 amount1) =
-                    pair.updateLiquidity(params.strike, params.tier, -int256(params.liquidity));
+                    pair.updateLiquidity(params.strike, params.spread, -int256(params.liquidity));
 
                 account.updateToken(params.token0, -int256(amount0));
                 account.updateToken(params.token1, -int256(amount1));
                 account.updateILRTA(
-                    dataID(abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.strike, params.tier))),
+                    dataID(
+                        abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.strike, params.spread))
+                    ),
                     int256(params.liquidity)
                 );
 
-                emit RemoveLiquidity(pairID, params.strike, params.tier, params.liquidity);
+                emit RemoveLiquidity(pairID, params.strike, params.spread, params.liquidity);
             } else if (commands[i] == Commands.CreatePair) {
                 _createPair(abi.decode(inputs[i], (CreatePairParams)));
             } else {
@@ -246,7 +250,7 @@ contract Engine is Positions {
     )
         external
         view
-        returns (uint128[MAX_TIERS] memory compositions, int24 strikeCurrent, int8 offset, uint8 initialized)
+        returns (uint128[MAX_SPREADS] memory compositions, int24 strikeCurrent, int8 offset, uint8 initialized)
     {
         (, Pairs.Pair storage pair) = pairs.getPairAndID(token0, token1);
         (compositions, strikeCurrent, offset, initialized) =
@@ -264,12 +268,12 @@ contract Engine is Positions {
         address token1,
         address owner,
         int24 strike,
-        uint8 tier
+        uint8 spread
     )
         external
         view
         returns (Positions.ILRTAData memory)
     {
-        return _dataOf[owner][dataID(abi.encode(Positions.ILRTADataID(token0, token1, strike, tier)))];
+        return _dataOf[owner][dataID(abi.encode(Positions.ILRTADataID(token0, token1, strike, spread)))];
     }
 }

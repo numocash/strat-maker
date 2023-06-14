@@ -7,14 +7,15 @@ abstract contract Positions is ILRTA {
     mapping(address owner => mapping(bytes32 id => ILRTAData data)) internal _dataOf;
 
     constructor()
-        ILRTA("Yikes", "YIKES", "TransferDetails(address token0,address token1,int24 strike,uint8 tier,uint256 amount)")
+        // solhint-disable-next-line max-line-length
+        ILRTA("Yikes", "YIKES", "TransferDetails(address token0,address token1,int24 strike,uint8 spread,uint256 amount)")
     {}
 
     struct ILRTADataID {
         address token0;
         address token1;
         int24 strike;
-        uint8 tier;
+        uint8 spread;
     }
 
     struct ILRTAData {

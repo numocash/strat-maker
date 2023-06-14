@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import {Pairs, MAX_TIERS} from "src/core/Pairs.sol";
+import {Pairs, MAX_SPREADS} from "src/core/Pairs.sol";
 import {Positions} from "src/core/Positions.sol";
 import {Strikes} from "src/core/Strikes.sol";
 
@@ -26,15 +26,15 @@ contract MockPair is Positions {
 
     function addLiquidity(
         int24 strike,
-        uint8 tier,
+        uint8 spread,
         uint256 liquidity
     )
         public
         returns (uint256 amount0, uint256 amount1)
     {
-        (amount0, amount1) = pair.updateLiquidity(strike, tier, int256(liquidity));
+        (amount0, amount1) = pair.updateLiquidity(strike, spread, int256(liquidity));
 
-        _mint(msg.sender, dataID(abi.encode(Positions.ILRTADataID(token0, token1, strike, tier))), liquidity);
+        _mint(msg.sender, dataID(abi.encode(Positions.ILRTADataID(token0, token1, strike, spread))), liquidity);
 
         address[] memory tokens = new address[](2);
         tokens[0] = token0;
@@ -55,18 +55,18 @@ contract MockPair is Positions {
 
     function removeLiquidity(
         int24 strike,
-        uint8 tier,
+        uint8 spread,
         uint256 liquidity
     )
         public
         returns (uint256 amount0, uint256 amount1)
     {
-        (amount0, amount1) = pair.updateLiquidity(strike, tier, -int256(liquidity));
+        (amount0, amount1) = pair.updateLiquidity(strike, spread, -int256(liquidity));
 
         SafeTransferLib.safeTransfer(token0, msg.sender, amount0);
         SafeTransferLib.safeTransfer(token1, msg.sender, amount1);
 
-        _burn(msg.sender, dataID(abi.encode(Positions.ILRTADataID(token0, token1, strike, tier))), liquidity);
+        _burn(msg.sender, dataID(abi.encode(Positions.ILRTADataID(token0, token1, strike, spread))), liquidity);
     }
 
     function swap(bool isToken0, int256 amountDesired) public returns (int256 amount0, int256 amount1) {
@@ -100,7 +100,7 @@ contract MockPair is Positions {
     function getPair()
         external
         view
-        returns (uint128[MAX_TIERS] memory compositions, int24 strikeCurrent, int8 offset, uint8 initialized)
+        returns (uint128[MAX_SPREADS] memory compositions, int24 strikeCurrent, int8 offset, uint8 initialized)
     {
         (compositions, strikeCurrent, offset, initialized) =
             (pair.compositions, pair.strikeCurrent, pair.offset, pair.initialized);
@@ -110,7 +110,15 @@ contract MockPair is Positions {
         return pair.strikes[strike];
     }
 
-    function getPosition(address owner, int24 strike, uint8 tier) external view returns (Positions.ILRTAData memory) {
-        return _dataOf[owner][dataID(abi.encode(Positions.ILRTADataID(token0, token1, strike, tier)))];
+    function getPosition(
+        address owner,
+        int24 strike,
+        uint8 spread
+    )
+        external
+        view
+        returns (Positions.ILRTAData memory)
+    {
+        return _dataOf[owner][dataID(abi.encode(Positions.ILRTADataID(token0, token1, strike, spread)))];
     }
 }
