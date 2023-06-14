@@ -48,13 +48,23 @@ This design essentially allows for fees to be encoded in ticks. Yikes has multip
 
 Yikes uses an engine contract that manages the creation and interaction with each pair. Contrary to many other exchanges, pairs are not seperate contracts but instead implemented as a library. Therefore, the engine smart contract holds the state of all pairs. This greatly decreases the cost of creating a new pair and also allows for more efficient multi-hop swaps.
 
+In the `Engine.sol` contract information about different token pairs is store and retrieved in the internal mapping called `pairs`, which maps a pair identifier computed using token addresses to a `Pairs.Pair` struct. This struct contains data related to a specific token pair, such as liquidity, tick information, and position data. 
+
+The `createPair()` function creates a new token pair and initializes it with an initial tick, `tickInitial`. 
+
+The `addLiquidity()` function adds liquidity to a specified pair and updates the corresponding balances. It also invokes a callback function defined in the IAddLiquidityCallback interface. Similarly, the `removeLiquidity()` function removes liquidity from a pair and transfers the respective token amounts to the specified recipient.
+
+The `swap()` function allows users to swap tokens between a given pair. It calculates the resulting token amounts and performs necessary transfers. The function also invokes a callback defined in the ISwapCallback interface. The contract also provides functions to retrieve pair information, tick data, and position information for a given pair, owner, tier, and tick.
+
 ### Pair (`core/Pair.sol`)
 
 Each individual market, described by `token0` and `token1` is an instance of a pair.
 
-### Ticks
+### TickMaps (`core/TickMaps.sol`)
 
-### Positions
+TickMaps is a library used in `Pairs.sol`. Its purpose is to manage and store information about initialized ticks with each tick being a fixed price on the constant sum curve. To do this, information about initialized blocks, words, and ticks is stored in the struct `TickMap`. It uses bitmaps and mappings to represent the initialization status at different levels, providing a compact and scalable solution for managing tick-related data.
+
+### Positions (`core/Positions.sol`)
 
 ### Periphery
 
