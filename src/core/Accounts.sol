@@ -4,9 +4,6 @@ pragma solidity ^0.8.19;
 import {BalanceLib} from "src/libraries/BalanceLib.sol";
 
 library Accounts {
-    /// @param ids The id of the token. If any of the last 12 bytes are flipped, this represents a ILRTA positions id,
-    /// otherwise represents a token address
-    /// @param balanceChanges The change in balance for the engine
     struct Account {
         address[] tokens;
         int256[] tokenDeltas;
@@ -28,7 +25,6 @@ library Accounts {
         }
     }
 
-    /// @custom:team pack balances tighter
     function updateToken(Account memory account, address token, int256 delta) internal view {
         if (delta == 0) return;
 
