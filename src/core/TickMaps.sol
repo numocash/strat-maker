@@ -60,6 +60,7 @@ library TickMaps {
     //     masked: 0000 0000 0010 1100
     //                         ↑
     //                  msb(masked) = 5
+    /// @custom:team could we assume MIN_TICK in some cases to save gas
     function nextBelow(TickMap storage self, int24 tick) internal view returns (int24 tickBelow) {
         unchecked {
             (uint256 blockIdx, uint256 wordIdx, uint256 compressed) = _indices(tick);
