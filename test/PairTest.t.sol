@@ -95,11 +95,11 @@ contract AddLiquidityTest is Test, PairHelper {
         assertEq(tick.next1To0, MAX_TICK, "1 to 0");
     }
 
-    function testAddLiquidityGasFreshTicks() external {
+    function testGasAddLiquidityFreshTicks() external {
         pair.addLiquidity(0, 1, 1e18);
     }
 
-    function testAddLiquidityGasHotTicks() external {
+    function testGasAddLiquidityHotTicks() external {
         vm.pauseGasMetering();
         pair.addLiquidity(0, 1, 1e18);
         vm.resumeGasMetering();
@@ -161,7 +161,7 @@ contract RemoveLiquidityTest is Test, PairHelper {
         assertEq(positionInfo.liquidity, 0);
     }
 
-    function testRemoveLiquidityGasCloseTicks() external {
+    function testGasRemoveLiquidityCloseTicks() external {
         vm.pauseGasMetering();
         pair.addLiquidity(0, 1, 1e18);
 
@@ -170,7 +170,7 @@ contract RemoveLiquidityTest is Test, PairHelper {
         pair.removeLiquidity(0, 1, 1e18);
     }
 
-    function testRemoveLiquidityGasOpenTicks() external {
+    function testGasRemoveLiquidityOpenTicks() external {
         vm.pauseGasMetering();
         pair.addLiquidity(0, 1, 2e18);
         vm.resumeGasMetering();
@@ -347,7 +347,7 @@ contract SwapTest is Test, PairHelper {
 
     function testSwapStartPartial1To0() external {}
 
-    function testSwapGasSameTick() external {
+    function testGasSwapSameTick() external {
         vm.pauseGasMetering();
         basicAddLiquidity();
         vm.resumeGasMetering();
@@ -355,7 +355,7 @@ contract SwapTest is Test, PairHelper {
         pair.swap(false, 1e18 - 1);
     }
 
-    function testSwapGasMulti() external {
+    function testGasSwapMulti() external {
         vm.pauseGasMetering();
         basicAddLiquidity();
         vm.resumeGasMetering();
@@ -364,7 +364,7 @@ contract SwapTest is Test, PairHelper {
         pair.swap(false, 0.2e18);
     }
 
-    function testSwapGasTwoTicks() external {
+    function testGasSwapTwoTicks() external {
         vm.pauseGasMetering();
         pair.addLiquidity(0, 0, 1e18);
         pair.addLiquidity(1, 0, 1e18);
@@ -373,7 +373,7 @@ contract SwapTest is Test, PairHelper {
         pair.swap(false, 1.5e18);
     }
 
-    function testSwapGasFarTicks() external {
+    function testGasSwapFarTicks() external {
         vm.pauseGasMetering();
         pair.addLiquidity(0, 0, 1e18);
         pair.addLiquidity(10, 0, 1e18);

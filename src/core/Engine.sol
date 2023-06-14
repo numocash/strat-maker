@@ -12,8 +12,7 @@ import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
 import {IExecuteCallback} from "./interfaces/IExecuteCallback.sol";
 
 /// @author Robert Leifke and Kyle Scott
-/// @custom:team add execute by signature
-/// @custom:team check if a function that only does one action is worth it
+/// @custom:team return data
 contract Engine is Positions {
     using Ticks for Ticks.Tick;
     using Pairs for Pairs.Pair;
@@ -154,7 +153,7 @@ contract Engine is Positions {
 
                 emit RemoveLiquidity(pairID, params.tick, params.tier, params.liquidity);
             } else if (commands[i] == Commands.CreatePair) {
-                createPair(abi.decode(inputs[i], (CreatePairParams)));
+                _createPair(abi.decode(inputs[i], (CreatePairParams)));
             } else {
                 revert InvalidCommand();
             }
@@ -232,7 +231,7 @@ contract Engine is Positions {
         }
     }
 
-    function createPair(CreatePairParams memory params) private {
+    function _createPair(CreatePairParams memory params) private {
         if (params.token0 >= params.token1 || params.token0 == address(0)) revert InvalidTokenOrder();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
