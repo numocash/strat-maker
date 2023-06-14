@@ -9,7 +9,7 @@ import {Positions} from "src/core/Positions.sol";
 import {Pairs} from "src/core/Pairs.sol";
 
 contract EngineTest is Test, EngineHelper {
-    event PairCreated(address indexed token0, address indexed token1, int24 tickInitial);
+    event PairCreated(address indexed token0, address indexed token1, int24 strikeInitial);
 
     function setUp() external {
         _setUp();
@@ -24,9 +24,9 @@ contract EngineTest is Test, EngineHelper {
 
         engine.execute(commands, inputs, address(0), 0, 0, bytes(""));
 
-        (, int24 tickCurrent,, uint8 initialized) = engine.getPair(address(1), address(2));
+        (, int24 strikeCurrent,, uint8 initialized) = engine.getPair(address(1), address(2));
         assertEq(initialized, 1);
-        assertEq(tickCurrent, 1);
+        assertEq(strikeCurrent, 1);
     }
 
     function testCreatePairBadToken() external {
@@ -80,14 +80,14 @@ contract EngineTest is Test, EngineHelper {
         engine.execute(commands, inputs, address(0), 0, 0, bytes(""));
     }
 
-    function testCreatePairBadTick() external {
+    function testCreatePairBadStrike() external {
         Engine.Commands[] memory commands = new Engine.Commands[](1);
         commands[0] = Engine.Commands.CreatePair;
 
         bytes[] memory inputs = new bytes[](1);
         inputs[0] = abi.encode(Engine.CreatePairParams(address(1), address(2), type(int24).max));
 
-        vm.expectRevert(Pairs.InvalidTick.selector);
+        vm.expectRevert(Pairs.InvalidStrike.selector);
         engine.execute(commands, inputs, address(0), 0, 0, bytes(""));
     }
 

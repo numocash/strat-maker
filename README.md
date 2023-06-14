@@ -22,7 +22,7 @@ The protocol aims for ultimate simplicity and the expressiveness of an orderbook
 
 ### Strike Spacing
 
-In order to create a more familiar trading experience, we opt for a different strike spacing than what was used in Uniswap V3 where ticks are each 0.01\% from each other. Instead, we use constantly-spaced ticks with a piece-wise function determining the spacing.
+In order to create a more familiar trading experience, we opt for a different strike spacing than what was used in Uniswap V3 where ticks are each 0.01\% from each other. Instead, we use constantly-spaced strikes with a piece-wise function determining the spacing.
 
 ## Architecture
 
