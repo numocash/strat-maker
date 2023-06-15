@@ -248,7 +248,8 @@ library Pairs {
             strikeCurrentForSpread,
             pair.compositions[spread],
             strike,
-            liquidity > 0 ? uint256(liquidity) : uint256(-liquidity)
+            liquidity > 0 ? uint256(liquidity) : uint256(-liquidity),
+            liquidity > 0
         );
     }
 

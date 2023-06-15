@@ -7,7 +7,6 @@ import {getRatioAtStrike, Q128} from "./StrikeMath.sol";
 /// @notice Calculate amount0 delta when moving completely through the liquidity at the strike.
 /// @dev Assumes inputs are valid
 /// i.e. x = L/Pi
-/// @custom:team Rounding needs to be checked
 function getAmount0Delta(uint256 liquidity, int24 strike, bool roundUp) pure returns (uint256 amount0) {
     return roundUp
         ? mulDivRoundingUp(liquidity, Q128, getRatioAtStrike(strike))
@@ -22,7 +21,8 @@ function getAmount1Delta(uint256 liquidity) pure returns (uint256 amount1) {
 }
 
 /// @notice Calculate amount0 in a strike for a given composition and liquidity
-/// @custom:team check for overflow
+/// @custom:team This rounds down extra because composition is between 0 and uint128Max while ratio is scaled by
+/// uint128Max + 1
 function getAmount0FromComposition(
     uint128 composition,
     uint256 liquidity,
@@ -55,8 +55,6 @@ function getAmount1FromComposition(
 }
 
 /// @notice Calculate amount{0,1} needed for the given liquidity change
-/// @custom:team check for overflow on amount0
-/// @custom:team check when we can use unchecked math
 function calcAmountsForLiquidity(
     int24 strikeCurrent,
     uint128 composition,

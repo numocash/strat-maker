@@ -132,8 +132,8 @@ contract RemoveLiquidityTest is Test, PairHelper {
         basicAddLiquidity();
         (uint256 amount0, uint256 amount1) = basicRemoveLiquidity();
 
-        assertApproxEqRel(amount0, 1e18, precision);
-        assertEq(amount1, 0);
+        assertEq(amount0, 1e18, "amount0");
+        assertEq(amount1, 0, "amount1");
     }
 
     function testRemoveLiquidityTokenAmounts() external {
