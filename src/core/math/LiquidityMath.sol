@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.17;
 
 import {mulDiv} from "./FullMath.sol";
 import {getRatioAtStrike, Q128} from "./StrikeMath.sol";

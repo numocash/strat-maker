@@ -4,5 +4,5 @@ forge-std/=lib/forge-std/src/
 ilrta/=lib/ilrta/src/
 openzeppelin-contracts/=lib/ilrta/lib/permit2/lib/openzeppelin-contracts/
 permit2/=lib/ilrta/lib/permit2/
-solmate/=lib/solmate/src/
+solmate/=lib/ilrta/lib/permit2/lib/solmate/
 src/=src/

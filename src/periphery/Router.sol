@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.17;
 
 import {Engine} from "src/core/Engine.sol";
 import {IExecuteCallback} from "src/core/interfaces/IExecuteCallback.sol";

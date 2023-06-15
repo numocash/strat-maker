@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.17;
 
 import {mulDiv, mulDivRoundingUp} from "./FullMath.sol";
 import {getAmount0FromComposition, getAmount1FromComposition} from "./LiquidityMath.sol";

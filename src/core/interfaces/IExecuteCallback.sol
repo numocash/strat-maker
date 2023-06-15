@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.17;
 
 /// @custom:team this should take advantage of ilrta transfer structures
 interface IExecuteCallback {
