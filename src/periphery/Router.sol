@@ -45,30 +45,30 @@ contract Router is IExecuteCallback {
     }
 
     function executeCallback(
-        address[] calldata tokens,
+        address[] calldata,
         int256[] calldata tokensDelta,
-        bytes32[] calldata ids,
-        int256[] calldata ilrtaDeltas,
+        bytes32[] calldata,
+        int256[] calldata,
         bytes calldata data
     )
         external
     {
         if (msg.sender != address(engine)) revert InvalidCaller(msg.sender);
 
-        CallbackData memory data = abi.decode(data, (CallbackData));
+        CallbackData memory callbackData = abi.decode(data, (CallbackData));
 
-        SignatureTransferDetails[] memory transferDetails =
-            new SignatureTransferDetails[](data.batchPermit.permitted.length);
-        for (uint256 i = 0; i < tokens.length;) {
+        ISignatureTransfer.SignatureTransferDetails[] memory transferDetails =
+            new ISignatureTransfer.SignatureTransferDetails[](callbackData.batchPermit.permitted.length);
+
+        uint256 j = 0;
+        for (uint256 i = 0; i < tokensDelta.length;) {
             int256 delta = tokensDelta[i];
 
             if (delta > 0) {
-                address token = tokens[i];
+                transferDetails[j] = ISignatureTransfer.SignatureTransferDetails(msg.sender, uint256(delta));
 
-                if (token == address(token0)) {
-                    token0.mint(msg.sender, uint256(delta));
-                } else if (token == address(token1)) {
-                    token1.mint(msg.sender, uint256(delta));
+                unchecked {
+                    j++;
                 }
             }
 
@@ -76,6 +76,10 @@ contract Router is IExecuteCallback {
                 i++;
             }
         }
+
+        permit2.permitTransferFrom(
+            callbackData.batchPermit, transferDetails, callbackData.payer, callbackData.permitSignature
+        );
 
         // for (uint256 i = 0; i < ids.length;) {
         //     int256 delta = ilrtaDeltas[i];

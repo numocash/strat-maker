@@ -4,7 +4,7 @@ pragma solidity ^0.8.17;
 import {ILRTA} from "ilrta/ILRTA.sol";
 
 abstract contract Positions is ILRTA {
-    mapping(address owner => mapping(bytes32 id => ILRTAData data)) internal _dataOf;
+    mapping(address => mapping(bytes32 => ILRTAData)) internal _dataOf;
 
     constructor()
         // solhint-disable-next-line max-line-length

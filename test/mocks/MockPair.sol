@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.17;
 
 import {Pairs, MAX_SPREADS} from "src/core/Pairs.sol";
 import {Positions} from "src/core/Positions.sol";
