@@ -33,26 +33,27 @@ function computeSwapStep(
             ? getAmount0FromComposition(compositionInverse, liquidity, ratioX128, true)
             : getAmount1FromComposition(compositionInverse, liquidity, true);
 
-        bool completeSwap = uint256(amountDesired) >= maxAmountIn;
+        bool allLiquiditySwapped = uint256(amountDesired) > maxAmountIn;
 
-        amountIn = completeSwap ? maxAmountIn : uint256(amountDesired);
+        amountIn = allLiquiditySwapped ? maxAmountIn : uint256(amountDesired);
         amountOut = isToken0 ? mulDiv(amountIn, ratioX128, Q128) : mulDiv(amountIn, Q128, ratioX128);
 
         unchecked {
-            amountRemaining = completeSwap ? 0 : maxAmountIn - uint256(amountDesired);
+            amountRemaining = allLiquiditySwapped ? 0 : maxAmountIn - uint256(amountDesired);
         }
     } else {
         uint256 maxAmountOut = isToken0
             ? getAmount0FromComposition(composition, liquidity, ratioX128, false)
             : getAmount1FromComposition(composition, liquidity, false);
 
-        bool completeSwap = uint256(-amountDesired) > maxAmountOut;
+        bool allLiquiditySwapped = uint256(-amountDesired) > maxAmountOut;
 
-        amountOut = completeSwap ? maxAmountOut : uint256(-amountDesired);
-        amountIn = isToken0 ? mulDiv(amountOut, ratioX128, Q128) : mulDiv(amountOut, Q128, ratioX128);
+        amountOut = allLiquiditySwapped ? maxAmountOut : uint256(-amountDesired);
+        amountIn =
+            isToken0 ? mulDivRoundingUp(amountOut, ratioX128, Q128) : mulDivRoundingUp(amountOut, Q128, ratioX128);
 
         unchecked {
-            amountRemaining = completeSwap ? 0 : maxAmountOut - uint256(-amountDesired);
+            amountRemaining = allLiquiditySwapped ? 0 : maxAmountOut - uint256(-amountDesired);
         }
     }
 }
