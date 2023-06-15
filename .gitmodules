@@ -4,3 +4,6 @@
 [submodule "lib/solmate"]
 	path = lib/solmate
 	url = https://github.com/transmissions11/solmate
+[submodule "lib/ilrta"]
+	path = lib/ilrta
+	url = https://github.com/kyscott18/ilrta
