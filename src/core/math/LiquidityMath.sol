@@ -98,3 +98,9 @@ function addDelta(uint256 x, int256 y) pure returns (uint256 z) {
         return x + uint256(y);
     }
 }
+
+/// @notice cast uint256 to int256, revert on overflow
+function toInt256(uint256 x) pure returns (int256 z) {
+    assert(x <= uint256(type(int256).max));
+    z = int256(x);
+}
