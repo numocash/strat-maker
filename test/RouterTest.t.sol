@@ -209,4 +209,105 @@ contract RouterTest is Test {
         vm.prank(owner);
         router.execute(owner, commands, inputs, 1, 1, permitBatchEmpty, signatureTransfers, bytes(""), signatures);
     }
+
+    function testGasSwap() external {
+        vm.pauseGasMetering();
+        uint256 privateKey = 0xC0FFEE;
+        address owner = vm.addr(privateKey);
+
+        token0.mint(address(owner), 1e18);
+
+        vm.prank(owner);
+        token0.approve(address(permit2), 1e18);
+
+        Engine.Commands[] memory commands = new Engine.Commands[](1);
+        commands[0] = Engine.Commands.AddLiquidity;
+
+        bytes[] memory inputs = new bytes[](1);
+        inputs[0] = abi.encode(Engine.AddLiquidityParams(address(token0), address(token1), 0, 0, 1e18));
+
+        ISignatureTransfer.TokenPermissions[] memory permitted = new ISignatureTransfer.TokenPermissions[](1);
+        permitted[0] = ISignatureTransfer.TokenPermissions({token: address(token0), amount: 1e18});
+
+        ISignatureTransfer.PermitBatchTransferFrom memory permitBatch =
+            ISignatureTransfer.PermitBatchTransferFrom({permitted: permitted, nonce: 0, deadline: block.timestamp});
+
+        bytes32[] memory tokenPermissions = new bytes32[](permitBatch.permitted.length);
+        for (uint256 i = 0; i < permitBatch.permitted.length; ++i) {
+            tokenPermissions[i] = keccak256(abi.encode(TOKEN_PERMISSIONS_TYPEHASH, permitBatch.permitted[i]));
+        }
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            privateKey,
+            keccak256(
+                abi.encodePacked(
+                    "\x19\x01",
+                    permit2.DOMAIN_SEPARATOR(),
+                    keccak256(
+                        abi.encode(
+                            PERMIT_BATCH_TRANSFER_FROM_TYPEHASH,
+                            keccak256(abi.encodePacked(tokenPermissions)),
+                            address(router),
+                            0,
+                            block.timestamp
+                        )
+                    )
+                )
+            )
+        );
+
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        vm.prank(owner);
+        router.execute(
+            owner, commands, inputs, 1, 1, permitBatch, new ILRTA.SignatureTransfer[](0), signature, new bytes[](0)
+        );
+
+        // SWAP
+
+        token1.mint(address(owner), 1e18);
+
+        vm.prank(owner);
+        token1.approve(address(permit2), 1e18);
+
+        commands[0] = Engine.Commands.Swap;
+        inputs[0] = abi.encode(Engine.SwapParams(address(token0), address(token1), false, 1e18));
+
+        permitted[0] = ISignatureTransfer.TokenPermissions({token: address(token1), amount: 1e18});
+
+        permitBatch =
+            ISignatureTransfer.PermitBatchTransferFrom({permitted: permitted, nonce: 1, deadline: block.timestamp});
+
+        for (uint256 i = 0; i < permitBatch.permitted.length; ++i) {
+            tokenPermissions[i] = keccak256(abi.encode(TOKEN_PERMISSIONS_TYPEHASH, permitBatch.permitted[i]));
+        }
+
+        (v, r, s) = vm.sign(
+            privateKey,
+            keccak256(
+                abi.encodePacked(
+                    "\x19\x01",
+                    permit2.DOMAIN_SEPARATOR(),
+                    keccak256(
+                        abi.encode(
+                            PERMIT_BATCH_TRANSFER_FROM_TYPEHASH,
+                            keccak256(abi.encodePacked(tokenPermissions)),
+                            address(router),
+                            1,
+                            block.timestamp
+                        )
+                    )
+                )
+            )
+        );
+
+        signature = abi.encodePacked(r, s, v);
+
+        vm.resumeGasMetering();
+
+        vm.prank(owner);
+        router.execute(
+            owner, commands, inputs, 2, 0, permitBatch, new ILRTA.SignatureTransfer[](0), signature, new bytes[](0)
+        );
+    }
 }
