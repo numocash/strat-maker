@@ -16,8 +16,8 @@ contract Router is IExecuteCallback {
 
     struct CallbackData {
         ISignatureTransfer.PermitBatchTransferFrom batchPermit;
-        bytes permitSignature;
         ILRTA.SignatureTransfer[] ilrtaSignatureTransfers;
+        bytes permitSignature;
         bytes[] ilrtaSignatures;
         address payer;
     }
@@ -46,7 +46,7 @@ contract Router is IExecuteCallback {
             inputs,
             numTokens,
             numILRTA,
-            abi.encode(CallbackData(batchPermit, permitSignature, signatureTransfers, ilrtaSignatures, msg.sender))
+            abi.encode(CallbackData(batchPermit, signatureTransfers, permitSignature, ilrtaSignatures, msg.sender))
         );
     }
 
