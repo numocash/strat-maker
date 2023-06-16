@@ -17,7 +17,7 @@ contract Router is IExecuteCallback {
     struct CallbackData {
         ISignatureTransfer.PermitBatchTransferFrom batchPermit;
         bytes permitSignature;
-        ILRTA.SignatureTransfer[] signatureTransfers;
+        ILRTA.SignatureTransfer[] ilrtaSignatureTransfers;
         bytes[] ilrtaSignatures;
         address payer;
     }
@@ -28,22 +28,22 @@ contract Router is IExecuteCallback {
     }
 
     function execute(
+        address to,
         Engine.Commands[] calldata commands,
         bytes[] calldata inputs,
-        address to,
         uint256 numTokens,
         uint256 numILRTA,
         ISignatureTransfer.PermitBatchTransferFrom calldata batchPermit,
-        bytes calldata permitSignature,
         ILRTA.SignatureTransfer[] calldata signatureTransfers,
+        bytes calldata permitSignature,
         bytes[] calldata ilrtaSignatures
     )
         external
     {
         return engine.execute(
+            to,
             commands,
             inputs,
-            to,
             numTokens,
             numILRTA,
             abi.encode(CallbackData(batchPermit, permitSignature, signatureTransfers, ilrtaSignatures, msg.sender))
@@ -97,7 +97,7 @@ contract Router is IExecuteCallback {
             if (delta > 0 && id != bytes32(0)) {
                 engine.transferBySignature(
                     callbackData.payer,
-                    callbackData.signatureTransfers[j],
+                    callbackData.ilrtaSignatureTransfers[j],
                     ILRTA.RequestedTransfer(msg.sender, abi.encode(Positions.ILRTATransferDetails(id, uint256(delta)))),
                     callbackData.ilrtaSignatures[j]
                 );

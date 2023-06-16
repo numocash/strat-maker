@@ -49,7 +49,7 @@ contract RouterTest is Test {
         bytes[] memory inputs = new bytes[](1);
         inputs[0] = abi.encode(Engine.CreatePairParams(address(token0), address(token1), 0));
 
-        engine.execute(commands, inputs, address(0), 0, 0, bytes(""));
+        engine.execute(address(0), commands, inputs, 0, 0, bytes(""));
     }
 
     function testGasAddLiquidity() external {
@@ -103,7 +103,7 @@ contract RouterTest is Test {
 
         vm.prank(owner);
         router.execute(
-            commands, inputs, owner, 1, 1, permitBatch, signature, new ILRTA.SignatureTransfer[](0), new bytes[](0)
+            owner, commands, inputs, 1, 1, permitBatch, new ILRTA.SignatureTransfer[](0), signature, new bytes[](0)
         );
     }
 
@@ -157,7 +157,7 @@ contract RouterTest is Test {
 
         vm.prank(owner);
         router.execute(
-            commands, inputs, owner, 1, 1, permitBatch, signature, new ILRTA.SignatureTransfer[](0), new bytes[](0)
+            owner, commands, inputs, 1, 1, permitBatch, new ILRTA.SignatureTransfer[](0), signature, new bytes[](0)
         );
 
         // REMOVE LIQUIDITY
@@ -207,6 +207,6 @@ contract RouterTest is Test {
         vm.resumeGasMetering();
 
         vm.prank(owner);
-        router.execute(commands, inputs, owner, 1, 1, permitBatchEmpty, bytes(""), signatureTransfers, signatures);
+        router.execute(owner, commands, inputs, 1, 1, permitBatchEmpty, signatureTransfers, bytes(""), signatures);
     }
 }

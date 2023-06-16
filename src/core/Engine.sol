@@ -83,29 +83,16 @@ contract Engine is Positions {
         int24 strikeInitial;
     }
 
+    /// @dev Set to address to 0 if creating a pair
     function execute(
+        address to,
         Commands[] calldata commands,
         bytes[] calldata inputs,
-        address to,
         uint256 numTokens,
         uint256 numILRTA,
         bytes calldata data
     )
         external
-    {
-        _execute(commands, inputs, to, numTokens, numILRTA, data);
-    }
-
-    /// @dev Set to address to 0 if creating a pair
-    function _execute(
-        Commands[] calldata commands,
-        bytes[] calldata inputs,
-        address to,
-        uint256 numTokens,
-        uint256 numILRTA,
-        bytes calldata data
-    )
-        private
         nonReentrant
     {
         if (commands.length != inputs.length) revert CommandLengthMismatch();
