@@ -72,7 +72,7 @@ abstract contract Positions is ILRTA {
     function _transfer(address from, address to, ILRTATransferDetails memory transferDetails) private returns (bool) {
         _dataOf[from][transferDetails.id].liquidity -= transferDetails.amount;
 
-        // Cannot overflow because the sum of all user balances can't exceed the max uint256 value.
+        // change in liquidity cannot exceed the maximum liquidity in a strike
         unchecked {
             _dataOf[to][transferDetails.id].liquidity += transferDetails.amount;
         }
@@ -83,7 +83,7 @@ abstract contract Positions is ILRTA {
     }
 
     function _mint(address to, bytes32 id, uint256 amount) internal virtual {
-        // Cannot overflow because the sum of all user balances can't exceed the max uint256 value.
+        // change in liquidity cannot exceed the maximum liquidity in a strike
         unchecked {
             _dataOf[to][id].liquidity += amount;
         }

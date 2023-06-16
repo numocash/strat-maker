@@ -1,10 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
-
-/**
- * @dev https://github.com/Uniswap/uniswap-v3-core/blob/v1.0.0/contracts/libraries/FullMath.sol
- * Added `unchecked` and changed line 67 for being compatible in solidity 0.8
- */
+pragma solidity ^0.8.17;
 
 /// @notice Calculates floor(a×b÷denominator) with full precision. Throws if result overflows a uint256 or
 /// denominator == 0
@@ -60,12 +55,7 @@ function mulDiv(uint256 a, uint256 b, uint256 denominator) pure returns (uint256
         // Factor powers of two out of denominator
         // Compute largest power of two divisor of denominator.
         // Always >= 1.
-
-        // [*] The next line is edited to be compatible with solidity 0.8
-        // ref: https://ethereum.stackexchange.com/a/96646
-        // original: uint256 twos = -denominator & denominator;
-        uint256 twos = denominator & (~denominator + 1);
-
+        uint256 twos = (0 - denominator) & denominator;
         // Divide denominator by power of two
         assembly {
             denominator := div(denominator, twos)
@@ -117,8 +107,11 @@ function mulDiv(uint256 a, uint256 b, uint256 denominator) pure returns (uint256
 /// @param denominator The divisor
 /// @return result The 256-bit result
 function mulDivRoundingUp(uint256 a, uint256 b, uint256 denominator) pure returns (uint256 result) {
-    result = mulDiv(a, b, denominator);
-    if (mulmod(a, b, denominator) > 0) {
-        result++;
+    unchecked {
+        result = mulDiv(a, b, denominator);
+        if (mulmod(a, b, denominator) > 0) {
+            require(result < type(uint256).max);
+            result++;
+        }
     }
 }

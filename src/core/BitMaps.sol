@@ -61,7 +61,6 @@ library BitMaps {
     //     masked: 0000 0000 0010 1100
     //                         ↑
     //                  msb(masked) = 5
-    /// @custom:team could we assume MIN_STRIKE in some cases to save gas
     function nextBelow(BitMap storage self, int24 strike) internal view returns (int24 strikeBelow) {
         unchecked {
             (uint256 blockIdx, uint256 wordIdx, uint256 compressed) = _indices(strike);

@@ -157,7 +157,7 @@ contract RouterTest is Test {
 
         vm.prank(owner);
         router.execute(
-            commands, inputs, owner, 1, 0, permitBatch, signature, new ILRTA.SignatureTransfer[](0), new bytes[](0)
+            commands, inputs, owner, 1, 1, permitBatch, signature, new ILRTA.SignatureTransfer[](0), new bytes[](0)
         );
 
         // REMOVE LIQUIDITY
@@ -207,6 +207,6 @@ contract RouterTest is Test {
         vm.resumeGasMetering();
 
         vm.prank(owner);
-        router.execute(commands, inputs, owner, 0, 1, permitBatchEmpty, bytes(""), signatureTransfers, signatures);
+        router.execute(commands, inputs, owner, 1, 1, permitBatchEmpty, bytes(""), signatureTransfers, signatures);
     }
 }
