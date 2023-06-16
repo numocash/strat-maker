@@ -204,7 +204,6 @@ contract Engine is Positions {
         }
 
         (int256 amount0, int256 amount1) = pair.swap(params.selector == TokenSelector.Token0, params.amountDesired);
-
         account.updateToken(params.token0, amount0);
         account.updateToken(params.token1, amount1);
 
@@ -269,7 +268,7 @@ contract Engine is Positions {
                     pair.strikeCurrent,
                     pair.compositions[params.spread],
                     params.strike,
-                    uint256(params.amountDesired),
+                    uint256(-params.amountDesired),
                     true
                 )
             );
@@ -280,7 +279,7 @@ contract Engine is Positions {
                     pair.strikeCurrent,
                     pair.compositions[params.spread],
                     params.strike,
-                    uint256(params.amountDesired),
+                    uint256(-params.amountDesired),
                     true
                 )
             );

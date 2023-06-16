@@ -9,7 +9,8 @@ import {
     pushCommands,
     pushInputs,
     addLiquidityCommand,
-    removeLiquidityCommand
+    removeLiquidityCommand,
+    swapCommand
 } from "./helpers/Utils.sol";
 
 import {Engine} from "src/core/Engine.sol";
@@ -189,5 +190,72 @@ contract EngineTest is Test, EngineHelper {
         vm.resumeGasMetering();
 
         engine.execute(address(this), commands, inputs, 2, 0, bytes(""));
+    }
+
+    function testGasSwapAndAdd() external {
+        vm.pauseGasMetering();
+        basicCreate();
+        basicAddLiquidity();
+
+        Engine.Commands[] memory commands = createCommands();
+        bytes[] memory inputs = createInputs();
+
+        (Engine.Commands _swapCommand, bytes memory swapInput) =
+            swapCommand(address(token0), address(token1), Engine.TokenSelector.Token0, -0.2e18);
+
+        commands = pushCommands(commands, _swapCommand);
+        inputs = pushInputs(inputs, swapInput);
+
+        (Engine.Commands addCommand, bytes memory addInput) =
+            addLiquidityCommand(address(token0), address(token1), 0, 0, Engine.TokenSelector.Token0, 0.2e18);
+
+        commands = pushCommands(commands, addCommand);
+        inputs = pushInputs(inputs, addInput);
+
+        vm.resumeGasMetering();
+
+        engine.execute(address(this), commands, inputs, 2, 1, bytes(""));
+
+        vm.pauseGasMetering();
+        assertEq(token0.balanceOf(address(this)), 0);
+        assertEq(token1.balanceOf(address(this)), 0);
+        vm.resumeGasMetering();
+    }
+
+    function testRemoveAndSwap() external {
+        vm.pauseGasMetering();
+        basicCreate();
+        basicAddLiquidity();
+
+        Engine.Commands[] memory commands = createCommands();
+        bytes[] memory inputs = createInputs();
+
+        (Engine.Commands addCommand, bytes memory addInput) =
+            addLiquidityCommand(address(token0), address(token1), -1, 0, Engine.TokenSelector.Token0, 1e18);
+
+        commands = pushCommands(commands, addCommand);
+        inputs = pushInputs(inputs, addInput);
+
+        engine.execute(address(this), commands, inputs, 1, 1, bytes(""));
+
+        (Engine.Commands removeCommand, bytes memory removeInput) =
+            removeLiquidityCommand(address(token0), address(token1), 0, 0, Engine.TokenSelector.Token0, -0.2e18);
+
+        commands[0] = removeCommand;
+        inputs[0] = removeInput;
+
+        (Engine.Commands _swapCommand, bytes memory swapInput) =
+            swapCommand(address(token0), address(token1), Engine.TokenSelector.Token0, 0.2e18);
+
+        commands = pushCommands(commands, _swapCommand);
+        inputs = pushInputs(inputs, swapInput);
+
+        vm.resumeGasMetering();
+
+        engine.execute(address(this), commands, inputs, 2, 1, bytes(""));
+
+        vm.pauseGasMetering();
+        assertEq(token0.balanceOf(address(this)), 0);
+        vm.resumeGasMetering();
     }
 }
