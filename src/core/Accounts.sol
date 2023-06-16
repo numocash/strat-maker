@@ -4,6 +4,8 @@ pragma solidity ^0.8.17;
 import {BalanceLib} from "src/libraries/BalanceLib.sol";
 
 library Accounts {
+    error InvalidAccountLength();
+
     struct Account {
         address[] tokens;
         int256[] tokenDeltas;
@@ -48,6 +50,8 @@ library Accounts {
                 i++;
             }
         }
+
+        revert InvalidAccountLength();
     }
 
     function updateILRTA(Account memory account, bytes32 id, int256 delta) internal pure {
@@ -70,5 +74,7 @@ library Accounts {
                 i++;
             }
         }
+
+        revert InvalidAccountLength();
     }
 }
