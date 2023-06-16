@@ -3,6 +3,14 @@ pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
 import {EngineHelper} from "./helpers/EngineHelper.sol";
+import {
+    createCommands,
+    createInputs,
+    pushCommands,
+    pushInputs,
+    addLiquidityCommand,
+    removeLiquidityCommand
+} from "./helpers/Utils.sol";
 
 import {Engine} from "src/core/Engine.sol";
 import {Positions} from "src/core/Positions.sol";
@@ -142,31 +150,24 @@ contract EngineTest is Test, EngineHelper {
     function testGasRemoveLiquidity() external {
         vm.pauseGasMetering();
         basicCreate();
-        Engine.Commands[] memory commands = new Engine.Commands[](1);
-        commands[0] = Engine.Commands.AddLiquidity;
 
-        bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(
-            Engine.AddLiquidityParams(
-                address(token0), address(token1), 0, 1, Engine.TokenSelector.LiquidityPosition, 1e18
-            )
-        );
+        Engine.Commands[] memory commands = createCommands();
+        bytes[] memory inputs = createInputs();
 
-        address[] memory tokens = new address[](1);
-        tokens[0] = address(token0);
+        (Engine.Commands addCommand, bytes memory addInput) =
+            addLiquidityCommand(address(token0), address(token1), 0, 1, Engine.TokenSelector.LiquidityPosition, 1e18);
 
-        bytes32[] memory ids = new bytes32[](1);
-        ids[0] = engine.dataID(abi.encode(Positions.ILRTADataID(address(token0), address(token1), 0, 1)));
+        commands = pushCommands(commands, addCommand);
+        inputs = pushInputs(inputs, addInput);
 
         engine.execute(address(this), commands, inputs, 1, 1, bytes(""));
 
-        commands[0] = Engine.Commands.RemoveLiquidity;
-
-        inputs[0] = abi.encode(
-            Engine.RemoveLiquidityParams(
-                address(token0), address(token1), 0, 1, Engine.TokenSelector.LiquidityPosition, -1e18
-            )
+        (Engine.Commands removeCommand, bytes memory removeInput) = removeLiquidityCommand(
+            address(token0), address(token1), 0, 1, Engine.TokenSelector.LiquidityPosition, -1e18
         );
+
+        commands[0] = removeCommand;
+        inputs[0] = removeInput;
 
         vm.resumeGasMetering();
 
