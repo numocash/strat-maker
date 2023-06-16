@@ -77,18 +77,54 @@ function calcAmountsForLiquidity(
     }
 }
 
-/// @notice Calculate max liquidity received if adding the given token amounts
-function calcLiquidityForAmounts(
+/// @notice Calculate max liquidity received if adding the given amount0
+function calcLiquidityForAmount0(
     int24 strikeCurrent,
     uint128 composition,
     int24 strike,
     uint256 amount0,
+    bool roundUp
+)
+    pure
+    returns (uint256 liquidity)
+{
+    if (strike > strikeCurrent) {
+        return roundUp
+            ? mulDivRoundingUp(amount0, getRatioAtStrike(strike), Q128)
+            : mulDiv(amount0, getRatioAtStrike(strike), Q128);
+    } else if (strike == strikeCurrent) {
+        uint128 token0Composition;
+        unchecked {
+            token0Composition = type(uint128).max - composition;
+        }
+
+        return roundUp
+            ? mulDivRoundingUp(amount0, getRatioAtStrike(strikeCurrent), token0Composition)
+            : mulDiv(amount0, getRatioAtStrike(strikeCurrent), token0Composition);
+    } else {
+        return 0;
+    }
+}
+
+/// @notice Calculate max liquidity received if adding the given amount1
+function calcLiquidityForAmount1(
+    int24 strikeCurrent,
+    uint128 composition,
+    int24 strike,
     uint256 amount1,
     bool roundUp
 )
     pure
     returns (uint256 liquidity)
-{}
+{
+    if (strike < strikeCurrent) {
+        return amount1;
+    } else if (strike == strikeCurrent) {
+        return roundUp ? mulDivRoundingUp(amount1, composition, Q128) : mulDiv(amount1, composition, Q128);
+    } else {
+        return 0;
+    }
+}
 
 /// @notice Add signed liquidity delta to liquidity
 function addDelta(uint256 x, int256 y) pure returns (uint256 z) {
