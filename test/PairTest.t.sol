@@ -189,20 +189,24 @@ contract RemoveLiquidityTest is Test, PairHelper {
     }
 
     function testRemoveLiquidityStrikeMapCurrentStrike() external {
-        pair.addLiquidity(0, 1, 1e18);
+        pair.addLiquidity(1, 0, 1e18);
         pair.swap(false, 1e18 - 1);
 
-        pair.removeLiquidity(0, 1, 1e18);
+        pair.removeLiquidity(1, 0, 1e18);
 
         Strikes.Strike memory strike = pair.getStrike(0);
         assertEq(strike.next0To1, MIN_STRIKE);
+        assertEq(strike.next1To0, 0);
+
+        strike = pair.getStrike(1);
+        assertEq(strike.next0To1, 0);
         assertEq(strike.next1To0, MAX_STRIKE);
 
         strike = pair.getStrike(MAX_STRIKE);
-        assertEq(strike.next0To1, 0);
+        assertEq(strike.next0To1, 1);
 
         strike = pair.getStrike(MIN_STRIKE);
-        assertEq(strike.next1To0, 0);
+        assertEq(strike.next1To0, 1);
     }
 
     function testRemoveLiquidityBadStrikes() external {
