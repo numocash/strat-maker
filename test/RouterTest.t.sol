@@ -66,7 +66,11 @@ contract RouterTest is Test {
         commands[0] = Engine.Commands.AddLiquidity;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(Engine.AddLiquidityParams(address(token0), address(token1), 0, 0, 1e18));
+        inputs[0] = abi.encode(
+            Engine.AddLiquidityParams(
+                address(token0), address(token1), 0, 0, Engine.TokenSelector.LiquidityPosition, 1e18
+            )
+        );
 
         ISignatureTransfer.TokenPermissions[] memory permitted = new ISignatureTransfer.TokenPermissions[](1);
         permitted[0] = ISignatureTransfer.TokenPermissions({token: address(token0), amount: 1e18});
@@ -121,7 +125,11 @@ contract RouterTest is Test {
         commands[0] = Engine.Commands.AddLiquidity;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(Engine.AddLiquidityParams(address(token0), address(token1), 0, 0, 1e18));
+        inputs[0] = abi.encode(
+            Engine.AddLiquidityParams(
+                address(token0), address(token1), 0, 0, Engine.TokenSelector.LiquidityPosition, 1e18
+            )
+        );
 
         ISignatureTransfer.TokenPermissions[] memory permitted = new ISignatureTransfer.TokenPermissions[](1);
         permitted[0] = ISignatureTransfer.TokenPermissions({token: address(token0), amount: 1e18});
@@ -163,7 +171,11 @@ contract RouterTest is Test {
         // REMOVE LIQUIDITY
 
         commands[0] = Engine.Commands.RemoveLiquidity;
-        inputs[0] = abi.encode(Engine.RemoveLiquidityParams(address(token0), address(token1), 0, 0, 1e18));
+        inputs[0] = abi.encode(
+            Engine.RemoveLiquidityParams(
+                address(token0), address(token1), 0, 0, Engine.TokenSelector.LiquidityPosition, -1e18
+            )
+        );
 
         ILRTA.SignatureTransfer[] memory signatureTransfers = new ILRTA.SignatureTransfer[](1);
         signatureTransfers[0] = ILRTA.SignatureTransfer(
@@ -224,7 +236,11 @@ contract RouterTest is Test {
         commands[0] = Engine.Commands.AddLiquidity;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(Engine.AddLiquidityParams(address(token0), address(token1), 0, 0, 1e18));
+        inputs[0] = abi.encode(
+            Engine.AddLiquidityParams(
+                address(token0), address(token1), 0, 0, Engine.TokenSelector.LiquidityPosition, 1e18
+            )
+        );
 
         ISignatureTransfer.TokenPermissions[] memory permitted = new ISignatureTransfer.TokenPermissions[](1);
         permitted[0] = ISignatureTransfer.TokenPermissions({token: address(token0), amount: 1e18});
@@ -271,7 +287,7 @@ contract RouterTest is Test {
         token1.approve(address(permit2), 1e18);
 
         commands[0] = Engine.Commands.Swap;
-        inputs[0] = abi.encode(Engine.SwapParams(address(token0), address(token1), false, 1e18));
+        inputs[0] = abi.encode(Engine.SwapParams(address(token0), address(token1), Engine.TokenSelector.Token1, 1e18));
 
         permitted[0] = ISignatureTransfer.TokenPermissions({token: address(token1), amount: 1e18});
 

@@ -10,20 +10,20 @@ library Accounts {
         address[] tokens;
         int256[] tokenDeltas;
         uint256[] balances;
-        bytes32[] ids;
-        int256[] ilrtaDeltas;
+        bytes32[] lpIDs;
+        int256[] lpDeltas;
     }
 
-    function newAccount(uint256 numTokens, uint256 numILRTA) internal pure returns (Account memory account) {
+    function newAccount(uint256 numTokens, uint256 numLPs) internal pure returns (Account memory account) {
         if (numTokens > 0) {
             account.tokens = new address[](numTokens);
             account.tokenDeltas = new int256[](numTokens);
             account.balances = new uint256[](numTokens);
         }
 
-        if (numILRTA > 0) {
-            account.ids = new bytes32[](numILRTA);
-            account.ilrtaDeltas = new int256[](numILRTA);
+        if (numLPs > 0) {
+            account.lpIDs = new bytes32[](numLPs);
+            account.lpDeltas = new int256[](numLPs);
         }
     }
 
@@ -57,16 +57,16 @@ library Accounts {
     function updateILRTA(Account memory account, bytes32 id, int256 delta) internal pure {
         if (delta == 0) return;
 
-        for (uint256 i = 0; i < account.ids.length;) {
-            if (account.ids[i] == id) {
+        for (uint256 i = 0; i < account.lpIDs.length;) {
+            if (account.lpIDs[i] == id) {
                 // change in liquidity cannot exceed the maximum liquidity in a strike
                 unchecked {
-                    account.ilrtaDeltas[i] = account.ilrtaDeltas[i] + delta;
+                    account.lpDeltas[i] = account.lpDeltas[i] + delta;
                 }
                 return;
-            } else if (account.ids[i] == bytes32(0)) {
-                account.ids[i] = id;
-                account.ilrtaDeltas[i] = delta;
+            } else if (account.lpIDs[i] == bytes32(0)) {
+                account.lpIDs[i] = id;
+                account.lpDeltas[i] = delta;
                 return;
             }
 

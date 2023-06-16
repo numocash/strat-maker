@@ -114,7 +114,8 @@ contract EngineTest is Test, EngineHelper {
         commands[0] = Engine.Commands.Swap;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(Engine.SwapParams(address(token0), address(token1), false, 1e18 - 1));
+        inputs[0] =
+            abi.encode(Engine.SwapParams(address(token0), address(token1), Engine.TokenSelector.Token1, 1e18 - 1));
 
         engine.execute(address(this), commands, inputs, 2, 0, bytes(""));
     }
@@ -127,7 +128,11 @@ contract EngineTest is Test, EngineHelper {
         commands[0] = Engine.Commands.AddLiquidity;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(Engine.AddLiquidityParams(address(token0), address(token1), 0, 1, 1e18));
+        inputs[0] = abi.encode(
+            Engine.AddLiquidityParams(
+                address(token0), address(token1), 0, 1, Engine.TokenSelector.LiquidityPosition, 1e18
+            )
+        );
 
         vm.resumeGasMetering();
 
@@ -141,7 +146,11 @@ contract EngineTest is Test, EngineHelper {
         commands[0] = Engine.Commands.AddLiquidity;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(Engine.AddLiquidityParams(address(token0), address(token1), 0, 1, 1e18));
+        inputs[0] = abi.encode(
+            Engine.AddLiquidityParams(
+                address(token0), address(token1), 0, 1, Engine.TokenSelector.LiquidityPosition, 1e18
+            )
+        );
 
         address[] memory tokens = new address[](1);
         tokens[0] = address(token0);
@@ -153,7 +162,11 @@ contract EngineTest is Test, EngineHelper {
 
         commands[0] = Engine.Commands.RemoveLiquidity;
 
-        inputs[0] = abi.encode(Engine.RemoveLiquidityParams(address(token0), address(token1), 0, 1, 1e18));
+        inputs[0] = abi.encode(
+            Engine.RemoveLiquidityParams(
+                address(token0), address(token1), 0, 1, Engine.TokenSelector.LiquidityPosition, -1e18
+            )
+        );
 
         vm.resumeGasMetering();
 
@@ -169,7 +182,8 @@ contract EngineTest is Test, EngineHelper {
         commands[0] = Engine.Commands.Swap;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(Engine.SwapParams(address(token0), address(token1), false, 1e18 - 1));
+        inputs[0] =
+            abi.encode(Engine.SwapParams(address(token0), address(token1), Engine.TokenSelector.Token1, 1e18 - 1));
 
         vm.resumeGasMetering();
 

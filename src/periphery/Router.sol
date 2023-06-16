@@ -32,7 +32,7 @@ contract Router is IExecuteCallback {
         Engine.Commands[] calldata commands,
         bytes[] calldata inputs,
         uint256 numTokens,
-        uint256 numILRTA,
+        uint256 numLPs,
         ISignatureTransfer.PermitBatchTransferFrom calldata batchPermit,
         ILRTA.SignatureTransfer[] calldata signatureTransfers,
         bytes calldata permitSignature,
@@ -45,7 +45,7 @@ contract Router is IExecuteCallback {
             commands,
             inputs,
             numTokens,
-            numILRTA,
+            numLPs,
             abi.encode(CallbackData(batchPermit, signatureTransfers, permitSignature, ilrtaSignatures, msg.sender))
         );
     }
@@ -53,8 +53,8 @@ contract Router is IExecuteCallback {
     function executeCallback(
         address[] calldata tokens,
         int256[] calldata tokensDelta,
-        bytes32[] calldata ids,
-        int256[] calldata ilrtaDeltas,
+        bytes32[] calldata lpIDs,
+        int256[] calldata lpDeltas,
         bytes calldata data
     )
         external
@@ -90,15 +90,16 @@ contract Router is IExecuteCallback {
         }
 
         j = 0;
-        for (uint256 i = 0; i < ilrtaDeltas.length;) {
-            int256 delta = ilrtaDeltas[i];
-            bytes32 id = ids[i];
+        for (uint256 i = 0; i < lpIDs.length;) {
+            int256 delta = lpDeltas[i];
+            bytes32 id = lpIDs[i];
 
-            if (delta > 0 && id != bytes32(0)) {
+            if (delta < 0 && id != bytes32(0)) {
                 engine.transferBySignature(
                     callbackData.payer,
                     callbackData.ilrtaSignatureTransfers[j],
-                    ILRTA.RequestedTransfer(msg.sender, abi.encode(Positions.ILRTATransferDetails(id, uint256(delta)))),
+                    // solhint-disable-next-line max-line-length
+                    ILRTA.RequestedTransfer(msg.sender, abi.encode(Positions.ILRTATransferDetails(id, uint256(-delta)))),
                     callbackData.ilrtaSignatures[j]
                 );
 

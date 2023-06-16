@@ -6,6 +6,7 @@ import {toInt256} from "./math/LiquidityMath.sol";
 import {Pairs, MAX_SPREADS} from "./Pairs.sol";
 import {Positions} from "./Positions.sol";
 import {Strikes} from "./Strikes.sol";
+import {calcLiquidityForAmount0, calcLiquidityForAmount1} from "./math/LiquidityMath.sol";
 
 import {BalanceLib} from "src/libraries/BalanceLib.sol";
 import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
@@ -13,7 +14,7 @@ import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
 import {IExecuteCallback} from "./interfaces/IExecuteCallback.sol";
 
 /// @author Robert Leifke and Kyle Scott
-/// @custom:team return data
+/// @custom:team return data and events
 contract Engine is Positions {
     using Strikes for Strikes.Strike;
     using Pairs for Pairs.Pair;
@@ -30,6 +31,8 @@ contract Engine is Positions {
     error InsufficientInput();
     error CommandLengthMismatch();
     error InvalidCommand();
+    error InvalidSelector();
+    error InvalidAmountDesired();
 
     /// @dev this should be checked when reading any `get` function from another contract to prevent read-only
     /// reentrancy
@@ -54,10 +57,16 @@ contract Engine is Positions {
         CreatePair
     }
 
+    enum TokenSelector {
+        Token0,
+        Token1,
+        LiquidityPosition
+    }
+
     struct SwapParams {
         address token0;
         address token1;
-        bool isToken0;
+        TokenSelector selector;
         int256 amountDesired;
     }
 
@@ -66,7 +75,8 @@ contract Engine is Positions {
         address token1;
         int24 strike;
         uint8 spread;
-        uint256 liquidity;
+        TokenSelector selector;
+        int256 amountDesired;
     }
 
     struct RemoveLiquidityParams {
@@ -74,7 +84,8 @@ contract Engine is Positions {
         address token1;
         int24 strike;
         uint8 spread;
-        uint256 liquidity;
+        TokenSelector selector;
+        int256 amountDesired;
     }
 
     struct CreatePairParams {
@@ -89,7 +100,7 @@ contract Engine is Positions {
         Commands[] calldata commands,
         bytes[] calldata inputs,
         uint256 numTokens,
-        uint256 numILRTA,
+        uint256 numLPs,
         bytes calldata data
     )
         external
@@ -97,53 +108,15 @@ contract Engine is Positions {
     {
         if (commands.length != inputs.length) revert CommandLengthMismatch();
 
-        Accounts.Account memory account = Accounts.newAccount(numTokens, numILRTA);
+        Accounts.Account memory account = Accounts.newAccount(numTokens, numLPs);
 
         for (uint256 i = 0; i < commands.length;) {
             if (commands[i] == Commands.Swap) {
-                SwapParams memory params = abi.decode(inputs[i], (SwapParams));
-                (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
-
-                (int256 amount0, int256 amount1) = pair.swap(params.isToken0, params.amountDesired);
-
-                account.updateToken(params.token0, amount0);
-                account.updateToken(params.token1, amount1);
-
-                emit Swap(pairID);
+                _swap(abi.decode(inputs[i], (SwapParams)), account);
             } else if (commands[i] == Commands.AddLiquidity) {
-                AddLiquidityParams memory params = abi.decode(inputs[i], (AddLiquidityParams));
-                (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
-
-                (uint256 amount0, uint256 amount1) =
-                    pair.updateLiquidity(params.strike, params.spread, toInt256(params.liquidity));
-
-                account.updateToken(params.token0, toInt256(amount0));
-                account.updateToken(params.token1, toInt256(amount1));
-                account.updateILRTA(
-                    dataID(
-                        abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.strike, params.spread))
-                    ),
-                    -int256(params.liquidity)
-                );
-
-                emit AddLiquidity(pairID, params.strike, params.spread, params.liquidity);
+                _addLiquidity(abi.decode(inputs[i], (AddLiquidityParams)), account);
             } else if (commands[i] == Commands.RemoveLiquidity) {
-                RemoveLiquidityParams memory params = abi.decode(inputs[i], (RemoveLiquidityParams));
-                (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
-
-                (uint256 amount0, uint256 amount1) =
-                    pair.updateLiquidity(params.strike, params.spread, -toInt256(params.liquidity));
-
-                account.updateToken(params.token0, -toInt256(amount0));
-                account.updateToken(params.token1, -toInt256(amount1));
-                account.updateILRTA(
-                    dataID(
-                        abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.strike, params.spread))
-                    ),
-                    int256(params.liquidity)
-                );
-
-                emit RemoveLiquidity(pairID, params.strike, params.spread, params.liquidity);
+                _removeLiquidity(abi.decode(inputs[i], (RemoveLiquidityParams)), account);
             } else if (commands[i] == Commands.CreatePair) {
                 _createPair(abi.decode(inputs[i], (CreatePairParams)));
             } else {
@@ -170,14 +143,14 @@ contract Engine is Positions {
             }
         }
 
-        for (uint256 i = 0; i < numILRTA;) {
-            int256 delta = account.ilrtaDeltas[i];
-            bytes32 id = account.ids[i];
+        for (uint256 i = 0; i < numLPs;) {
+            int256 delta = account.lpDeltas[i];
+            bytes32 id = account.lpIDs[i];
 
             if (id == bytes32(0)) break;
 
-            if (delta < 0) {
-                _mint(to, id, uint256(-delta));
+            if (delta > 0) {
+                _mint(to, id, uint256(delta));
             }
 
             unchecked {
@@ -185,9 +158,9 @@ contract Engine is Positions {
             }
         }
 
-        if (numTokens > 0 || numILRTA > 0) {
+        if (numTokens > 0 || numLPs > 0) {
             IExecuteCallback(msg.sender).executeCallback(
-                account.tokens, account.tokenDeltas, account.ids, account.ilrtaDeltas, data
+                account.tokens, account.tokenDeltas, account.lpIDs, account.lpDeltas, data
             );
         }
 
@@ -207,20 +180,124 @@ contract Engine is Positions {
             }
         }
 
-        for (uint256 i = 0; i < numILRTA;) {
-            int256 delta = account.ilrtaDeltas[i];
-            bytes32 id = account.ids[i];
+        for (uint256 i = 0; i < numLPs;) {
+            int256 delta = account.lpDeltas[i];
+            bytes32 id = account.lpIDs[i];
 
             if (id == bytes32(0)) break;
 
-            if (delta > 0) {
-                _burn(address(this), id, uint256(delta));
+            if (delta < 0) {
+                _burn(address(this), id, uint256(-delta));
             }
 
             unchecked {
                 i++;
             }
         }
+    }
+
+    function _swap(SwapParams memory params, Accounts.Account memory account) private {
+        (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
+
+        if (params.selector != TokenSelector.Token0 && params.selector != TokenSelector.Token1) {
+            revert InvalidSelector();
+        }
+
+        (int256 amount0, int256 amount1) = pair.swap(params.selector == TokenSelector.Token0, params.amountDesired);
+
+        account.updateToken(params.token0, amount0);
+        account.updateToken(params.token1, amount1);
+
+        emit Swap(pairID);
+    }
+
+    function _addLiquidity(AddLiquidityParams memory params, Accounts.Account memory account) private {
+        (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
+
+        int256 liquidity;
+        if (params.selector == TokenSelector.LiquidityPosition) {
+            if (params.amountDesired < 0) revert InvalidAmountDesired();
+            liquidity = params.amountDesired;
+        } else if (params.selector == TokenSelector.Token0) {
+            if (params.amountDesired < 0) revert InvalidAmountDesired();
+            liquidity = toInt256(
+                calcLiquidityForAmount0(
+                    pair.strikeCurrent,
+                    pair.compositions[params.spread],
+                    params.strike,
+                    uint256(params.amountDesired),
+                    false
+                )
+            );
+        } else if (params.selector == TokenSelector.Token1) {
+            if (params.amountDesired < 0) revert InvalidAmountDesired();
+            liquidity = toInt256(
+                calcLiquidityForAmount1(
+                    pair.strikeCurrent,
+                    pair.compositions[params.spread],
+                    params.strike,
+                    uint256(params.amountDesired),
+                    false
+                )
+            );
+        } else {
+            revert InvalidSelector();
+        }
+
+        (uint256 amount0, uint256 amount1) = pair.updateLiquidity(params.strike, params.spread, liquidity);
+
+        account.updateToken(params.token0, toInt256(amount0));
+        account.updateToken(params.token1, toInt256(amount1));
+        account.updateILRTA(
+            dataID(abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.strike, params.spread))),
+            liquidity
+        );
+        emit AddLiquidity(pairID, params.strike, params.spread, uint256(liquidity));
+    }
+
+    function _removeLiquidity(RemoveLiquidityParams memory params, Accounts.Account memory account) private {
+        (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
+
+        int256 liquidity;
+        if (params.selector == TokenSelector.LiquidityPosition) {
+            if (params.amountDesired > 0) revert InvalidAmountDesired();
+            liquidity = params.amountDesired;
+        } else if (params.selector == TokenSelector.Token0) {
+            if (params.amountDesired > 0) revert InvalidAmountDesired();
+            liquidity = -toInt256(
+                calcLiquidityForAmount0(
+                    pair.strikeCurrent,
+                    pair.compositions[params.spread],
+                    params.strike,
+                    uint256(params.amountDesired),
+                    true
+                )
+            );
+        } else if (params.selector == TokenSelector.Token1) {
+            if (params.amountDesired > 0) revert InvalidAmountDesired();
+            liquidity = -toInt256(
+                calcLiquidityForAmount1(
+                    pair.strikeCurrent,
+                    pair.compositions[params.spread],
+                    params.strike,
+                    uint256(params.amountDesired),
+                    true
+                )
+            );
+        } else {
+            revert InvalidSelector();
+        }
+
+        (uint256 amount0, uint256 amount1) = pair.updateLiquidity(params.strike, params.spread, liquidity);
+
+        account.updateToken(params.token0, -toInt256(amount0));
+        account.updateToken(params.token1, -toInt256(amount1));
+        account.updateILRTA(
+            dataID(abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.strike, params.spread))),
+            liquidity
+        );
+
+        emit RemoveLiquidity(pairID, params.strike, params.spread, uint256(-liquidity));
     }
 
     function _createPair(CreatePairParams memory params) private {
