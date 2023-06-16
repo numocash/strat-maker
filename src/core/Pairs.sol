@@ -13,8 +13,6 @@ import {BitMaps} from "./BitMaps.sol";
 uint8 constant MAX_SPREADS = 5;
 int8 constant MAX_OFFSET = int8(MAX_SPREADS) - 1;
 
-import {console2} from "forge-std/console2.sol";
-
 /// @author Robert Leifke and Kyle Scott
 library Pairs {
     using Strikes for Strikes.Strike;
@@ -130,8 +128,6 @@ library Pairs {
             });
         }
 
-        console2.log("a");
-
         while (true) {
             uint256 ratioX128 = getRatioAtStrike(state.strikeCurrent);
 
@@ -159,18 +155,13 @@ library Pairs {
             }
 
             if (isSwap0To1) {
-                console2.log("b");
-
                 int24 strikePrev = state.strikeCurrent;
                 if (strikePrev == MIN_STRIKE) revert OutOfBounds();
                 state.strikeCurrent = pair.strikes[strikePrev].next0To1;
-                console2.log("strike current %d", state.strikeCurrent);
 
                 // Remove strike from linked list and bit map if it has no liquidity
                 // Only happens when initialized or all liquidity is removed from current strike
                 if (state.liquidity == 0) {
-                    console2.log("c");
-
                     assert(pair.strikes[strikePrev].reference0To1 == 1);
 
                     int24 below = -pair.bitMap0To1.nextBelow(-strikePrev);
@@ -193,8 +184,6 @@ library Pairs {
                     state.liquidity += pair.strikes[state.strikeCurrent + i].getLiquidity(uint8(i));
                 }
 
-                console2.log("d");
-
                 uint256 newLiquidity =
                     pair.strikes[state.strikeCurrent + state.offset].getLiquidity(uint8(state.offset));
                 uint256 newComposition = pair.compositions[uint8(state.offset)];
@@ -206,10 +195,7 @@ library Pairs {
                             ? 0
                             : uint128(mulDiv(type(uint128).max - newComposition, newLiquidity, state.liquidity))
                     );
-
-                console2.log("e");
             } else {
-                console2.log("f");
                 int24 strikePrev = state.strikeCurrent;
                 if (strikePrev == MAX_STRIKE) revert OutOfBounds();
                 state.strikeCurrent = pair.strikes[strikePrev].next1To0;
@@ -217,7 +203,6 @@ library Pairs {
                 // Remove strike from linked list and bit map if it has no liquidity
                 // Only happens when initialized or all liquidity is removed from current strike
                 if (state.liquidity == 0) {
-                    console2.log("g");
                     assert(pair.strikes[strikePrev].reference1To0 == 1);
 
                     int24 below = pair.bitMap1To0.nextBelow(strikePrev);
@@ -240,8 +225,6 @@ library Pairs {
                     state.liquidity += pair.strikes[state.strikeCurrent - i].getLiquidity(uint8(i));
                 }
 
-                console2.log("h");
-
                 uint256 newLiquidity =
                     pair.strikes[state.strikeCurrent + state.offset].getLiquidity(uint8(-state.offset));
                 uint256 newComposition = pair.compositions[uint8(-state.offset)];
@@ -249,7 +232,6 @@ library Pairs {
                 state.liquidity += newLiquidity;
                 state.composition =
                     state.liquidity == 0 ? 0 : uint128(mulDiv(newComposition, newLiquidity, state.liquidity));
-                console2.log("i");
             }
         }
 

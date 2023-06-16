@@ -231,7 +231,7 @@ contract EngineTest is Test, EngineHelper {
         bytes[] memory inputs = createInputs();
 
         (Engine.Commands addCommand, bytes memory addInput) =
-            addLiquidityCommand(address(token0), address(token1), -1, 0, Engine.TokenSelector.Token0, 1e18);
+            addLiquidityCommand(address(token0), address(token1), -1, 0, Engine.TokenSelector.LiquidityPosition, 1e18);
 
         commands = pushCommands(commands, addCommand);
         inputs = pushInputs(inputs, addInput);
