@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
-import {Pairs, MAX_SPREADS} from "./Pairs.sol";
-import {Strikes} from "./Strikes.sol";
-import {Positions} from "./Positions.sol";
 import {Accounts} from "./Accounts.sol";
+import {toInt256} from "./math/LiquidityMath.sol";
+import {Pairs, MAX_SPREADS} from "./Pairs.sol";
+import {Positions} from "./Positions.sol";
+import {Strikes} from "./Strikes.sol";
 
 import {BalanceLib} from "src/libraries/BalanceLib.sol";
 import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
@@ -127,10 +128,10 @@ contract Engine is Positions {
                 (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
 
                 (uint256 amount0, uint256 amount1) =
-                    pair.updateLiquidity(params.strike, params.spread, int256(params.liquidity));
+                    pair.updateLiquidity(params.strike, params.spread, toInt256(params.liquidity));
 
-                account.updateToken(params.token0, int256(amount0));
-                account.updateToken(params.token1, int256(amount1));
+                account.updateToken(params.token0, toInt256(amount0));
+                account.updateToken(params.token1, toInt256(amount1));
                 account.updateILRTA(
                     dataID(
                         abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.strike, params.spread))
@@ -144,10 +145,10 @@ contract Engine is Positions {
                 (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
 
                 (uint256 amount0, uint256 amount1) =
-                    pair.updateLiquidity(params.strike, params.spread, -int256(params.liquidity));
+                    pair.updateLiquidity(params.strike, params.spread, -toInt256(params.liquidity));
 
-                account.updateToken(params.token0, -int256(amount0));
-                account.updateToken(params.token1, -int256(amount1));
+                account.updateToken(params.token0, -toInt256(amount0));
+                account.updateToken(params.token1, -toInt256(amount1));
                 account.updateILRTA(
                     dataID(
                         abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.strike, params.spread))

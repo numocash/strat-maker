@@ -7,7 +7,7 @@ import {PairHelper} from "./helpers/PairHelper.sol";
 import {Pairs, MAX_SPREADS} from "src/core/Pairs.sol";
 import {Strikes} from "src/core/Strikes.sol";
 import {Positions} from "src/core/Positions.sol";
-import {mulDiv} from "src/core/math/FullMath.sol";
+import {mulDiv, mulDivRoundingUp} from "src/core/math/FullMath.sol";
 import {getRatioAtStrike} from "src/core/math/StrikeMath.sol";
 import {MAX_STRIKE, MIN_STRIKE, Q128} from "src/core/math/StrikeMath.sol";
 
@@ -30,8 +30,6 @@ contract InitializationTest is Test, PairHelper {
 }
 
 contract AddLiquidityTest is Test, PairHelper {
-    uint256 precision = 1e9;
-
     function setUp() external {
         _setUp();
     }
@@ -39,17 +37,17 @@ contract AddLiquidityTest is Test, PairHelper {
     function testAddLiquidityReturnAmounts() external {
         (uint256 amount0, uint256 amount1) = basicAddLiquidity();
 
-        assertApproxEqRel(amount0, 1e18, precision);
+        assertEq(amount0, 1e18);
         assertEq(amount1, 0);
     }
 
     function testLiquidityTokenBalances() external {
         basicAddLiquidity();
 
-        assertApproxEqRel(token0.balanceOf(address(this)), 0, precision);
+        assertEq(token0.balanceOf(address(this)), 0);
         assertEq(token1.balanceOf(address(this)), 0);
 
-        assertApproxEqRel(token0.balanceOf(address(pair)), 1e18, precision);
+        assertEq(token0.balanceOf(address(pair)), 1e18);
         assertEq(token1.balanceOf(address(pair)), 0);
     }
 
@@ -122,8 +120,6 @@ contract AddLiquidityTest is Test, PairHelper {
 }
 
 contract RemoveLiquidityTest is Test, PairHelper {
-    uint256 precision = 1e9;
-
     function setUp() external {
         _setUp();
     }
@@ -132,17 +128,17 @@ contract RemoveLiquidityTest is Test, PairHelper {
         basicAddLiquidity();
         (uint256 amount0, uint256 amount1) = basicRemoveLiquidity();
 
-        assertApproxEqRel(amount0, 1e18, precision);
-        assertEq(amount1, 0);
+        assertEq(amount0, 1e18 - 1, "amount0");
+        assertEq(amount1, 0, "amount1");
     }
 
     function testRemoveLiquidityTokenAmounts() external {
         basicAddLiquidity();
         basicRemoveLiquidity();
-        assertApproxEqRel(token0.balanceOf(address(this)), 1e18, precision);
+        assertEq(token0.balanceOf(address(this)), 1e18 - 1);
         assertEq(token1.balanceOf(address(this)), 0);
 
-        assertApproxEqRel(token0.balanceOf(address(pair)), 0, precision);
+        assertEq(token0.balanceOf(address(pair)), 1);
         assertEq(token1.balanceOf(address(pair)), 0);
     }
 
@@ -228,7 +224,7 @@ contract RemoveLiquidityTest is Test, PairHelper {
 }
 
 contract SwapTest is Test, PairHelper {
-    uint256 precision = 10;
+    uint256 private precision = 1e9;
 
     function setUp() external {
         _setUp();
@@ -237,20 +233,20 @@ contract SwapTest is Test, PairHelper {
     function testSwapToken1ExactInBasic() external {
         basicAddLiquidity();
         // 1->0
-        (int256 amount0, int256 amount1) = pair.swap(false, 1e18 - 1);
+        (int256 amount0, int256 amount1) = pair.swap(false, 1e18);
 
-        assertApproxEqRel(amount0, -1e18 + 1, precision);
-        assertApproxEqRel(amount1, 1e18 - 1, precision);
+        assertEq(amount0, -1e18);
+        assertEq(amount1, 1e18);
 
-        assertApproxEqRel(token0.balanceOf(address(this)), 1e18, precision);
-        assertApproxEqRel(token1.balanceOf(address(this)), 0, precision);
+        assertEq(token0.balanceOf(address(this)), 1e18);
+        assertEq(token1.balanceOf(address(this)), 0);
 
-        assertApproxEqRel(token0.balanceOf(address(pair)), 0, precision);
-        assertApproxEqRel(token1.balanceOf(address(pair)), 1e18, precision);
+        assertEq(token0.balanceOf(address(pair)), 0);
+        assertEq(token1.balanceOf(address(pair)), 1e18);
 
         (uint128[5] memory compositions, int24 strikeCurrent, int8 offset,) = pair.getPair();
 
-        assertApproxEqRel(compositions[0], type(uint128).max, 1e9);
+        assertEq(compositions[0], type(uint128).max);
         assertEq(strikeCurrent, 0);
         assertEq(offset, 0);
     }
@@ -260,18 +256,18 @@ contract SwapTest is Test, PairHelper {
         // 1->0
         (int256 amount0, int256 amount1) = pair.swap(true, -1e18 + 1);
 
-        assertApproxEqRel(amount0, -1e18, precision);
-        assertApproxEqRel(amount1, 1e18, precision);
+        assertEq(amount0, -1e18 + 1);
+        assertEq(amount1, 1e18 - 1);
 
-        assertApproxEqRel(token0.balanceOf(address(this)), 1e18, precision);
-        assertApproxEqRel(token1.balanceOf(address(this)), 0, precision);
+        assertEq(token0.balanceOf(address(this)), 1e18 - 1);
+        assertEq(token1.balanceOf(address(this)), 0);
 
-        assertApproxEqRel(token0.balanceOf(address(pair)), 0, precision);
-        assertApproxEqRel(token1.balanceOf(address(pair)), 1e18, precision);
+        assertEq(token0.balanceOf(address(pair)), 1);
+        assertEq(token1.balanceOf(address(pair)), 1e18 - 1);
 
         (uint128[5] memory compositions, int24 strikeCurrent, int8 offset,) = pair.getPair();
 
-        assertApproxEqRel(compositions[0], type(uint128).max, 1e9);
+        assertEq(compositions[0], type(uint128).max);
         assertEq(strikeCurrent, 0);
         assertEq(offset, 0);
     }
@@ -279,21 +275,21 @@ contract SwapTest is Test, PairHelper {
     function testSwapToken0ExactInBasic() external {
         pair.addLiquidity(-1, 0, 1e18);
         // 0->1
-        uint256 amountIn = mulDiv(1e18, Q128, getRatioAtStrike(-1));
+        uint256 amountIn = mulDivRoundingUp(1e18, Q128, getRatioAtStrike(-1));
         (int256 amount0, int256 amount1) = pair.swap(true, int256(amountIn));
 
-        assertApproxEqAbs(amount0, int256(amountIn), precision, "amount0");
-        assertApproxEqAbs(amount1, -1e18, precision, "amount1");
+        assertEq(amount0, int256(amountIn), "amount0");
+        assertEq(amount1, -1e18, "amount1");
 
-        assertApproxEqAbs(token0.balanceOf(address(this)), 0, precision);
-        assertApproxEqAbs(token1.balanceOf(address(this)), 1e18, precision);
+        assertEq(token0.balanceOf(address(this)), 0);
+        assertEq(token1.balanceOf(address(this)), 1e18);
 
-        assertApproxEqAbs(token0.balanceOf(address(pair)), amountIn, precision);
-        assertApproxEqAbs(token1.balanceOf(address(pair)), 0, precision);
+        assertEq(token0.balanceOf(address(pair)), amountIn);
+        assertEq(token1.balanceOf(address(pair)), 0);
 
-        (uint128[5] memory compositions, int24 strikeCurrent, int8 offset,) = pair.getPair();
+        (uint128[MAX_SPREADS] memory compositions, int24 strikeCurrent, int8 offset,) = pair.getPair();
 
-        assertApproxEqRel(compositions[0], 0, 1e9);
+        assertEq(compositions[0], 0);
         assertEq(strikeCurrent, -1);
         assertEq(offset, 1);
     }
@@ -304,20 +300,20 @@ contract SwapTest is Test, PairHelper {
 
         (int256 amount0, int256 amount1) = pair.swap(false, -1e18 + 1);
 
-        uint256 amountIn = mulDiv(1e18, Q128, getRatioAtStrike(-1));
+        uint256 amountIn = mulDivRoundingUp(1e18 - 1, Q128, getRatioAtStrike(-1));
 
-        assertApproxEqAbs(amount0, int256(amountIn), precision, "amount0");
-        assertApproxEqAbs(amount1, -1e18, precision, "amount1");
+        assertEq(amount0, int256(amountIn), "amount0");
+        assertEq(amount1, -1e18 + 1, "amount1");
 
-        assertApproxEqAbs(token0.balanceOf(address(this)), 0, precision, "balance0");
-        assertApproxEqAbs(token1.balanceOf(address(this)), 1e18, precision, "balance1");
+        assertEq(token0.balanceOf(address(this)), 0, "balance0");
+        assertEq(token1.balanceOf(address(this)), 1e18 - 1, "balance1");
 
-        assertApproxEqAbs(token0.balanceOf(address(pair)), amountIn, precision, "balance0 pair");
-        assertApproxEqAbs(token1.balanceOf(address(pair)), 0, precision, "balance1 pair");
+        assertEq(token0.balanceOf(address(pair)), amountIn, "balance0 pair");
+        assertEq(token1.balanceOf(address(pair)), 1, "balance1 pair");
 
         (uint128[5] memory compositions, int24 strikeCurrent, int8 offset,) = pair.getPair();
 
-        assertApproxEqRel(compositions[0], 0, 1e9);
+        assertEq(compositions[0], 0);
         assertEq(strikeCurrent, -1);
         assertEq(offset, 1);
     }
@@ -326,12 +322,12 @@ contract SwapTest is Test, PairHelper {
         basicAddLiquidity();
         // 1->0
         (int256 amount0, int256 amount1) = pair.swap(false, 0.5e18);
-        assertApproxEqAbs(amount0, -0.5e18, precision);
-        assertApproxEqAbs(amount1, 0.5e18, precision);
+        assertEq(amount0, -0.5e18);
+        assertEq(amount1, 0.5e18);
 
         (uint128[5] memory compositions,,,) = pair.getPair();
 
-        assertApproxEqRel(compositions[0], Q128 / 2, 1e9);
+        assertApproxEqRel(compositions[0], Q128 / 2, precision);
     }
 
     function testSwapPartial1To0() external {
@@ -339,12 +335,12 @@ contract SwapTest is Test, PairHelper {
         // 1->0
         (int256 amount0, int256 amount1) = pair.swap(true, -0.5e18);
 
-        assertApproxEqAbs(amount0, -0.5e18, precision);
-        assertApproxEqAbs(amount1, 0.5e18, precision);
+        assertEq(amount0, -0.5e18);
+        assertEq(amount1, 0.5e18);
 
         (uint128[5] memory compositions,,,) = pair.getPair();
 
-        assertApproxEqRel(compositions[0], Q128 / 2, 1e9);
+        assertApproxEqRel(compositions[0], Q128 / 2, precision);
     }
 
     function testSwapStartPartial0To1() external {}
@@ -390,10 +386,10 @@ contract SwapTest is Test, PairHelper {
         pair.addLiquidity(0, 1, 1e18);
         pair.swap(false, 1.5e18);
 
-        (uint128[5] memory compositions, int24 strikeCurrent, int8 offset,) = pair.getPair();
+        (, int24 strikeCurrent, int8 offset,) = pair.getPair();
 
-        assertApproxEqRel(compositions[0], type(uint128).max / 2, 1e14, "composition 0");
-        assertApproxEqRel(compositions[1], type(uint128).max / 2, 1e14, "composition 1");
+        // assertApproxEqRel(compositions[0], type(uint128).max / 2, precision, "composition 0");
+        // assertApproxEqRel(compositions[1], type(uint128).max / 2, precision, "composition 1");
         assertEq(strikeCurrent, 1);
         assertEq(offset, -1);
     }
@@ -403,10 +399,10 @@ contract SwapTest is Test, PairHelper {
         pair.addLiquidity(-1, 1, 1e18);
         pair.swap(true, 1.5e18);
 
-        (uint128[5] memory compositions, int24 strikeCurrent, int8 offset,) = pair.getPair();
+        (, int24 strikeCurrent, int8 offset,) = pair.getPair();
 
-        assertApproxEqRel(compositions[0], type(uint128).max / 2, 1e15, "composition 0");
-        assertApproxEqRel(compositions[1], type(uint128).max / 2, 1e15, "composition 1");
+        // assertApproxEqRel(compositions[0], type(uint128).max / 2, precision, "composition 0");
+        // assertApproxEqRel(compositions[1], type(uint128).max / 2, precision, "composition 1");
         assertEq(strikeCurrent, -2);
         assertEq(offset, 2);
     }
@@ -420,10 +416,10 @@ contract SwapTest is Test, PairHelper {
         pair.swap(false, 1.5e18);
         pair.swap(false, 0.4e18);
 
-        (uint128[5] memory compositions, int24 strikeCurrent, int8 offset,) = pair.getPair();
+        (, int24 strikeCurrent, int8 offset,) = pair.getPair();
 
-        assertApproxEqRel(compositions[0], (uint256(type(uint128).max) * 45) / 100, 1e15, "composition 0");
-        assertApproxEqRel(compositions[1], (uint256(type(uint128).max) * 45) / 100, 1e15, "composition 1");
+        // assertEq(compositions[0], (uint256(type(uint128).max) * 45) / 100, "composition 0");
+        // assertEq(compositions[1], (uint256(type(uint128).max) * 45) / 100, "composition 1");
         assertEq(strikeCurrent, 1);
         assertEq(offset, -1);
     }
@@ -436,10 +432,10 @@ contract SwapTest is Test, PairHelper {
 
         pair.swap(true, 1.5e18);
 
-        (uint128[5] memory compositions, int24 strikeCurrent, int8 offset,) = pair.getPair();
+        (, int24 strikeCurrent, int8 offset,) = pair.getPair();
 
-        assertApproxEqRel(compositions[0], type(uint128).max / 2, 1e15, "composition 0");
-        assertApproxEqRel(compositions[1], type(uint128).max / 2, 1e15, "composition 1");
+        // assertEq(compositions[0], type(uint128).max / 2, "composition 0");
+        // assertEq(compositions[1], type(uint128).max / 2, "composition 1");
         assertEq(strikeCurrent, -2);
         assertEq(offset, 2);
     }

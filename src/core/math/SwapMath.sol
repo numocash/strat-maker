@@ -11,7 +11,6 @@ import {Q128} from "./StrikeMath.sol";
 /// @return amountIn The amount of tokens to be swapped in
 /// @return amountOut The amount of tokens to be swapped out
 /// @return amountRemaining The amount of output token still remaining in the strike
-/// @custom:team when do we need to round up and when can we use unchecked math
 function computeSwapStep(
     uint256 ratioX128,
     uint128 composition,
@@ -24,24 +23,37 @@ function computeSwapStep(
 {
     bool isExactIn = amountDesired > 0;
     if (isExactIn) {
+        uint128 compositionInverse;
+
+        unchecked {
+            compositionInverse = type(uint128).max - composition;
+        }
+
         uint256 maxAmountIn = isToken0
-            ? getAmount0FromComposition(type(uint128).max - composition, liquidity, ratioX128)
-            : getAmount1FromComposition(type(uint128).max - composition, liquidity);
+            ? getAmount0FromComposition(compositionInverse, liquidity, ratioX128, true)
+            : getAmount1FromComposition(compositionInverse, liquidity, true);
 
-        bool completeSwap = uint256(amountDesired) >= maxAmountIn;
+        bool allLiquiditySwapped = uint256(amountDesired) > maxAmountIn;
 
-        amountIn = completeSwap ? maxAmountIn : uint256(amountDesired);
+        amountIn = allLiquiditySwapped ? maxAmountIn : uint256(amountDesired);
         amountOut = isToken0 ? mulDiv(amountIn, ratioX128, Q128) : mulDiv(amountIn, Q128, ratioX128);
-        amountRemaining = completeSwap ? 0 : maxAmountIn - uint256(amountDesired);
+
+        unchecked {
+            amountRemaining = allLiquiditySwapped ? 0 : maxAmountIn - uint256(amountDesired);
+        }
     } else {
         uint256 maxAmountOut = isToken0
-            ? getAmount0FromComposition(composition, liquidity, ratioX128)
-            : getAmount1FromComposition(composition, liquidity);
+            ? getAmount0FromComposition(composition, liquidity, ratioX128, false)
+            : getAmount1FromComposition(composition, liquidity, false);
 
-        bool completeSwap = uint256(-amountDesired) > maxAmountOut;
+        bool allLiquiditySwapped = uint256(-amountDesired) > maxAmountOut;
 
-        amountOut = completeSwap ? maxAmountOut : uint256(-amountDesired);
-        amountIn = isToken0 ? mulDiv(amountOut, ratioX128, Q128) : mulDiv(amountOut, Q128, ratioX128);
-        amountRemaining = completeSwap ? 0 : maxAmountOut - uint256(-amountDesired);
+        amountOut = allLiquiditySwapped ? maxAmountOut : uint256(-amountDesired);
+        amountIn =
+            isToken0 ? mulDivRoundingUp(amountOut, ratioX128, Q128) : mulDivRoundingUp(amountOut, Q128, ratioX128);
+
+        unchecked {
+            amountRemaining = allLiquiditySwapped ? 0 : maxAmountOut - uint256(-amountDesired);
+        }
     }
 }

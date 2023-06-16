@@ -30,7 +30,10 @@ library Accounts {
 
         for (uint256 i = 0; i < account.tokens.length;) {
             if (account.tokens[i] == token) {
-                account.tokenDeltas[i] = account.tokenDeltas[i] + delta;
+                // change in balance cannot exceed the total supply
+                unchecked {
+                    account.tokenDeltas[i] = account.tokenDeltas[i] + delta;
+                }
                 return;
             } else if (account.tokens[i] == address(0)) {
                 account.tokens[i] = token;
@@ -52,7 +55,10 @@ library Accounts {
 
         for (uint256 i = 0; i < account.ids.length;) {
             if (account.ids[i] == id) {
-                account.ilrtaDeltas[i] = account.ilrtaDeltas[i] + delta;
+                // change in liquidity cannot exceed the maximum liquidity in a strike
+                unchecked {
+                    account.ilrtaDeltas[i] = account.ilrtaDeltas[i] + delta;
+                }
                 return;
             } else if (account.ids[i] == bytes32(0)) {
                 account.ids[i] = id;

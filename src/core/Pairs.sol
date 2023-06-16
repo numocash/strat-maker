@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import {mulDiv, mulDivRoundingUp} from "./math/FullMath.sol";
-import {addDelta, calcAmountsForLiquidity} from "./math/LiquidityMath.sol";
+import {addDelta, calcAmountsForLiquidity, toInt256} from "./math/LiquidityMath.sol";
 import {computeSwapStep} from "./math/SwapMath.sol";
 import {
     getCurrentStrikeForSpreadFromOffset, getRatioAtStrike, MAX_STRIKE, MIN_STRIKE, Q128
@@ -136,13 +136,13 @@ library Pairs {
                 computeSwapStep(ratioX128, state.composition, state.liquidity, isToken0, state.amountDesired);
 
             if (isExactIn) {
-                state.amountDesired = state.amountDesired - int256(amountIn);
-                state.amountA = state.amountA + int256(amountIn);
-                state.amountB = state.amountB - int256(amountOut);
+                state.amountDesired = state.amountDesired - toInt256(amountIn);
+                state.amountA = state.amountA + toInt256(amountIn);
+                state.amountB = state.amountB - toInt256(amountOut);
             } else {
-                state.amountDesired = state.amountDesired + int256(amountOut);
-                state.amountA = state.amountA - int256(amountOut);
-                state.amountB = state.amountB + int256(amountIn);
+                state.amountDesired = state.amountDesired + toInt256(amountOut);
+                state.amountA = state.amountA - toInt256(amountOut);
+                state.amountB = state.amountB + toInt256(amountIn);
             }
 
             if (state.amountDesired == 0) {
@@ -278,7 +278,8 @@ library Pairs {
             strikeCurrentForSpread,
             pair.compositions[spread],
             strike,
-            liquidity > 0 ? uint256(liquidity) : uint256(-liquidity)
+            liquidity > 0 ? uint256(liquidity) : uint256(-liquidity),
+            liquidity > 0
         );
     }
 
