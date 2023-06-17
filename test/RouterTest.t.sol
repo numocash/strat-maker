@@ -157,7 +157,7 @@ contract RouterTest is Test {
         vm.resumeGasMetering();
 
         vm.prank(owner);
-        router.execute(
+        router.route(
             owner, commands, inputs, 1, 1, permitBatch, new ILRTA.SignatureTransfer[](0), signature, new bytes[](0)
         );
     }
@@ -195,7 +195,7 @@ contract RouterTest is Test {
         bytes memory signature = signPermitBatch(permitBatch, privateKey, 0);
 
         vm.prank(owner);
-        router.execute(
+        router.route(
             owner, commands, inputs, 1, 1, permitBatch, new ILRTA.SignatureTransfer[](0), signature, new bytes[](0)
         );
 
@@ -229,7 +229,7 @@ contract RouterTest is Test {
         vm.resumeGasMetering();
 
         vm.prank(owner);
-        router.execute(owner, commands, inputs, 1, 1, permitBatchEmpty, signatureTransfers, bytes(""), signatures);
+        router.route(owner, commands, inputs, 1, 1, permitBatchEmpty, signatureTransfers, bytes(""), signatures);
     }
 
     function testGasSwap() external {
@@ -265,7 +265,7 @@ contract RouterTest is Test {
         bytes memory signature = signPermitBatch(permitBatch, privateKey, 0);
 
         vm.prank(owner);
-        router.execute(
+        router.route(
             owner, commands, inputs, 1, 1, permitBatch, new ILRTA.SignatureTransfer[](0), signature, new bytes[](0)
         );
 
@@ -292,7 +292,7 @@ contract RouterTest is Test {
         vm.resumeGasMetering();
 
         vm.prank(owner);
-        router.execute(
+        router.route(
             owner, commands, inputs, 2, 0, permitBatch, new ILRTA.SignatureTransfer[](0), signature, new bytes[](0)
         );
     }

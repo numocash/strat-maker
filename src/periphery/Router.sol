@@ -8,6 +8,8 @@ import {Permit2} from "permit2/src/Permit2.sol";
 import {ISignatureTransfer} from "permit2/src/interfaces/ISignatureTransfer.sol";
 import {ILRTA} from "ilrta/ILRTA.sol";
 
+/// @author Robert Leifke and Kyle Scott
+/// @custom:team route by signature
 contract Router is IExecuteCallback {
     Engine private immutable engine;
     Permit2 private immutable permit2;
@@ -27,7 +29,7 @@ contract Router is IExecuteCallback {
         permit2 = Permit2(_permit2);
     }
 
-    function execute(
+    function route(
         address to,
         Engine.Commands[] calldata commands,
         bytes[] calldata inputs,
