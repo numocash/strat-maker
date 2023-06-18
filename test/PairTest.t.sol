@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {Test} from "forge-std/Test.sol";
 import {PairHelper} from "./helpers/PairHelper.sol";
 
-import {Pairs, MAX_SPREADS} from "src/core/Pairs.sol";
+import {Pairs, NUM_SPREADS} from "src/core/Pairs.sol";
 import {Strikes} from "src/core/Strikes.sol";
 import {Positions} from "src/core/Positions.sol";
 import {mulDiv, mulDivRoundingUp} from "src/core/math/FullMath.sol";
@@ -287,7 +287,7 @@ contract SwapTest is Test, PairHelper {
         assertEq(token0.balanceOf(address(pair)), amountIn);
         assertEq(token1.balanceOf(address(pair)), 0);
 
-        (uint128[MAX_SPREADS] memory compositions, int24 strikeCurrent, int8 offset,) = pair.getPair();
+        (uint128[NUM_SPREADS] memory compositions, int24 strikeCurrent, int8 offset,) = pair.getPair();
 
         assertEq(compositions[0], 0);
         assertEq(strikeCurrent, -1);

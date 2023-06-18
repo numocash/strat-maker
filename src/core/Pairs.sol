@@ -10,8 +10,8 @@ import {
 import {Strikes} from "./Strikes.sol";
 import {BitMaps} from "./BitMaps.sol";
 
-uint8 constant MAX_SPREADS = 5;
-int8 constant MAX_OFFSET = int8(MAX_SPREADS) - 1;
+uint8 constant NUM_SPREADS = 5;
+int8 constant MAX_OFFSET = int8(NUM_SPREADS) - 1;
 
 /// @author Robert Leifke and Kyle Scott
 library Pairs {
@@ -24,7 +24,7 @@ library Pairs {
     error OutOfBounds();
 
     struct Pair {
-        uint128[MAX_SPREADS] compositions;
+        uint128[NUM_SPREADS] compositions;
         int24 strikeCurrent;
         int8 offset;
         uint8 initialized; // 1 == initialized, 0 == uninitialized
@@ -294,7 +294,7 @@ library Pairs {
 
     /// @notice Check the validity of the spread
     function _checkSpread(uint8 spread) private pure {
-        if (spread > MAX_SPREADS) revert InvalidSpread();
+        if (spread > NUM_SPREADS) revert InvalidSpread();
     }
 
     /// @notice Update a strike

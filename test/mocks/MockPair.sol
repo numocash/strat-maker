@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import {Pairs, MAX_SPREADS} from "src/core/Pairs.sol";
+import {Pairs, NUM_SPREADS} from "src/core/Pairs.sol";
 import {Positions} from "src/core/Positions.sol";
 import {Strikes} from "src/core/Strikes.sol";
 
@@ -107,7 +107,7 @@ contract MockPair is Positions {
     function getPair()
         external
         view
-        returns (uint128[MAX_SPREADS] memory compositions, int24 strikeCurrent, int8 offset, uint8 initialized)
+        returns (uint128[NUM_SPREADS] memory compositions, int24 strikeCurrent, int8 offset, uint8 initialized)
     {
         (compositions, strikeCurrent, offset, initialized) =
             (pair.compositions, pair.strikeCurrent, pair.offset, pair.initialized);

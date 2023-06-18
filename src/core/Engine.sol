@@ -3,7 +3,7 @@ pragma solidity ^0.8.17;
 
 import {Accounts} from "./Accounts.sol";
 import {toInt256} from "./math/LiquidityMath.sol";
-import {Pairs, MAX_SPREADS} from "./Pairs.sol";
+import {Pairs, NUM_SPREADS} from "./Pairs.sol";
 import {Positions} from "./Positions.sol";
 import {Strikes} from "./Strikes.sol";
 import {calcLiquidityForAmount0, calcLiquidityForAmount1} from "./math/LiquidityMath.sol";
@@ -316,7 +316,7 @@ contract Engine is Positions {
     )
         external
         view
-        returns (uint128[MAX_SPREADS] memory compositions, int24 strikeCurrent, int8 offset, uint8 initialized)
+        returns (uint128[NUM_SPREADS] memory compositions, int24 strikeCurrent, int8 offset, uint8 initialized)
     {
         (, Pairs.Pair storage pair) = pairs.getPairAndID(token0, token1);
         (compositions, strikeCurrent, offset, initialized) =
