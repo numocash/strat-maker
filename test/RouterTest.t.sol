@@ -5,9 +5,10 @@ import {Test} from "forge-std/Test.sol";
 
 import {Engine} from "src/core/Engine.sol";
 import {ILRTA} from "ilrta/ILRTA.sol";
-import {Permit2} from "permit2/src/Permit2.sol";
+import {Permit3} from "ilrta/Permit3.sol";
 import {Router} from "src/periphery/Router.sol";
 import {Positions} from "src/core/Positions.sol";
+import {SuperSignature} from "ilrta/SuperSignature.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 import {
     createCommands,
@@ -19,68 +20,67 @@ import {
     swapCommand
 } from "./helpers/Utils.sol";
 
-import {ISignatureTransfer} from "permit2/src/interfaces/ISignatureTransfer.sol";
-
 contract RouterTest is Test {
     Engine private engine;
-    Permit2 private permit2;
+    Permit3 private permit3;
+    SuperSignature private superSignature;
     Router private router;
     MockERC20 private token0;
     MockERC20 private token1;
 
-    bytes32 private constant TOKEN_PERMISSIONS_TYPEHASH = keccak256("TokenPermissions(address token,uint256 amount)");
+    bytes32 private constant VERIFY_TYPEHASH = keccak256("Verify(bytes32[] dataHash,uint256 nonce,uint256 deadline)");
 
-    bytes32 private constant PERMIT_BATCH_TRANSFER_FROM_TYPEHASH = keccak256(
-        // solhint-disable-next-line max-line-length
-        "PermitBatchTransferFrom(TokenPermissions[] permitted,address spender,uint256 nonce,uint256 deadline)TokenPermissions(address token,uint256 amount)"
+    bytes32 public constant TRANSFER_DETAILS_TYPEHASH = keccak256("TransferDetails(address token,uint256 amount)");
+
+    bytes32 private constant SUPER_SIGNATURE_TRANSFER_BATCH_TYPEHASH = keccak256(
+        "Transfer(TransferDetails[] transferDetails,address spender)TransferDetails(address token,uint256 amount)"
     );
 
-    bytes32 private constant ILRTA_TRANSFER_TYPEHASH = keccak256(
+    bytes32 private constant SUPER_SIGNATURE_ILRTA_TRANSFER_TYPEHASH = keccak256(
         // solhint-disable-next-line max-line-length
-        "Transfer(TransferDetails transferDetails,address spender,uint256 nonce,uint256 deadline)TransferDetails(address token0,address token1,int24 strike,uint8 spread,uint256 amount)"
+        "Transfer(TransferDetails transferDetails,address spender)TransferDetails(address token0,address token1,int24 strike,uint8 spread,uint256 amount)"
     );
 
     bytes32 private constant ILRTA_TRANSFER_DETAILS_TYPEHASH =
         keccak256("TransferDetails(address token0,address token1,int24 strike,uint8 spread,uint256 amount)");
 
-    function signPermitBatch(
-        ISignatureTransfer.PermitBatchTransferFrom memory permitBatch,
-        uint256 privateKey,
-        uint256 nonce
-    )
-        private
-        view
-        returns (bytes memory signature)
-    {
-        bytes32[] memory tokenPermissions = new bytes32[](permitBatch.permitted.length);
-        for (uint256 i = 0; i < permitBatch.permitted.length; ++i) {
-            tokenPermissions[i] = keccak256(abi.encode(TOKEN_PERMISSIONS_TYPEHASH, permitBatch.permitted[i]));
+    function permitDataHash(Permit3.TransferDetails[] memory permitTransfers) private view returns (bytes32) {
+        uint256 length = permitTransfers.length;
+        bytes32[] memory transfeDetailsHashes = new bytes32[](length);
+
+        for (uint256 i = 0; i < length;) {
+            transfeDetailsHashes[i] = keccak256(abi.encode(TRANSFER_DETAILS_TYPEHASH, permitTransfers[i]));
+
+            unchecked {
+                i++;
+            }
         }
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-            privateKey,
-            keccak256(
-                abi.encodePacked(
-                    "\x19\x01",
-                    permit2.DOMAIN_SEPARATOR(),
-                    keccak256(
-                        abi.encode(
-                            PERMIT_BATCH_TRANSFER_FROM_TYPEHASH,
-                            keccak256(abi.encodePacked(tokenPermissions)),
-                            address(router),
-                            nonce,
-                            block.timestamp
-                        )
-                    )
-                )
+        bytes32 signatureHash = keccak256(
+            abi.encode(
+                SUPER_SIGNATURE_TRANSFER_BATCH_TYPEHASH,
+                keccak256(abi.encodePacked(transfeDetailsHashes)),
+                address(router)
             )
         );
 
-        return abi.encodePacked(r, s, v);
+        return signatureHash;
     }
 
-    function signILRTATransfer(
-        ILRTA.SignatureTransfer memory signatureTransfer,
+    function positionsDataHash(Positions.ILRTATransferDetails memory positionTransfer) private view returns (bytes32) {
+        bytes32 signatureHash = keccak256(
+            abi.encode(
+                SUPER_SIGNATURE_ILRTA_TRANSFER_TYPEHASH,
+                keccak256(abi.encode(ILRTA_TRANSFER_DETAILS_TYPEHASH, abi.encode(positionTransfer))),
+                msg.sender
+            )
+        );
+
+        return signatureHash;
+    }
+
+    function signSuperSignature(
+        SuperSignature.Verify memory verify,
         uint256 privateKey
     )
         private
@@ -92,14 +92,10 @@ contract RouterTest is Test {
             keccak256(
                 abi.encodePacked(
                     "\x19\x01",
-                    engine.DOMAIN_SEPARATOR(),
+                    superSignature.DOMAIN_SEPARATOR(),
                     keccak256(
                         abi.encode(
-                            ILRTA_TRANSFER_TYPEHASH,
-                            keccak256(abi.encode(ILRTA_TRANSFER_DETAILS_TYPEHASH, signatureTransfer.transferDetails)),
-                            address(router),
-                            0,
-                            block.timestamp
+                            VERIFY_TYPEHASH, keccak256(abi.encodePacked(verify.dataHash)), verify.nonce, verify.deadline
                         )
                     )
                 )
@@ -110,9 +106,10 @@ contract RouterTest is Test {
     }
 
     function setUp() external {
-        engine = new Engine();
-        permit2 = new Permit2();
-        router = new Router(address(engine), address(permit2));
+        superSignature = new SuperSignature();
+        permit3 = new Permit3(address(superSignature));
+        engine = new Engine(address(superSignature));
+        router = new Router(address(engine), address(permit3), address(superSignature));
 
         MockERC20 tokenA = new MockERC20();
         MockERC20 tokenB = new MockERC20();
@@ -135,7 +132,7 @@ contract RouterTest is Test {
         token0.mint(address(owner), 1e18);
 
         vm.prank(owner);
-        token0.approve(address(permit2), 1e18);
+        token0.approve(address(permit3), 1e18);
 
         Engine.Commands[] memory commands = new Engine.Commands[](1);
         commands[0] = Engine.Commands.AddLiquidity;
@@ -147,18 +144,28 @@ contract RouterTest is Test {
             )
         );
 
-        ISignatureTransfer.TokenPermissions[] memory permitted = new ISignatureTransfer.TokenPermissions[](1);
-        permitted[0] = ISignatureTransfer.TokenPermissions({token: address(token0), amount: 1e18});
+        Permit3.TransferDetails[] memory permitTransferDetails = new Permit3.TransferDetails[](1);
+        permitTransferDetails[0] = Permit3.TransferDetails({token: address(token0), amount: 1e18});
 
-        ISignatureTransfer.PermitBatchTransferFrom memory permitBatch =
-            ISignatureTransfer.PermitBatchTransferFrom({permitted: permitted, nonce: 0, deadline: block.timestamp});
+        bytes32[] memory dataHash = new bytes32[](1);
+        dataHash[0] = permitDataHash(permitTransferDetails);
 
-        bytes memory signature = signPermitBatch(permitBatch, privateKey, 0);
+        SuperSignature.Verify memory verify = SuperSignature.Verify(dataHash, 0, block.timestamp);
+
+        bytes memory signature = signSuperSignature(verify, privateKey);
         vm.resumeGasMetering();
 
         vm.prank(owner);
         router.route(
-            owner, commands, inputs, 1, 1, permitBatch, new ILRTA.SignatureTransfer[](0), signature, new bytes[](0)
+            owner,
+            commands,
+            inputs,
+            1,
+            1,
+            permitTransferDetails,
+            new Positions.ILRTATransferDetails[](0),
+            verify,
+            signature
         );
     }
 
@@ -170,7 +177,7 @@ contract RouterTest is Test {
         token0.mint(address(owner), 1e18);
 
         vm.prank(owner);
-        token0.approve(address(permit2), 1e18);
+        token0.approve(address(permit3), 1e18);
 
         Engine.Commands[] memory commands = createCommands();
         bytes[] memory inputs = createInputs();
@@ -181,22 +188,27 @@ contract RouterTest is Test {
         commands = pushCommands(commands, addCommand);
         inputs = pushInputs(inputs, addInput);
 
-        ISignatureTransfer.TokenPermissions[] memory permitted = new ISignatureTransfer.TokenPermissions[](1);
-        permitted[0] = ISignatureTransfer.TokenPermissions({token: address(token0), amount: 1e18});
+        Permit3.TransferDetails[] memory permitTransferDetails = new Permit3.TransferDetails[](1);
+        permitTransferDetails[0] = Permit3.TransferDetails({token: address(token0), amount: 1e18});
 
-        ISignatureTransfer.PermitBatchTransferFrom memory permitBatch =
-            ISignatureTransfer.PermitBatchTransferFrom({permitted: permitted, nonce: 0, deadline: block.timestamp});
+        bytes32[] memory dataHash = new bytes32[](1);
+        dataHash[0] = permitDataHash(permitTransferDetails);
 
-        bytes32[] memory tokenPermissions = new bytes32[](permitBatch.permitted.length);
-        for (uint256 i = 0; i < permitBatch.permitted.length; ++i) {
-            tokenPermissions[i] = keccak256(abi.encode(TOKEN_PERMISSIONS_TYPEHASH, permitBatch.permitted[i]));
-        }
+        SuperSignature.Verify memory verify = SuperSignature.Verify(dataHash, 0, block.timestamp);
 
-        bytes memory signature = signPermitBatch(permitBatch, privateKey, 0);
+        bytes memory signature = signSuperSignature(verify, privateKey);
 
         vm.prank(owner);
         router.route(
-            owner, commands, inputs, 1, 1, permitBatch, new ILRTA.SignatureTransfer[](0), signature, new bytes[](0)
+            owner,
+            commands,
+            inputs,
+            1,
+            1,
+            permitTransferDetails,
+            new Positions.ILRTATransferDetails[](0),
+            verify,
+            signature
         );
 
         // REMOVE LIQUIDITY
@@ -208,28 +220,23 @@ contract RouterTest is Test {
         commands[0] = removeCommand;
         inputs[0] = removeInput;
 
-        ILRTA.SignatureTransfer[] memory signatureTransfers = new ILRTA.SignatureTransfer[](1);
-        signatureTransfers[0] = ILRTA.SignatureTransfer(
-            0,
-            block.timestamp,
-            abi.encode(
-                Positions.ILRTATransferDetails(
-                    engine.dataID(abi.encode(Positions.ILRTADataID(address(token0), address(token1), 0, 0))), 1e18
-                )
-            )
+        Positions.ILRTATransferDetails[] memory positionTransfer = new Positions.ILRTATransferDetails[](1);
+        positionTransfer[0] = Positions.ILRTATransferDetails(
+            engine.dataID(abi.encode(Positions.ILRTADataID(address(token0), address(token1), 0, 0))), 1e18
         );
 
-        signature = signILRTATransfer(signatureTransfers[0], privateKey);
+        dataHash[0] = positionsDataHash(positionTransfer[0]);
 
-        ISignatureTransfer.PermitBatchTransferFrom memory permitBatchEmpty;
+        verify = SuperSignature.Verify(dataHash, 1, block.timestamp);
 
-        bytes[] memory signatures = new bytes[](1);
-        signatures[0] = signature;
+        signature = signSuperSignature(verify, privateKey);
 
         vm.resumeGasMetering();
 
         vm.prank(owner);
-        router.route(owner, commands, inputs, 1, 1, permitBatchEmpty, signatureTransfers, bytes(""), signatures);
+        router.route(
+            owner, commands, inputs, 1, 1, new Permit3.TransferDetails[](0), positionTransfer, verify, signature
+        );
     }
 
     function testGasSwap() external {
@@ -240,7 +247,7 @@ contract RouterTest is Test {
         token0.mint(address(owner), 1e18);
 
         vm.prank(owner);
-        token0.approve(address(permit2), 1e18);
+        token0.approve(address(permit3), 1e18);
 
         Engine.Commands[] memory commands = createCommands();
         bytes[] memory inputs = createInputs();
@@ -251,22 +258,26 @@ contract RouterTest is Test {
         commands = pushCommands(commands, addCommand);
         inputs = pushInputs(inputs, addInput);
 
-        ISignatureTransfer.TokenPermissions[] memory permitted = new ISignatureTransfer.TokenPermissions[](1);
-        permitted[0] = ISignatureTransfer.TokenPermissions({token: address(token0), amount: 1e18});
+        Permit3.TransferDetails[] memory permitTransferDetails = new Permit3.TransferDetails[](1);
+        permitTransferDetails[0] = Permit3.TransferDetails({token: address(token0), amount: 1e18});
 
-        ISignatureTransfer.PermitBatchTransferFrom memory permitBatch =
-            ISignatureTransfer.PermitBatchTransferFrom({permitted: permitted, nonce: 0, deadline: block.timestamp});
+        bytes32[] memory dataHash = new bytes32[](1);
+        dataHash[0] = permitDataHash(permitTransferDetails);
 
-        bytes32[] memory tokenPermissions = new bytes32[](permitBatch.permitted.length);
-        for (uint256 i = 0; i < permitBatch.permitted.length; ++i) {
-            tokenPermissions[i] = keccak256(abi.encode(TOKEN_PERMISSIONS_TYPEHASH, permitBatch.permitted[i]));
-        }
-
-        bytes memory signature = signPermitBatch(permitBatch, privateKey, 0);
+        SuperSignature.Verify memory verify = SuperSignature.Verify(dataHash, 0, block.timestamp);
+        bytes memory signature = signSuperSignature(verify, privateKey);
 
         vm.prank(owner);
         router.route(
-            owner, commands, inputs, 1, 1, permitBatch, new ILRTA.SignatureTransfer[](0), signature, new bytes[](0)
+            owner,
+            commands,
+            inputs,
+            1,
+            1,
+            permitTransferDetails,
+            new Positions.ILRTATransferDetails[](0),
+            verify,
+            signature
         );
 
         // SWAP
@@ -274,7 +285,7 @@ contract RouterTest is Test {
         token1.mint(address(owner), 1e18);
 
         vm.prank(owner);
-        token1.approve(address(permit2), 1e18);
+        token1.approve(address(permit3), 1e18);
 
         (Engine.Commands _swapCommand, bytes memory swapInput) =
             swapCommand(address(token0), address(token1), Engine.TokenSelector.Token1, 1e18);
@@ -282,18 +293,26 @@ contract RouterTest is Test {
         commands[0] = _swapCommand;
         inputs[0] = swapInput;
 
-        permitted[0] = ISignatureTransfer.TokenPermissions({token: address(token1), amount: 1e18});
+        permitTransferDetails[0] = Permit3.TransferDetails({token: address(token1), amount: 1e18});
 
-        permitBatch =
-            ISignatureTransfer.PermitBatchTransferFrom({permitted: permitted, nonce: 1, deadline: block.timestamp});
+        dataHash[0] = permitDataHash(permitTransferDetails);
 
-        signature = signPermitBatch(permitBatch, privateKey, 1);
+        verify = SuperSignature.Verify(dataHash, 1, block.timestamp);
+        signature = signSuperSignature(verify, privateKey);
 
         vm.resumeGasMetering();
 
         vm.prank(owner);
         router.route(
-            owner, commands, inputs, 2, 0, permitBatch, new ILRTA.SignatureTransfer[](0), signature, new bytes[](0)
+            owner,
+            commands,
+            inputs,
+            2,
+            0,
+            permitTransferDetails,
+            new Positions.ILRTATransferDetails[](0),
+            verify,
+            signature
         );
     }
 }

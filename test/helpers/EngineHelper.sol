@@ -13,7 +13,7 @@ contract EngineHelper is IExecuteCallback {
     MockERC20 internal token1;
 
     function _setUp() internal {
-        engine = new Engine();
+        engine = new Engine(address(0));
         MockERC20 tokenA = new MockERC20();
         MockERC20 tokenB = new MockERC20();
         (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);

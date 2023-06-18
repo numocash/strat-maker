@@ -4,29 +4,30 @@ pragma solidity ^0.8.17;
 import {Engine} from "src/core/Engine.sol";
 import {Positions} from "src/core/Positions.sol";
 import {IExecuteCallback} from "src/core/interfaces/IExecuteCallback.sol";
-import {Permit2} from "permit2/src/Permit2.sol";
-import {ISignatureTransfer} from "permit2/src/interfaces/ISignatureTransfer.sol";
 import {ILRTA} from "ilrta/ILRTA.sol";
+import {Permit3} from "ilrta/Permit3.sol";
+import {SuperSignature} from "ilrta/SuperSignature.sol";
 
 /// @author Robert Leifke and Kyle Scott
 /// @custom:team route by signature
 contract Router is IExecuteCallback {
     Engine private immutable engine;
-    Permit2 private immutable permit2;
+    Permit3 private immutable permit3;
+    SuperSignature private immutable superSignature;
 
     error InvalidCaller(address caller);
 
     struct CallbackData {
-        ISignatureTransfer.PermitBatchTransferFrom batchPermit;
-        ILRTA.SignatureTransfer[] ilrtaSignatureTransfers;
-        bytes permitSignature;
-        bytes[] ilrtaSignatures;
+        Permit3.TransferDetails[] permitTransfers;
+        Positions.ILRTATransferDetails[] positionTransfers;
+        bytes32[] dataHash;
         address payer;
     }
 
-    constructor(address _engine, address _permit2) {
+    constructor(address _engine, address _permit3, address _superSignature) {
         engine = Engine(_engine);
-        permit2 = Permit2(_permit2);
+        permit3 = Permit3(_permit3);
+        superSignature = SuperSignature(_superSignature);
     }
 
     function route(
@@ -35,20 +36,22 @@ contract Router is IExecuteCallback {
         bytes[] calldata inputs,
         uint256 numTokens,
         uint256 numLPs,
-        ISignatureTransfer.PermitBatchTransferFrom calldata batchPermit,
-        ILRTA.SignatureTransfer[] calldata signatureTransfers,
-        bytes calldata permitSignature,
-        bytes[] calldata ilrtaSignatures
+        Permit3.TransferDetails[] calldata permitTransfers,
+        Positions.ILRTATransferDetails[] calldata positionTransfers,
+        SuperSignature.Verify calldata verify,
+        bytes calldata signature
     )
         external
     {
+        superSignature.verifyAndStoreRoot(msg.sender, verify, signature);
+
         return engine.execute(
             to,
             commands,
             inputs,
             numTokens,
             numLPs,
-            abi.encode(CallbackData(batchPermit, signatureTransfers, permitSignature, ilrtaSignatures, msg.sender))
+            abi.encode(CallbackData(permitTransfers, positionTransfers, verify.dataHash, msg.sender))
         );
     }
 
@@ -62,18 +65,18 @@ contract Router is IExecuteCallback {
         external
     {
         if (msg.sender != address(engine)) revert InvalidCaller(msg.sender);
-
         CallbackData memory callbackData = abi.decode(data, (CallbackData));
 
-        ISignatureTransfer.SignatureTransferDetails[] memory transferDetails =
-            new ISignatureTransfer.SignatureTransferDetails[](callbackData.batchPermit.permitted.length);
+        // build array of transfer requests, then send as a batch
+        Permit3.RequestedTransferDetails[] memory requestedTransfer =
+            new Permit3.RequestedTransferDetails[](callbackData.permitTransfers.length);
 
         uint256 j = 0;
         for (uint256 i = 0; i < tokensDelta.length;) {
             int256 delta = tokensDelta[i];
 
             if (delta > 0 && tokens[i] != address(0)) {
-                transferDetails[j] = ISignatureTransfer.SignatureTransferDetails(msg.sender, uint256(delta));
+                requestedTransfer[j] = Permit3.RequestedTransferDetails(msg.sender, uint256(delta));
 
                 unchecked {
                     j++;
@@ -85,9 +88,9 @@ contract Router is IExecuteCallback {
             }
         }
 
-        if (callbackData.batchPermit.permitted.length > 0) {
-            permit2.permitTransferFrom(
-                callbackData.batchPermit, transferDetails, callbackData.payer, callbackData.permitSignature
+        if (callbackData.permitTransfers.length > 0) {
+            permit3.transferBySuperSignature(
+                callbackData.permitTransfers, requestedTransfer, callbackData.payer, callbackData.dataHash
             );
         }
 
@@ -96,19 +99,20 @@ contract Router is IExecuteCallback {
             int256 delta = lpDeltas[i];
             bytes32 id = lpIDs[i];
 
-            if (delta < 0 && id != bytes32(0)) {
-                engine.transferBySignature(
-                    callbackData.payer,
-                    callbackData.ilrtaSignatureTransfers[j],
-                    // solhint-disable-next-line max-line-length
-                    ILRTA.RequestedTransfer(msg.sender, abi.encode(Positions.ILRTATransferDetails(id, uint256(-delta)))),
-                    callbackData.ilrtaSignatures[j]
-                );
+            // if (delta < 0 && id != bytes32(0)) {
+            //     engine.transferBySuperSignature(
+            //         callbackData.payer,
+            //         abi.encode(callbackData.positionTransfers[j]),
+            //         // solhint-disable-next-line max-line-length
+            //         ILRTA.RequestedTransfer(msg.sender, abi.encode(Positions.ILRTATransferDetails(id,
+            // uint256(-delta)))),
+            //         callbackData.dataHash[1 + j:]
+            //     );
 
-                unchecked {
-                    j++;
-                }
-            }
+            //     unchecked {
+            //         j++;
+            //     }
+            // }
 
             unchecked {
                 i++;

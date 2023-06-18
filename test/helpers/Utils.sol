@@ -2,8 +2,6 @@
 pragma solidity ^0.8.0;
 
 import {Engine} from "src/core/Engine.sol";
-import {ISignatureTransfer} from "permit2/src/interfaces/ISignatureTransfer.sol";
-import "forge-std/Vm.sol";
 
 function createCommand(
     address token0,

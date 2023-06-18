@@ -6,9 +6,14 @@ import {ILRTA} from "ilrta/ILRTA.sol";
 abstract contract Positions is ILRTA {
     mapping(address => mapping(bytes32 => ILRTAData)) internal _dataOf;
 
-    constructor()
+    constructor(address _superSignature)
         // solhint-disable-next-line max-line-length
-        ILRTA("Yikes", "YIKES", "TransferDetails(address token0,address token1,int24 strike,uint8 spread,uint256 amount)")
+        ILRTA(
+            _superSignature,
+            "Yikes",
+            "YIKES",
+            "TransferDetails(address token0,address token1,int24 strike,uint8 spread,uint256 amount)"
+        )
     {}
 
     struct ILRTADataID {
@@ -63,6 +68,34 @@ abstract contract Positions is ILRTA {
         }
 
         verifySignature(from, signatureTransfer, signature);
+
+        return
+        /* solhint-disable-next-line max-line-length */
+        _transfer(from, requestedTransfer.to, abi.decode(requestedTransfer.transferDetails, (ILRTATransferDetails)));
+    }
+
+    function transferBySuperSignature(
+        address from,
+        bytes calldata transferDetails,
+        RequestedTransfer calldata requestedTransfer,
+        bytes32[] calldata dataHash
+    )
+        external
+        override
+        returns (bool)
+    {
+        ILRTATransferDetails memory requestedTransferDetails =
+            abi.decode(requestedTransfer.transferDetails, (ILRTATransferDetails));
+        ILRTATransferDetails memory signatureTransferDetails = abi.decode(transferDetails, (ILRTATransferDetails));
+
+        if (
+            requestedTransferDetails.amount > signatureTransferDetails.amount
+                || requestedTransferDetails.id != signatureTransferDetails.id
+        ) {
+            revert InvalidRequest(abi.encode(requestedTransferDetails));
+        }
+
+        verifySuperSignature(from, transferDetails, dataHash);
 
         return
         /* solhint-disable-next-line max-line-length */

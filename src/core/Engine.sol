@@ -94,6 +94,8 @@ contract Engine is Positions {
         int24 strikeInitial;
     }
 
+    constructor(address _superSignature) Positions(_superSignature) {}
+
     /// @dev Set to address to 0 if creating a pair
     function execute(
         address to,
