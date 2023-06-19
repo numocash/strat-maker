@@ -3,30 +3,30 @@ pragma solidity ^0.8.19;
 
 uint256 constant Q128 = 0x100000000000000000000000000000000;
 
-int24 constant MAX_TICK = 887_272;
-int24 constant MIN_TICK = -887_272;
+int24 constant MAX_STRIKE = 887_272;
+int24 constant MIN_STRIKE = -887_272;
 
-error InvalidTick();
+error InvalidStrike();
 
-/// @notice Calculates 1.0001^tick * 2^128
+/// @notice Calculates 1.0001^strike * 2^128
 /**
- * @dev Uses binary decomposition of |tick|
+ * @dev Uses binary decomposition of |strike|
  *
  * Let b_i = the i-th bit of x and b_i ∈ {0, 1}
  * Then  x = (b0 * 2^0) + (b1 * 2^1) + (b2 * 2^2) + ...
  * Thus, r = u^x
  *         = u^(b0 * 2^0) * u^(b1 * 2^1) * u^(b2 * 2^2) * ...
  *         = k0^b0 * k1^b1 * k2^b2 * ... (where k_i = u^(2^i))
- * We pre-compute k_i in script/TickMathScript.s.sol since u is a known constant. In practice, we use u = 1/1.0001 to
+ * We pre-compute k_i in script/StrikeMathScript.s.sol since u is a known constant. In practice, we use u = 1/1.0001 to
  * prevent overflow during the computation, then inverse the result at the end.
  */
 /// @dev Modified from Uniswap (), and Muffin ()
 /// @custom:team I believe these constants do not round correctly
-function getRatioAtTick(int24 tick) pure returns (uint256 ratioX128) {
+function getRatioAtStrike(int24 strike) pure returns (uint256 ratioX128) {
     unchecked {
-        if (tick < MIN_TICK || tick > MAX_TICK) revert InvalidTick();
+        if (strike < MIN_STRIKE || strike > MAX_STRIKE) revert InvalidStrike();
 
-        uint256 x = uint256(uint24(tick < 0 ? -tick : tick));
+        uint256 x = uint256(uint24(strike < 0 ? -strike : strike));
         ratioX128 = Q128;
 
         if (x & 0x1 > 0) ratioX128 = (ratioX128 * 0xfff97272373d413259a407b06395f90f) >> 128;
@@ -49,32 +49,13 @@ function getRatioAtTick(int24 tick) pure returns (uint256 ratioX128) {
         if (x & 0x20000 > 0) ratioX128 = (ratioX128 * 0x2216e584f5fa1ea90bf2722b93a1) >> 128;
         if (x & 0x40000 > 0) ratioX128 = (ratioX128 * 0x48a170391f7dc423d5d34c2) >> 128;
         if (x & 0x80000 > 0) ratioX128 = (ratioX128 * 0x149b34ee7ac262) >> 128;
-        // Stop computation here since |tick| < 2**20
+        // Stop computation here since |strike| < 2**20
 
         // Inverse r since base = 1/1.0001
-        if (tick > 0) ratioX128 = type(uint256).max / ratioX128;
+        if (strike > 0) ratioX128 = type(uint256).max / ratioX128;
     }
 }
 
-/// @notice Calculates the greatest tick value such that getRatioAtTick(tick) <= ratio
-/// @dev Find tick = floor(log_1.0001(ratioX128))
-function getTickAtRatio(uint256 ratioX128) pure returns (int24 tick) {}
-
-/// @notice Calculates the tick that a tier is currently at
-function getCurrentTickForTierFromOffset(
-    int24 tickCurrent,
-    int8 offset,
-    uint8 tier
-)
-    pure
-    returns (int24 tickCurrentForTier)
-{
-    bool swap0To1Last = offset > 0;
-    int8 absOffset = offset >= 0 ? offset : -offset;
-
-    if (absOffset > int8(tier)) {
-        return swap0To1Last ? tickCurrent + int8(tier) : tickCurrent - int8(tier);
-    } else {
-        return tickCurrent + offset;
-    }
-}
+/// @notice Calculates the greatest strike value such that getRatioAtStrike(strike) <= ratio
+/// @dev Find strike = floor(log_1.0001(ratioX128))
+function getStrikeAtRatio(uint256 ratioX128) pure returns (int24 strike) {}

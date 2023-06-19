@@ -1,9 +1,9 @@
 # Yikes [![GitHub Actions][gha-badge]][gha]
 
-[gha]: https://github.com/kyscott18/ilrta/actions
-[gha-badge]: https://github.com/kyscott18/ilrta/actions/workflows/main.yml/badge.svg
+[gha]: https://github.com/kyscott18/yikes/actions
+[gha-badge]: https://github.com/kyscott18/yikes/actions/workflows/main.yml/badge.svg
 
-An ethereum erc20 exchange protocol.
+An ERC20 exchange protocol on the Ethereum Virtual Machine.
 
 > ⚠️ Please note this is for research purposes only and lacks sufficient testing and audits necessary to be used in a production setting.
 
@@ -41,6 +41,16 @@ In order to allow for maximum simplicity and expressiveness, Yikes is an aggrega
 Yikes allows liquidity providers to impose a fee on their liquidity when used for a trade. Many popular AMM designs measure fees based on a fixed percentage of the input of every trade. Yikes takes a different approach and instead fees are described as a spread on the underlying liquidity. For example, liquidity placed at tick 10 with a spread of 1 is willing to swap 0 -> 1 (sell) at tick 11 and swap 1 -> 0 (buy) at tick 9.
 
 This design essentially allows for fees to be encoded in ticks. Yikes has multiple fee tiers per pair, and optimally routes trades through all fee tiers internally in each pair.
+
+The protocol aims for ultimate simplicity and the expressiveness of an orderbook by using an aggregate of two asset, constant sum liquidity pools. Unlike Uniswap V3, liquidity can be precisely distributed on any fixed price rather than distributed evenly across a price range.
+
+### Strikes 
+
+### Offsets
+
+### Strike Spacing
+
+In order to create a more familiar trading experience, we opt for a different strike spacing than what was used in Uniswap V3 where ticks are each 0.01\% from each other. Instead, we use constantly-spaced strikes with a piece-wise function determining the spacing.
 
 ## Architecture
 
