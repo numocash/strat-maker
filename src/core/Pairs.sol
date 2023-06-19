@@ -74,6 +74,7 @@ library Pairs {
                               INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Initialize the pair by setting the initial strike
     function initialize(Pair storage pair, int24 strikeInitial) internal {
         if (pair.initialized != 0) revert Initialized();
         _checkStrike(strikeInitial);
@@ -82,12 +83,18 @@ library Pairs {
         pair.initialized = 1;
 
         for (uint256 i = 0; i < NUM_SPREADS;) {
-            pair.spreads[0].strikeCurrent = strikeInitial;
+            pair.spreads[i].strikeCurrent = strikeInitial;
 
             unchecked {
                 i++;
             }
         }
+
+        // strike order when swapping 0 -> 1
+        // MAX_STRIKE -> strikeInitial -> MIN_STRIKE
+
+        // strike order when swapping 1 -> 0
+        // MIN_STRIKE -> strikeInitial -> MAX_STRIKE
 
         pair.bitMap0To1.set(MIN_STRIKE);
         pair.bitMap1To0.set(MIN_STRIKE);
@@ -129,46 +136,12 @@ library Pairs {
         bool isSwap0To1 = isToken0 == isExactIn;
 
         SwapState memory state;
-        {
-            uint256 liquidity;
-            uint128 composition;
-            int24 _strikeCurrent = pair.strikeCurrent;
+        state.amountDesired = amountDesired;
+        state.strikeCurrent = pair.strikeCurrent;
+        state.spreads = pair.spreads;
 
-            // Find the cheapest liquidity available
-            // KYLE: Composition can be taken from the lowest active spread
-            for (uint256 i = 1; i <= NUM_SPREADS;) {
-                // active strike for spread i
-                int24 activeStrike = isSwap0To1 ? _strikeCurrent + int24(int256(i)) : _strikeCurrent - int24(int256(i));
-                if (activeStrike == pair.spreads[i - 1].strikeCurrent) {
-                    if (pair.strikes[activeStrike].liquidity[i - 1] > 0) {
-                        liquidity += pair.strikes[activeStrike].liquidity[i - 1];
-                        // KYLE: is this rounding correctly
-                        composition += uint128(
-                            mulDiv(
-                                pair.spreads[i - 1].composition, pair.strikes[activeStrike].liquidity[i - 1], liquidity
-                            )
-                        );
-                    }
-                } else {
-                    // exit early because higher spreads are always farther away from the active strike
-                    break;
-                }
-
-                unchecked {
-                    i++;
-                }
-            }
-
-            state = SwapState({
-                strikeCurrent: _strikeCurrent,
-                spreads: pair.spreads,
-                liquidity: liquidity,
-                composition: composition,
-                amountDesired: amountDesired,
-                amountA: 0,
-                amountB: 0
-            });
-        }
+        (state.liquidity, state.composition) =
+            _calculateActiveLiquidity(state.spreads, pair.strikes, state.strikeCurrent, isSwap0To1);
 
         while (true) {
             uint256 ratioX128 = getRatioAtStrike(state.strikeCurrent);
@@ -242,7 +215,7 @@ library Pairs {
                     int24 strikePrev = state.strikeCurrent;
                     if (strikePrev == MIN_STRIKE) revert OutOfBounds();
 
-                    // move state vars to the next tick
+                    // move state vars to the next strike
                     state.strikeCurrent = pair.strikes[strikePrev].next0To1;
                     for (uint256 i = 1; i <= NUM_SPREADS;) {
                         // only update if it was active previously
@@ -275,46 +248,14 @@ library Pairs {
                     }
                 }
 
-                uint256 liquidity;
-                uint128 composition;
-
-                // find all liquidity that has the same strike
-                // KYLE: This can be done much more efficiently with caching and exiting early from the loop
-                // only the newest spreads add to composition
-                for (uint256 i = 1; i <= NUM_SPREADS;) {
-                    // active strike for spread i
-                    int24 activeStrike = state.strikeCurrent + int24(int256(i));
-
-                    if (activeStrike == state.spreads[i - 1].strikeCurrent) {
-                        if (pair.strikes[activeStrike].liquidity[i - 1] > 0) {
-                            liquidity += pair.strikes[activeStrike].liquidity[i - 1];
-                            // KYLE: is this rounding correctly
-                            composition += uint128(
-                                mulDiv(
-                                    state.spreads[i - 1].composition,
-                                    pair.strikes[activeStrike].liquidity[i - 1],
-                                    liquidity
-                                )
-                            );
-                        }
-                    } else {
-                        // exit early because higher spreads are alwasy farther away from the active strike
-                        break;
-                    }
-
-                    unchecked {
-                        i++;
-                    }
-                }
-
-                state.liquidity = liquidity;
-                state.composition = composition;
+                (state.liquidity, state.composition) =
+                    _calculateActiveLiquidity(state.spreads, pair.strikes, state.strikeCurrent, true);
             } else {
                 {
                     int24 strikePrev = state.strikeCurrent;
                     if (strikePrev == MAX_STRIKE) revert OutOfBounds();
 
-                    // move state vars to the next tick
+                    // move state vars to the next strike
                     state.strikeCurrent = pair.strikes[strikePrev].next1To0;
                     for (uint256 i = 1; i <= NUM_SPREADS;) {
                         // only update if it was active previously
@@ -347,40 +288,8 @@ library Pairs {
                     }
                 }
 
-                uint256 liquidity;
-                uint128 composition;
-
-                // find all liquidity that has the same strike
-                // KYLE: This can be done much more efficiently with caching and exiting early from the loop
-                // only the newest spreads add to composition
-                for (uint256 i = 1; i <= NUM_SPREADS;) {
-                    // active strike for spread i
-                    int24 activeStrike = state.strikeCurrent - int24(int256(i));
-
-                    if (activeStrike == state.spreads[i - 1].strikeCurrent) {
-                        if (pair.strikes[activeStrike].liquidity[i - 1] > 0) {
-                            liquidity += pair.strikes[activeStrike].liquidity[i - 1];
-                            // KYLE: is this rounding correctly
-                            composition += uint128(
-                                mulDiv(
-                                    state.spreads[i - 1].composition,
-                                    pair.strikes[activeStrike].liquidity[i - 1],
-                                    liquidity
-                                )
-                            );
-                        }
-                    } else {
-                        // exit early because higher spreads are alwasy farther away from the active strike
-                        break;
-                    }
-
-                    unchecked {
-                        i++;
-                    }
-                }
-
-                state.liquidity = liquidity;
-                state.composition = composition;
+                (state.liquidity, state.composition) =
+                    _calculateActiveLiquidity(state.spreads, pair.strikes, state.strikeCurrent, false);
             }
         }
 
@@ -434,6 +343,39 @@ library Pairs {
     /*//////////////////////////////////////////////////////////////
                              INTERNAL LOGIC
     //////////////////////////////////////////////////////////////*/
+
+    /// @notice sum all the active liquidity
+    function _calculateActiveLiquidity(
+        Spread[NUM_SPREADS] memory spreads,
+        mapping(int24 => Strike) storage strikes,
+        int24 strikeCurrent,
+        bool isSwap0To1
+    )
+        private
+        view
+        returns (uint256 liquidity, uint128 composition)
+    {
+        unchecked {
+            for (uint256 i = 1; i <= NUM_SPREADS; i++) {
+                int24 activeStrike = isSwap0To1 ? strikeCurrent + int24(int256(i)) : strikeCurrent - int24(int256(i));
+                int24 spreadStrikeCurrent = spreads[i - 1].strikeCurrent;
+
+                if (activeStrike == spreadStrikeCurrent) {
+                    uint256 spreadLiquidity = strikes[activeStrike].liquidity[i - 1];
+
+                    if (spreadLiquidity > 0) {
+                        liquidity += spreadLiquidity;
+                        // KYLE: is this rounding correctly
+                        // composition should just be the lowest spread
+                        composition += uint128(mulDiv(spreads[i - 1].composition, spreadLiquidity, liquidity));
+                    }
+                } else {
+                    // exit early because higher spreads are always farther away from the active strike
+                    break;
+                }
+            }
+        }
+    }
 
     /// @notice Check the validiity of strikes
     function _checkStrike(int24 strike) private pure {
