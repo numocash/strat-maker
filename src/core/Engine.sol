@@ -5,7 +5,6 @@ import {Accounts} from "./Accounts.sol";
 import {toInt256} from "./math/LiquidityMath.sol";
 import {Pairs, NUM_SPREADS} from "./Pairs.sol";
 import {Positions} from "./Positions.sol";
-import {Strikes} from "./Strikes.sol";
 import {calcLiquidityForAmount0, calcLiquidityForAmount1} from "./math/LiquidityMath.sol";
 
 import {BalanceLib} from "src/libraries/BalanceLib.sol";
@@ -16,7 +15,6 @@ import {IExecuteCallback} from "./interfaces/IExecuteCallback.sol";
 /// @author Robert Leifke and Kyle Scott
 /// @custom:team return data and events
 contract Engine is Positions {
-    using Strikes for Strikes.Strike;
     using Pairs for Pairs.Pair;
     using Accounts for Accounts.Account;
     using Pairs for mapping(bytes32 => Pairs.Pair);
@@ -320,7 +318,7 @@ contract Engine is Positions {
     {
         (, Pairs.Pair storage pair) = pairs.getPairAndID(token0, token1);
         (compositions, strikeCurrent, offset, initialized) =
-            (pair.compositions, pair.strikeCurrent, pair.offset, pair.initialized);
+            (pair.compositions, pair.strikeCurrent, pair.consecutiveStrikes, pair.initialized);
     }
 
     function getStrike(address token0, address token1, int24 strike) external view returns (Strikes.Strike memory) {

@@ -110,13 +110,14 @@ contract MockPair is Positions {
         returns (uint128[NUM_SPREADS] memory compositions, int24 strikeCurrent, int8 offset, uint8 initialized)
     {
         (compositions, strikeCurrent, offset, initialized) =
-            (pair.compositions, pair.strikeCurrent, pair.offset, pair.initialized);
+            (pair.compositions, pair.strikeCurrent, pair.consecutiveStrikes, pair.initialized);
     }
 
     function getStrike(int24 strike) external view returns (Strikes.Strike memory) {
         return pair.strikes[strike];
     }
 
+    /// @custom:team should we check ticks and spread?
     function getPosition(
         address owner,
         int24 strike,

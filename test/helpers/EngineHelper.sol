@@ -80,7 +80,7 @@ contract EngineHelper is IExecuteCallback {
         bytes[] memory inputs = new bytes[](1);
         inputs[0] = abi.encode(
             Engine.AddLiquidityParams(
-                address(token0), address(token1), 0, 0, Engine.TokenSelector.LiquidityPosition, 1e18
+                address(token0), address(token1), 0, 1, Engine.TokenSelector.LiquidityPosition, 1e18
             )
         );
 
@@ -94,7 +94,7 @@ contract EngineHelper is IExecuteCallback {
         bytes[] memory inputs = new bytes[](1);
         inputs[0] = abi.encode(
             Engine.RemoveLiquidityParams(
-                address(token0), address(token1), 0, 0, Engine.TokenSelector.LiquidityPosition, -1e18
+                address(token0), address(token1), 0, 1, Engine.TokenSelector.LiquidityPosition, -1e18
             )
         );
 

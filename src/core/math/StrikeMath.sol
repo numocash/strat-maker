@@ -59,22 +59,3 @@ function getRatioAtStrike(int24 strike) pure returns (uint256 ratioX128) {
 /// @notice Calculates the greatest strike value such that getRatioAtStrike(strike) <= ratio
 /// @dev Find strike = floor(log_1.0001(ratioX128))
 function getStrikeAtRatio(uint256 ratioX128) pure returns (int24 strike) {}
-
-/// @notice Calculates the strike that a spread is currently at
-function getCurrentStrikeForSpreadFromOffset(
-    int24 strikeCurrent,
-    int8 offset,
-    uint8 spread
-)
-    pure
-    returns (int24 strikeCurrentForSpread)
-{
-    bool swap0To1Last = offset > 0;
-    int8 absOffset = offset >= 0 ? offset : -offset;
-
-    if (absOffset > int8(spread)) {
-        return swap0To1Last ? strikeCurrent + int8(spread) : strikeCurrent - int8(spread);
-    } else {
-        return strikeCurrent + offset;
-    }
-}
