@@ -40,7 +40,7 @@ In order to allow for maximum simplicity and expressiveness, Yikes is an aggrega
 
 Yikes allows liquidity providers to impose a fee on their liquidity when used for a trade. Many popular AMM designs measure fees based on a fixed percentage of the input of every trade. Yikes takes a different approach and instead fees are described as a spread on the underlying liquidity. For example, liquidity placed at tick 10 with a spread of 1 is willing to swap 0 -> 1 (sell) at tick 11 and swap 1 -> 0 (buy) at tick 9.
 
-This design essentially allows for fees to be encoded in ticks. Yikes has multiple fee tiers per pair, and optimally routes trades through all fee tiers.
+This design essentially allows for fees to be encoded in ticks. Yikes has multiple fee tiers per pair, and optimally routes trades through all fee tiers internally in each pair.
 
 ## Architecture
 
@@ -48,9 +48,9 @@ This design essentially allows for fees to be encoded in ticks. Yikes has multip
 
 Yikes uses an engine contract that manages the creation and interaction with each pair. Contrary to many other exchanges, pairs are not seperate contracts but instead implemented as a library. Therefore, the engine smart contract holds the state of all pairs. This greatly decreases the cost of creating a new pair and also allows for more efficient multi-hop swaps.
 
-In the `Engine.sol` contract information about different token pairs is store and retrieved in the internal mapping called `pairs`, which maps a pair identifier computed using token addresses to a `Pairs.Pair` struct. This struct contains data related to a specific token pair, such as liquidity, tick information, and position data. 
+In the `Engine.sol` contract information about different token pairs is store and retrieved in the internal mapping called `pairs`, which maps a pair identifier computed using token addresses to a `Pairs.Pair` struct. This struct contains data related to a specific token pair, such as liquidity, tick information, and position data.
 
-The `createPair()` function creates a new token pair and initializes it with an initial tick, `tickInitial`. 
+The `createPair()` function creates a new token pair and initializes it with an initial tick, `tickInitial`.
 
 The `addLiquidity()` function adds liquidity to a specified pair and updates the corresponding balances. It also invokes a callback function defined in the IAddLiquidityCallback interface. Similarly, the `removeLiquidity()` function removes liquidity from a pair and transfers the respective token amounts to the specified recipient.
 
@@ -58,7 +58,18 @@ The `swap()` function allows users to swap tokens between a given pair. It calcu
 
 ### Pair (`core/Pair.sol`)
 
-Each individual market, described by `token0` and `token1` is an instance of a pair.
+Each individual market, described by `token0` and `token1` is an instance of a pair. Pairs contains all accounting logic.
+
+Pairs have several state variables including:
+
+- `compositions`: Compositions represent the portion of the liquidity that is held in `token1`. There is one for each fee tier.
+- `tickCurrent`: The current tick for the lowest fee tier.
+- `offset`: How many ticks to the right (positive) or left (negative) is the bound where liquidity is no longer active.
+
+Pairs also contain two functions to manage the state variables:
+
+- `swap()`: Swap from one token to another, routing through the best priced liquidity.
+- `updateLiquidity()`: Either add or remove liquidity from the pair.
 
 ### TickMaps (`core/TickMaps.sol`)
 
