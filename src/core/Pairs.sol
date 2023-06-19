@@ -210,7 +210,6 @@ library Pairs {
                         }
                     }
 
-                    // update spreads instead of composition
                     // KYLE: is this rounding correctly
                     state.composition = uint128(mulDiv(amountRemaining, Q128, state.liquidity));
                 } else {
