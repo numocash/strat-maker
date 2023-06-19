@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.19;
 
 import {Accounts} from "./Accounts.sol";
 import {toInt256} from "./math/LiquidityMath.sol";
@@ -221,8 +221,8 @@ contract Engine is Positions {
             if (params.amountDesired < 0) revert InvalidAmountDesired();
             liquidity = toInt256(
                 calcLiquidityForAmount0(
-                    pair.strikeCurrent,
-                    pair.compositions[params.spread],
+                    pair.spreads[params.spread].strikeCurrent,
+                    pair.spreads[params.spread].composition,
                     params.strike,
                     uint256(params.amountDesired),
                     false
@@ -232,8 +232,8 @@ contract Engine is Positions {
             if (params.amountDesired < 0) revert InvalidAmountDesired();
             liquidity = toInt256(
                 calcLiquidityForAmount1(
-                    pair.strikeCurrent,
-                    pair.compositions[params.spread],
+                    pair.spreads[params.spread].strikeCurrent,
+                    pair.spreads[params.spread].composition,
                     params.strike,
                     uint256(params.amountDesired),
                     false
@@ -265,8 +265,8 @@ contract Engine is Positions {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
             liquidity = -toInt256(
                 calcLiquidityForAmount0(
-                    pair.strikeCurrent,
-                    pair.compositions[params.spread],
+                    pair.spreads[params.spread].strikeCurrent,
+                    pair.spreads[params.spread].composition,
                     params.strike,
                     uint256(-params.amountDesired),
                     true
@@ -276,8 +276,8 @@ contract Engine is Positions {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
             liquidity = -toInt256(
                 calcLiquidityForAmount1(
-                    pair.strikeCurrent,
-                    pair.compositions[params.spread],
+                    pair.spreads[params.spread].strikeCurrent,
+                    pair.spreads[params.spread].composition,
                     params.strike,
                     uint256(-params.amountDesired),
                     true
@@ -314,14 +314,13 @@ contract Engine is Positions {
     )
         external
         view
-        returns (uint128[NUM_SPREADS] memory compositions, int24 strikeCurrent, int8 offset, uint8 initialized)
+        returns (Pairs.Spread[NUM_SPREADS] memory spreads, int24 strikeCurrent, uint8 initialized)
     {
         (, Pairs.Pair storage pair) = pairs.getPairAndID(token0, token1);
-        (compositions, strikeCurrent, offset, initialized) =
-            (pair.compositions, pair.strikeCurrent, pair.consecutiveStrikes, pair.initialized);
+        (spreads, strikeCurrent, initialized) = (pair.spreads, pair.strikeCurrent, pair.initialized);
     }
 
-    function getStrike(address token0, address token1, int24 strike) external view returns (Strikes.Strike memory) {
+    function getStrike(address token0, address token1, int24 strike) external view returns (Pairs.Strike memory) {
         (, Pairs.Pair storage pair) = pairs.getPairAndID(token0, token1);
 
         return pair.strikes[strike];

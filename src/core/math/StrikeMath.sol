@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.19;
 
 uint256 constant Q128 = 0x100000000000000000000000000000000;
 

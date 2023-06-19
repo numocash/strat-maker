@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.19;
 
 /// @notice Calculates floor(a×b÷denominator) with full precision. Throws if result overflows a uint256 or
 /// denominator == 0
