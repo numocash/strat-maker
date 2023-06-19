@@ -219,10 +219,11 @@ contract Engine is Positions {
             liquidity = params.amountDesired;
         } else if (params.selector == TokenSelector.Token0) {
             if (params.amountDesired < 0) revert InvalidAmountDesired();
+
             liquidity = toInt256(
                 calcLiquidityForAmount0(
-                    pair.spreads[params.spread].strikeCurrent,
-                    pair.spreads[params.spread].composition,
+                    pair.spreads[params.spread - 1].strikeCurrent,
+                    pair.spreads[params.spread - 1].composition,
                     params.strike,
                     uint256(params.amountDesired),
                     false
@@ -232,8 +233,8 @@ contract Engine is Positions {
             if (params.amountDesired < 0) revert InvalidAmountDesired();
             liquidity = toInt256(
                 calcLiquidityForAmount1(
-                    pair.spreads[params.spread].strikeCurrent,
-                    pair.spreads[params.spread].composition,
+                    pair.spreads[params.spread - 1].strikeCurrent,
+                    pair.spreads[params.spread - 1].composition,
                     params.strike,
                     uint256(params.amountDesired),
                     false
@@ -265,8 +266,8 @@ contract Engine is Positions {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
             liquidity = -toInt256(
                 calcLiquidityForAmount0(
-                    pair.spreads[params.spread].strikeCurrent,
-                    pair.spreads[params.spread].composition,
+                    pair.spreads[params.spread - 1].strikeCurrent,
+                    pair.spreads[params.spread - 1].composition,
                     params.strike,
                     uint256(-params.amountDesired),
                     true
@@ -276,8 +277,8 @@ contract Engine is Positions {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
             liquidity = -toInt256(
                 calcLiquidityForAmount1(
-                    pair.spreads[params.spread].strikeCurrent,
-                    pair.spreads[params.spread].composition,
+                    pair.spreads[params.spread - 1].strikeCurrent,
+                    pair.spreads[params.spread - 1].composition,
                     params.strike,
                     uint256(-params.amountDesired),
                     true

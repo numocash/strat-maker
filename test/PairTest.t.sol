@@ -313,94 +313,63 @@ contract SwapTest is Test, PairHelper {
         assertEq(strikeCurrent, -2);
     }
 
-    //     function testSwapPartial0To1() external {
-    //         basicAddLiquidity();
-    //         // 1->0
-    //         (int256 amount0, int256 amount1) = pair.swap(false, 0.5e18);
-    //         assertEq(amount0, -0.5e18);
-    //         assertEq(amount1, 0.5e18);
+    // function testSwapPartial0To1() external {
+    //     basicAddLiquidity();
+    //     // 1->0
+    //     (int256 amount0, int256 amount1) = pair.swap(false, 0.5e18);
+    //     assertEq(amount0, -0.5e18);
+    //     assertEq(amount1, 0.5e18);
 
-    //         (uint128[5] memory compositions,,,) = pair.getPair();
+    //     (Pairs.Spread[NUM_SPREADS] memory spreads,,) = pair.getPair();
 
-    //         assertApproxEqRel(compositions[0], Q128 / 2, precision);
-    //     }
+    //     assertApproxEqRel(spreads[0].composition, Q128 / 2, precision);
+    // }
 
-    //     function testSwapPartial1To0() external {
-    //         basicAddLiquidity();
-    //         // 1->0
-    //         (int256 amount0, int256 amount1) = pair.swap(true, -0.5e18);
+    // function testSwapPartial1To0() external {
+    //     basicAddLiquidity();
+    //     // 1->0
+    //     (int256 amount0, int256 amount1) = pair.swap(true, -0.5e18);
 
-    //         assertEq(amount0, -0.5e18);
-    //         assertEq(amount1, 0.5e18);
+    //     assertEq(amount0, -0.5e18);
+    //     assertEq(amount1, 0.5e18);
 
-    //         (uint128[5] memory compositions,,,) = pair.getPair();
+    //     (uint128[5] memory compositions,,,) = pair.getPair();
 
-    //         assertApproxEqRel(compositions[0], Q128 / 2, precision);
-    //     }
+    //     assertApproxEqRel(compositions[0], Q128 / 2, precision);
+    // }
 
-    //     function testSwapStartPartial0To1() external {}
+    function testSwapStartPartial0To1() external {}
 
-    //     function testSwapStartPartial1To0() external {}
+    function testSwapStartPartial1To0() external {}
 
-    //     function testGasSwapSameStrike() external {
-    //         vm.pauseGasMetering();
-    //         basicAddLiquidity();
-    //         vm.resumeGasMetering();
+    function testGasSwapHot() external {
+        vm.pauseGasMetering();
+        basicAddLiquidity();
+        pair.swap(false, 0.2e18);
+        vm.resumeGasMetering();
 
-    //         pair.swap(false, 1e18 - 1);
-    //     }
+        pair.swap(false, 0.2e18);
+    }
 
-    //     function testGasSwapMulti() external {
-    //         vm.pauseGasMetering();
-    //         basicAddLiquidity();
-    //         vm.resumeGasMetering();
+    function testGasSwapTwoStrikes() external {
+        vm.pauseGasMetering();
+        pair.addLiquidity(0, 1, 1e18);
+        pair.addLiquidity(1, 1, 1e18);
+        pair.swap(false, 0.2e18);
+        vm.resumeGasMetering();
 
-    //         pair.swap(false, 0.2e18);
-    //         pair.swap(false, 0.2e18);
-    //     }
+        pair.swap(false, 1.5e18);
+    }
 
-    //     function testGasSwapTwoStrikes() external {
-    //         vm.pauseGasMetering();
-    //         pair.addLiquidity(0, 0, 1e18);
-    //         pair.addLiquidity(1, 0, 1e18);
-    //         vm.resumeGasMetering();
+    function testGasSwapFarStrikes() external {
+        vm.pauseGasMetering();
+        pair.addLiquidity(0, 1, 1e18);
+        pair.addLiquidity(100, 1, 1e18);
+        pair.swap(false, 0.2e18);
+        vm.resumeGasMetering();
 
-    //         pair.swap(false, 1.5e18);
-    //     }
-
-    //     function testGasSwapFarStrikes() external {
-    //         vm.pauseGasMetering();
-    //         pair.addLiquidity(0, 0, 1e18);
-    //         pair.addLiquidity(10, 0, 1e18);
-    //         vm.resumeGasMetering();
-    //         pair.swap(false, 1.5e18);
-    //     }
-
-    //     function testMultiSpreadDown() external {
-    //         pair.addLiquidity(0, 0, 1e18);
-    //         pair.addLiquidity(0, 1, 1e18);
-    //         pair.swap(false, 1.5e18);
-
-    //         (, int24 strikeCurrent, int8 offset,) = pair.getPair();
-
-    //         // assertApproxEqRel(compositions[0], type(uint128).max / 2, precision, "composition 0");
-    //         // assertApproxEqRel(compositions[1], type(uint128).max / 2, precision, "composition 1");
-    //         assertEq(strikeCurrent, 1);
-    //         assertEq(offset, -1);
-    //     }
-
-    //     function testMultiSpreadUp() external {
-    //         pair.addLiquidity(-1, 0, 1e18);
-    //         pair.addLiquidity(-1, 1, 1e18);
-    //         pair.swap(true, 1.5e18);
-
-    //         (, int24 strikeCurrent, int8 offset,) = pair.getPair();
-
-    //         // assertApproxEqRel(compositions[0], type(uint128).max / 2, precision, "composition 0");
-    //         // assertApproxEqRel(compositions[1], type(uint128).max / 2, precision, "composition 1");
-    //         assertEq(strikeCurrent, -2);
-    //         assertEq(offset, 2);
-    //     }
+        pair.swap(false, 1e18);
+    }
 
     //     function testInitialLiquidity() external {
     //         pair.addLiquidity(0, 0, 1e18);
