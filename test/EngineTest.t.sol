@@ -33,7 +33,7 @@ contract EngineTest is Test, EngineHelper {
 
         engine.execute(address(0), commands, inputs, 0, 0, bytes(""));
 
-        (, int24 strikeCurrent, uint8 initialized) = engine.getPair(address(1), address(2));
+        (,, int24 strikeCurrent, uint8 initialized) = engine.getPair(address(1), address(2));
         assertEq(initialized, 1);
         assertEq(strikeCurrent, 1);
     }

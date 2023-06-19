@@ -222,8 +222,8 @@ contract Engine is Positions {
 
             liquidity = toInt256(
                 calcLiquidityForAmount0(
-                    pair.spreads[params.spread - 1].strikeCurrent,
-                    pair.spreads[params.spread - 1].composition,
+                    pair.strikeCurrent[params.spread - 1],
+                    pair.composition[params.spread - 1],
                     params.strike,
                     uint256(params.amountDesired),
                     false
@@ -233,8 +233,8 @@ contract Engine is Positions {
             if (params.amountDesired < 0) revert InvalidAmountDesired();
             liquidity = toInt256(
                 calcLiquidityForAmount1(
-                    pair.spreads[params.spread - 1].strikeCurrent,
-                    pair.spreads[params.spread - 1].composition,
+                    pair.strikeCurrent[params.spread - 1],
+                    pair.composition[params.spread - 1],
                     params.strike,
                     uint256(params.amountDesired),
                     false
@@ -266,8 +266,8 @@ contract Engine is Positions {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
             liquidity = -toInt256(
                 calcLiquidityForAmount0(
-                    pair.spreads[params.spread - 1].strikeCurrent,
-                    pair.spreads[params.spread - 1].composition,
+                    pair.strikeCurrent[params.spread - 1],
+                    pair.composition[params.spread - 1],
                     params.strike,
                     uint256(-params.amountDesired),
                     true
@@ -277,8 +277,8 @@ contract Engine is Positions {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
             liquidity = -toInt256(
                 calcLiquidityForAmount1(
-                    pair.spreads[params.spread - 1].strikeCurrent,
-                    pair.spreads[params.spread - 1].composition,
+                    pair.strikeCurrent[params.spread - 1],
+                    pair.composition[params.spread - 1],
                     params.strike,
                     uint256(-params.amountDesired),
                     true
@@ -315,10 +315,16 @@ contract Engine is Positions {
     )
         external
         view
-        returns (Pairs.Spread[NUM_SPREADS] memory spreads, int24 strikeCurrent, uint8 initialized)
+        returns (
+            uint128[NUM_SPREADS] memory composition,
+            int24[NUM_SPREADS] memory strikeCurrent,
+            int24 cachedStrikeCurrent,
+            uint8 initialized
+        )
     {
         (, Pairs.Pair storage pair) = pairs.getPairAndID(token0, token1);
-        (spreads, strikeCurrent, initialized) = (pair.spreads, pair.strikeCurrent, pair.initialized);
+        (composition, strikeCurrent, cachedStrikeCurrent, initialized) =
+            (pair.composition, pair.strikeCurrent, pair.cachedStrikeCurrent, pair.initialized);
     }
 
     function getStrike(address token0, address token1, int24 strike) external view returns (Pairs.Strike memory) {
