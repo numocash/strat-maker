@@ -237,11 +237,12 @@ contract SwapTest is Test, PairHelper {
         assertEq(token0.balanceOf(address(pair)), 1e18 - amountOut);
         assertEq(token1.balanceOf(address(pair)), 1e18);
 
-        (Pairs.Spread[NUM_SPREADS] memory spreads, int24 strikeCurrent,) = pair.getPair();
+        (uint128[NUM_SPREADS] memory composition, int24[NUM_SPREADS] memory strikeCurrent, int24 cachedStrikeCurrent,) =
+            pair.getPair();
 
-        assertEq(spreads[0].composition, type(uint128).max);
-        assertEq(spreads[0].strikeCurrent, 0);
-        assertEq(strikeCurrent, 1);
+        assertEq(composition[0], type(uint128).max);
+        assertEq(strikeCurrent[0], 0);
+        assertEq(cachedStrikeCurrent, 1);
     }
 
     function testSwapToken0ExactOutBasic() external {
@@ -260,11 +261,12 @@ contract SwapTest is Test, PairHelper {
         assertEq(token0.balanceOf(address(pair)), 1e18 - amountOut);
         assertEq(token1.balanceOf(address(pair)), 1e18);
 
-        (Pairs.Spread[NUM_SPREADS] memory spreads, int24 strikeCurrent,) = pair.getPair();
+        (uint128[NUM_SPREADS] memory composition, int24[NUM_SPREADS] memory strikeCurrent, int24 cachedStrikeCurrent,) =
+            pair.getPair();
 
-        assertEq(spreads[0].composition, type(uint128).max);
-        assertEq(spreads[0].strikeCurrent, 0);
-        assertEq(strikeCurrent, 1);
+        assertEq(composition[0], type(uint128).max);
+        assertEq(strikeCurrent[0], 0);
+        assertEq(cachedStrikeCurrent, 1);
     }
 
     function testSwapToken0ExactInBasic() external {
@@ -282,11 +284,12 @@ contract SwapTest is Test, PairHelper {
         assertEq(token0.balanceOf(address(pair)), amountIn);
         assertEq(token1.balanceOf(address(pair)), 0);
 
-        (Pairs.Spread[NUM_SPREADS] memory spreads, int24 strikeCurrent,) = pair.getPair();
+        (uint128[NUM_SPREADS] memory composition, int24[NUM_SPREADS] memory strikeCurrent, int24 cachedStrikeCurrent,) =
+            pair.getPair();
 
-        assertEq(spreads[0].composition, 0);
-        assertEq(spreads[0].strikeCurrent, -1);
-        assertEq(strikeCurrent, -2);
+        assertEq(composition[0], 0);
+        assertEq(strikeCurrent[0], -1);
+        assertEq(cachedStrikeCurrent, -2);
     }
 
     function testSwapToken1ExactOutBasic() external {
@@ -306,11 +309,12 @@ contract SwapTest is Test, PairHelper {
         assertEq(token0.balanceOf(address(pair)), amountIn, "balance0 pair");
         assertEq(token1.balanceOf(address(pair)), 1, "balance1 pair");
 
-        (Pairs.Spread[NUM_SPREADS] memory spreads, int24 strikeCurrent,) = pair.getPair();
+        (uint128[NUM_SPREADS] memory composition, int24[NUM_SPREADS] memory strikeCurrent, int24 cachedStrikeCurrent,) =
+            pair.getPair();
 
-        assertEq(spreads[0].composition, 0);
-        assertEq(spreads[0].strikeCurrent, -1);
-        assertEq(strikeCurrent, -2);
+        assertEq(composition[0], 0);
+        assertEq(strikeCurrent[0], -1);
+        assertEq(cachedStrikeCurrent, -2);
     }
 
     // function testSwapPartial0To1() external {
