@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.19;
 
 import {Accounts} from "./Accounts.sol";
 import {toInt256} from "./math/LiquidityMath.sol";
-import {Pairs, MAX_SPREADS} from "./Pairs.sol";
+import {Pairs, NUM_SPREADS} from "./Pairs.sol";
 import {Positions} from "./Positions.sol";
-import {Strikes} from "./Strikes.sol";
 import {calcLiquidityForAmount0, calcLiquidityForAmount1} from "./math/LiquidityMath.sol";
 
 import {BalanceLib} from "src/libraries/BalanceLib.sol";
@@ -16,7 +15,6 @@ import {IExecuteCallback} from "./interfaces/IExecuteCallback.sol";
 /// @author Robert Leifke and Kyle Scott
 /// @custom:team return data and events
 contract Engine is Positions {
-    using Strikes for Strikes.Strike;
     using Pairs for Pairs.Pair;
     using Accounts for Accounts.Account;
     using Pairs for mapping(bytes32 => Pairs.Pair);
@@ -221,10 +219,11 @@ contract Engine is Positions {
             liquidity = params.amountDesired;
         } else if (params.selector == TokenSelector.Token0) {
             if (params.amountDesired < 0) revert InvalidAmountDesired();
+
             liquidity = toInt256(
                 calcLiquidityForAmount0(
-                    pair.strikeCurrent,
-                    pair.compositions[params.spread],
+                    pair.spreads[params.spread - 1].strikeCurrent,
+                    pair.spreads[params.spread - 1].composition,
                     params.strike,
                     uint256(params.amountDesired),
                     false
@@ -234,8 +233,8 @@ contract Engine is Positions {
             if (params.amountDesired < 0) revert InvalidAmountDesired();
             liquidity = toInt256(
                 calcLiquidityForAmount1(
-                    pair.strikeCurrent,
-                    pair.compositions[params.spread],
+                    pair.spreads[params.spread - 1].strikeCurrent,
+                    pair.spreads[params.spread - 1].composition,
                     params.strike,
                     uint256(params.amountDesired),
                     false
@@ -267,8 +266,8 @@ contract Engine is Positions {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
             liquidity = -toInt256(
                 calcLiquidityForAmount0(
-                    pair.strikeCurrent,
-                    pair.compositions[params.spread],
+                    pair.spreads[params.spread - 1].strikeCurrent,
+                    pair.spreads[params.spread - 1].composition,
                     params.strike,
                     uint256(-params.amountDesired),
                     true
@@ -278,8 +277,8 @@ contract Engine is Positions {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
             liquidity = -toInt256(
                 calcLiquidityForAmount1(
-                    pair.strikeCurrent,
-                    pair.compositions[params.spread],
+                    pair.spreads[params.spread - 1].strikeCurrent,
+                    pair.spreads[params.spread - 1].composition,
                     params.strike,
                     uint256(-params.amountDesired),
                     true
@@ -316,14 +315,13 @@ contract Engine is Positions {
     )
         external
         view
-        returns (uint128[MAX_SPREADS] memory compositions, int24 strikeCurrent, int8 offset, uint8 initialized)
+        returns (Pairs.Spread[NUM_SPREADS] memory spreads, int24 strikeCurrent, uint8 initialized)
     {
         (, Pairs.Pair storage pair) = pairs.getPairAndID(token0, token1);
-        (compositions, strikeCurrent, offset, initialized) =
-            (pair.compositions, pair.strikeCurrent, pair.offset, pair.initialized);
+        (spreads, strikeCurrent, initialized) = (pair.spreads, pair.strikeCurrent, pair.initialized);
     }
 
-    function getStrike(address token0, address token1, int24 strike) external view returns (Strikes.Strike memory) {
+    function getStrike(address token0, address token1, int24 strike) external view returns (Pairs.Strike memory) {
         (, Pairs.Pair storage pair) = pairs.getPairAndID(token0, token1);
 
         return pair.strikes[strike];

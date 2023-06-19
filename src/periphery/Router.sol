@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.19;
 
 import {Engine} from "src/core/Engine.sol";
 import {Positions} from "src/core/Positions.sol";
@@ -30,28 +30,26 @@ contract Router is IExecuteCallback {
         superSignature = SuperSignature(_superSignature);
     }
 
-    function route(
-        address to,
-        Engine.Commands[] calldata commands,
-        bytes[] calldata inputs,
-        uint256 numTokens,
-        uint256 numLPs,
-        Permit3.TransferDetails[] calldata permitTransfers,
-        Positions.ILRTATransferDetails[] calldata positionTransfers,
-        SuperSignature.Verify calldata verify,
-        bytes calldata signature
-    )
-        external
-    {
-        superSignature.verifyAndStoreRoot(msg.sender, verify, signature);
+    struct RouteParams {
+        address to;
+        Engine.Commands[] commands;
+        bytes[] inputs;
+        uint256 numTokens;
+        uint256 numLPs;
+        Permit3.TransferDetails[] permitTransfers;
+        Positions.ILRTATransferDetails[] positionTransfers;
+        SuperSignature.Verify verify;
+        bytes signature;
+    }
+
+    function route(RouteParams calldata params) external {
+        superSignature.verifyAndStoreRoot(msg.sender, params.verify, params.signature);
+
+        CallbackData memory callbackData =
+            CallbackData(params.permitTransfers, params.positionTransfers, params.verify.dataHash, msg.sender);
 
         return engine.execute(
-            to,
-            commands,
-            inputs,
-            numTokens,
-            numLPs,
-            abi.encode(CallbackData(permitTransfers, positionTransfers, verify.dataHash, msg.sender))
+            params.to, params.commands, params.inputs, params.numTokens, params.numLPs, abi.encode(callbackData)
         );
     }
 
@@ -94,25 +92,26 @@ contract Router is IExecuteCallback {
             );
         }
 
+        // send all liquidity positions individually
         j = 0;
         for (uint256 i = 0; i < lpIDs.length;) {
             int256 delta = lpDeltas[i];
             bytes32 id = lpIDs[i];
 
-            // if (delta < 0 && id != bytes32(0)) {
-            //     engine.transferBySuperSignature(
-            //         callbackData.payer,
-            //         abi.encode(callbackData.positionTransfers[j]),
-            //         // solhint-disable-next-line max-line-length
-            //         ILRTA.RequestedTransfer(msg.sender, abi.encode(Positions.ILRTATransferDetails(id,
-            // uint256(-delta)))),
-            //         callbackData.dataHash[1 + j:]
-            //     );
+            if (delta < 0 && id != bytes32(0)) {
+                engine.transferBySuperSignature(
+                    callbackData.payer,
+                    abi.encode(callbackData.positionTransfers[j]),
+                    // solhint-disable-next-line max-line-length
+                    ILRTA.RequestedTransfer(msg.sender, abi.encode(Positions.ILRTATransferDetails(id, uint256(-delta)))),
+                    // TODO: this reverts
+                    abi.decode(data[1 + j:], (bytes32[]))
+                );
 
-            //     unchecked {
-            //         j++;
-            //     }
-            // }
+                unchecked {
+                    j++;
+                }
+            }
 
             unchecked {
                 i++;

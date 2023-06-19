@@ -47,10 +47,10 @@ contract PairHelper is IExecuteCallback {
     }
 
     function basicAddLiquidity() internal returns (uint256 amount0, uint256 amount1) {
-        (amount0, amount1) = pair.addLiquidity(0, 0, 1e18);
+        (amount0, amount1) = pair.addLiquidity(0, 1, 1e18);
     }
 
     function basicRemoveLiquidity() internal returns (uint256 amount0, uint256 amount1) {
-        (amount0, amount1) = pair.removeLiquidity(0, 0, 1e18);
+        (amount0, amount1) = pair.removeLiquidity(0, 1, 1e18);
     }
 }
