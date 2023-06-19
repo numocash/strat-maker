@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.17;
 
 import {Pairs, MAX_SPREADS} from "src/core/Pairs.sol";
 import {Positions} from "src/core/Positions.sol";
@@ -18,7 +18,14 @@ contract MockPair is Positions {
 
     Pairs.Pair private pair;
 
-    constructor(address _token0, address _token1, int24 strikeInitial) {
+    constructor(
+        address _superSignature,
+        address _token0,
+        address _token1,
+        int24 strikeInitial
+    )
+        Positions(_superSignature)
+    {
         token0 = _token0;
         token1 = _token1;
         pair.initialize(strikeInitial);

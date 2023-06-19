@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.17;
 
 import {mulDiv, mulDivRoundingUp} from "./math/FullMath.sol";
 import {addDelta, calcAmountsForLiquidity, toInt256} from "./math/LiquidityMath.sol";
@@ -117,7 +117,6 @@ library Pairs {
                 liquidity += pair.strikes[isSwap0To1 ? _strikeCurrent + i : _strikeCurrent - i].getLiquidity(uint8(i));
             }
 
-            // TODO: could we cache liquidity
             state = SwapState({
                 liquidity: liquidity,
                 composition: pair.compositions[0],
@@ -226,7 +225,6 @@ library Pairs {
                     state.liquidity += pair.strikes[state.strikeCurrent - i].getLiquidity(uint8(i));
                 }
 
-                // solhint-disable-next-line max-line-length
                 uint256 newLiquidity =
                     pair.strikes[state.strikeCurrent + state.offset].getLiquidity(uint8(-state.offset));
                 uint256 newComposition = pair.compositions[uint8(-state.offset)];

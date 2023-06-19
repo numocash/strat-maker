@@ -8,6 +8,8 @@ import {
     getAmount1Delta,
     getAmount0FromComposition,
     getAmount1FromComposition,
+    calcLiquidityForAmount0,
+    calcLiquidityForAmount1,
     calcAmountsForLiquidity
 } from "src/core/math/LiquidityMath.sol";
 import {getRatioAtStrike, Q128} from "src/core/math/StrikeMath.sol";
@@ -90,5 +92,27 @@ contract LiquidityMathTest is Test {
             calcAmountsForLiquidity(strikeCurrent, composition, strike, liquidity, false);
         assertEq(amount0, mulDiv(liquidity, type(uint128).max - composition, getRatioAtStrike(3)));
         assertEq(amount1, mulDiv(liquidity, composition, Q128));
+    }
+
+    function testGetLiquidityFromAmount0() external {
+        assertEq(calcLiquidityForAmount0(1, 0, 0, 1e18, false), 0);
+        assertEq(calcLiquidityForAmount0(1, 0, 0, 1e18, true), 0);
+
+        assertEq(calcLiquidityForAmount0(0, 0, 0, 1e18, false), 1e18);
+        assertEq(calcLiquidityForAmount0(0, 0, 0, 1e18, true), 1e18 + 1);
+
+        assertEq(calcLiquidityForAmount0(0, 0, 1, mulDiv(1e18, Q128, getRatioAtStrike(1)) + 1, false), 1e18);
+        assertEq(calcLiquidityForAmount0(0, 0, 1, mulDiv(1e18, Q128, getRatioAtStrike(1)), true), 1e18);
+    }
+
+    function testGetLiquidityFromAmount1() external {
+        assertEq(calcLiquidityForAmount1(1, 0, 0, 1e18, false), 1e18);
+        assertEq(calcLiquidityForAmount1(1, 0, 0, 1e18, true), 1e18);
+
+        assertEq(calcLiquidityForAmount1(0, type(uint128).max, 0, 1e18, false), 1e18 - 1);
+        assertEq(calcLiquidityForAmount1(0, type(uint128).max, 0, 1e18, true), 1e18);
+
+        assertEq(calcLiquidityForAmount1(0, 0, 1, 1e18, false), 0);
+        assertEq(calcLiquidityForAmount1(0, 0, 1, 1e18, true), 0);
     }
 }

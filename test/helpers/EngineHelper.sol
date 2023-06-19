@@ -13,7 +13,7 @@ contract EngineHelper is IExecuteCallback {
     MockERC20 internal token1;
 
     function _setUp() internal {
-        engine = new Engine();
+        engine = new Engine(address(0));
         MockERC20 tokenA = new MockERC20();
         MockERC20 tokenB = new MockERC20();
         (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
@@ -22,8 +22,8 @@ contract EngineHelper is IExecuteCallback {
     function executeCallback(
         address[] calldata tokens,
         int256[] calldata tokensDelta,
-        bytes32[] calldata ids,
-        int256[] calldata ilrtaDeltas,
+        bytes32[] calldata lpIDs,
+        int256[] calldata lpDeltas,
         bytes calldata
     )
         external
@@ -46,14 +46,14 @@ contract EngineHelper is IExecuteCallback {
             }
         }
 
-        for (uint256 i = 0; i < ids.length;) {
-            int256 delta = ilrtaDeltas[i];
+        for (uint256 i = 0; i < lpIDs.length;) {
+            int256 delta = lpDeltas[i];
 
-            if (delta > 0) {
-                bytes32 id = ids[i];
+            if (delta < 0) {
+                bytes32 id = lpIDs[i];
 
-                if (ids[i] != bytes32(0)) {
-                    engine.transfer(msg.sender, abi.encode(Positions.ILRTATransferDetails(id, uint256(delta))));
+                if (lpIDs[i] != bytes32(0)) {
+                    engine.transfer(msg.sender, abi.encode(Positions.ILRTATransferDetails(id, uint256(-delta))));
                 }
             }
 
@@ -70,7 +70,7 @@ contract EngineHelper is IExecuteCallback {
         bytes[] memory inputs = new bytes[](1);
         inputs[0] = abi.encode(Engine.CreatePairParams(address(token0), address(token1), 0));
 
-        engine.execute(commands, inputs, address(0), 0, 0, bytes(""));
+        engine.execute(address(0), commands, inputs, 0, 0, bytes(""));
     }
 
     function basicAddLiquidity() internal {
@@ -78,9 +78,13 @@ contract EngineHelper is IExecuteCallback {
         commands[0] = Engine.Commands.AddLiquidity;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(Engine.AddLiquidityParams(address(token0), address(token1), 0, 0, 1e18));
+        inputs[0] = abi.encode(
+            Engine.AddLiquidityParams(
+                address(token0), address(token1), 0, 0, Engine.TokenSelector.LiquidityPosition, 1e18
+            )
+        );
 
-        engine.execute(commands, inputs, address(this), 1, 1, bytes(""));
+        engine.execute(address(this), commands, inputs, 1, 1, bytes(""));
     }
 
     function basicRemoveLiquidity() internal {
@@ -88,8 +92,12 @@ contract EngineHelper is IExecuteCallback {
         commands[0] = Engine.Commands.RemoveLiquidity;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(Engine.RemoveLiquidityParams(address(token0), address(token1), 0, 0, 1e18));
+        inputs[0] = abi.encode(
+            Engine.RemoveLiquidityParams(
+                address(token0), address(token1), 0, 0, Engine.TokenSelector.LiquidityPosition, -1e18
+            )
+        );
 
-        engine.execute(commands, inputs, address(this), 1, 1, bytes(""));
+        engine.execute(address(this), commands, inputs, 1, 1, bytes(""));
     }
 }
