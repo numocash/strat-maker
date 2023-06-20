@@ -130,8 +130,7 @@ library Pairs {
     /// @return amount1 The delta of the balance of token1 of the pair
     function swap(Pair storage pair, bool isToken0, int256 amountDesired) internal returns (int256, int256) {
         if (pair.initialized != 1) revert Initialized();
-        bool isExactIn = amountDesired > 0;
-        bool isSwap0To1 = isToken0 == isExactIn;
+        bool isSwap0To1 = isToken0 == amountDesired > 0;
 
         SwapState memory state;
         state.composition = pair.composition;
@@ -145,14 +144,13 @@ library Pairs {
         while (true) {
             uint256 ratioX128 = getRatioAtStrike(state.cachedStrikeCurrent);
             uint256 amountRemaining;
-            uint256 tokenInPerLiquidityNew;
             {
                 uint256 amountIn;
                 uint256 amountOut;
                 (amountIn, amountOut, amountRemaining) =
                     computeSwapStep(ratioX128, state.cachedComposition, state.cachedLiquidity, isToken0, amountDesired);
 
-                if (isExactIn) {
+                if (amountDesired > 0) {
                     amountDesired -= toInt256(amountIn);
                     state.amountA += toInt256(amountIn);
                     state.amountB -= toInt256(amountOut);
@@ -162,31 +160,41 @@ library Pairs {
                     state.amountB += toInt256(amountIn);
                 }
 
-                if (state.cachedLiquidity > 0) tokenInPerLiquidityNew = mulDiv(amountIn, Q128, state.cachedLiquidity);
-            }
+                if (isSwap0To1) {
+                    unchecked {
+                        uint256 swapLiquidityAvailable =
+                            mulDiv(type(uint256).max - state.cachedComposition, state.cachedLiquidity, Q128);
 
-            if (isSwap0To1) {
-                unchecked {
-                    for (uint256 i = 1; i <= NUM_SPREADS; i++) {
-                        int24 activeStrike = state.cachedStrikeCurrent + int24(int256(i));
-                        int24 spreadStrikeCurrent = state.strikeCurrent[i - 1];
-                        if (activeStrike == spreadStrikeCurrent) {
-                            pair.strikes[activeStrike].token0InPerLiquidity[i - 1] += tokenInPerLiquidityNew;
-                        } else {
-                            break;
+                        if (swapLiquidityAvailable > 0) {
+                            for (uint256 i = 1; i <= NUM_SPREADS; i++) {
+                                int24 activeStrike = state.cachedStrikeCurrent + int24(int256(i));
+                                int24 spreadStrikeCurrent = state.strikeCurrent[i - 1];
+                                if (activeStrike == spreadStrikeCurrent) {
+                                    // uint256
+                                    pair.strikes[activeStrike].token0InPerLiquidity[i - 1] += mulDiv(
+                                        amountIn, type(uint256).max - state.composition[i - 1], swapLiquidityAvailable
+                                    );
+                                } else {
+                                    break;
+                                }
+                            }
                         }
                     }
-                }
-            } else {
-                unchecked {
-                    for (uint256 i = 1; i <= NUM_SPREADS; i++) {
-                        int24 activeStrike = state.cachedStrikeCurrent - int24(int256(i));
-                        int24 spreadStrikeCurrent = state.strikeCurrent[i - 1];
+                } else {
+                    unchecked {
+                        uint256 swapLiquidityAvailable = mulDiv(state.cachedComposition, state.cachedLiquidity, Q128);
+                        if (swapLiquidityAvailable > 0) {
+                            for (uint256 i = 1; i <= NUM_SPREADS; i++) {
+                                int24 activeStrike = state.cachedStrikeCurrent - int24(int256(i));
+                                int24 spreadStrikeCurrent = state.strikeCurrent[i - 1];
 
-                        if (activeStrike == spreadStrikeCurrent) {
-                            pair.strikes[activeStrike].token1InPerLiquidity[i - 1] += tokenInPerLiquidityNew;
-                        } else {
-                            break;
+                                if (activeStrike == spreadStrikeCurrent) {
+                                    pair.strikes[activeStrike].token1InPerLiquidity[i - 1] +=
+                                        mulDiv(amountIn, state.composition[i - 1], swapLiquidityAvailable);
+                                } else {
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
