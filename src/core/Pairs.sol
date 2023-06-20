@@ -27,8 +27,9 @@ library Pairs {
                                DATA TYPES
     <3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3*/
 
+    /// @custom:team could we make reference a bitmap
     struct Strike {
-        uint256[NUM_SPREADS] liquidity;
+        uint256[NUM_SPREADS] liquidityBiDirectional;
         uint256[NUM_SPREADS] token0InPerLiquidity; //Q128.128
         uint256[NUM_SPREADS] token1InPerLiquidity; // Q128.128
         int24 next0To1;
@@ -385,7 +386,7 @@ library Pairs {
                 int24 spreadStrikeCurrent = strikeCurrent[i - 1];
 
                 if (activeStrike == spreadStrikeCurrent) {
-                    uint256 spreadLiquidity = strikes[activeStrike].liquidity[i - 1];
+                    uint256 spreadLiquidity = strikes[activeStrike].liquidityBiDirectional[i - 1];
 
                     if (spreadLiquidity > 0) {
                         cachedLiquidity += spreadLiquidity;
@@ -417,8 +418,8 @@ library Pairs {
     /// @param liquidity The amount of liquidity being added or removed
     /// @custom:team check strike + spread is not greater than max
     function _updateStrike(Pair storage pair, int24 strike, uint8 spread, int256 liquidity) private {
-        uint256 existingLiquidity = pair.strikes[strike].liquidity[spread - 1];
-        pair.strikes[strike].liquidity[spread - 1] = addDelta(existingLiquidity, liquidity);
+        uint256 existingLiquidity = pair.strikes[strike].liquidityBiDirectional[spread - 1];
+        pair.strikes[strike].liquidityBiDirectional[spread - 1] = addDelta(existingLiquidity, liquidity);
 
         unchecked {
             if (existingLiquidity == 0 && liquidity > 0) {

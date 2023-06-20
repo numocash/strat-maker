@@ -18,9 +18,16 @@ abstract contract Positions is ILRTA {
         )
     {}
 
+    enum OrderType {
+        BiDirectional,
+        ZeroToOne,
+        OneToZero
+    }
+
     struct ILRTADataID {
         address token0;
         address token1;
+        OrderType orderType;
         int24 strike;
         uint8 spread;
     }
@@ -147,10 +154,10 @@ abstract contract Positions is ILRTA {
     {
         unchecked {
             if (position.liquidity > 0) {
-                uint256 token0InPerLiquidityDelta =
-                    pair.strikes[strike - int8(spread)].liquidity[spread] - position.token0InPerLiquidityLast;
-                uint256 token1InPerLiquidityDelta =
-                    pair.strikes[strike + int8(spread)].liquidity[spread] - position.token1InPerLiquidityLast;
+                uint256 token0InPerLiquidityDelta = pair.strikes[strike - int8(spread)].liquidityBiDirectional[spread]
+                    - position.token0InPerLiquidityLast;
+                uint256 token1InPerLiquidityDelta = pair.strikes[strike + int8(spread)].liquidityBiDirectional[spread]
+                    - position.token1InPerLiquidityLast;
 
                 uint256 strikePrice = getRatioAtStrike(strike);
                 uint256 strikePrice0To1Inverse = getRatioAtStrike(int24(int8(spread)) - strike);
@@ -168,8 +175,8 @@ abstract contract Positions is ILRTA {
                 position.token1Owed += amount1Owed;
             }
 
-            position.token0InPerLiquidityLast = pair.strikes[strike - int8(spread)].liquidity[spread];
-            position.token1InPerLiquidityLast = pair.strikes[strike + int8(spread)].liquidity[spread];
+            position.token0InPerLiquidityLast = pair.strikes[strike - int8(spread)].liquidityBiDirectional[spread];
+            position.token1InPerLiquidityLast = pair.strikes[strike + int8(spread)].liquidityBiDirectional[spread];
         }
     }
 }

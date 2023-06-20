@@ -254,12 +254,22 @@ contract Engine is Positions {
         account.updateToken(params.token1, toInt256(amount1));
 
         Positions.ILRTAData storage position = _dataOf[to][dataID(
-            abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.strike, params.spread))
+            abi.encode(
+                Positions.ILRTADataID(
+                    params.token0, params.token1, Positions.OrderType.BiDirectional, params.strike, params.spread
+                )
+            )
         )];
         _getTokensOwed(pair, params.strike, params.spread, position);
         _mint(
             to,
-            dataID(abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.strike, params.spread))),
+            dataID(
+                abi.encode(
+                    Positions.ILRTADataID(
+                        params.token0, params.token1, Positions.OrderType.BiDirectional, params.strike, params.spread
+                    )
+                )
+            ),
             uint256(liquidity)
         );
 
@@ -269,7 +279,11 @@ contract Engine is Positions {
     function _collect(CollectParams memory params) private {
         (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
         Positions.ILRTAData storage position = _dataOf[params.owner][dataID(
-            abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.strike, params.spread))
+            abi.encode(
+                Positions.ILRTADataID(
+                    params.token0, params.token1, Positions.OrderType.BiDirectional, params.strike, params.spread
+                )
+            )
         )];
 
         (uint256 amount0Owed, uint256 amount1Owed) = _getTokensOwed(pair, params.strike, params.spread, position);
@@ -315,7 +329,13 @@ contract Engine is Positions {
         account.updateToken(params.token0, -toInt256(amount0));
         account.updateToken(params.token1, -toInt256(amount1));
         account.updateILRTA(
-            dataID(abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.strike, params.spread))),
+            dataID(
+                abi.encode(
+                    Positions.ILRTADataID(
+                        params.token0, params.token1, Positions.OrderType.BiDirectional, params.strike, params.spread
+                    )
+                )
+            ),
             liquidity
         );
 
@@ -366,6 +386,8 @@ contract Engine is Positions {
         view
         returns (Positions.ILRTAData memory)
     {
-        return _dataOf[owner][dataID(abi.encode(Positions.ILRTADataID(token0, token1, strike, spread)))];
+        return _dataOf[owner][dataID(
+            abi.encode(Positions.ILRTADataID(token0, token1, Positions.OrderType.BiDirectional, strike, spread))
+        )];
     }
 }

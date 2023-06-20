@@ -40,7 +40,12 @@ contract MockPair is Positions {
     {
         (amount0, amount1) = pair.updateLiquidity(strike, spread, int256(liquidity));
 
-        _mint(msg.sender, dataID(abi.encode(Positions.ILRTADataID(token0, token1, strike, spread))), liquidity);
+        _mint(
+            msg.sender,
+            // solhint-disable-next-line max-line-length
+            dataID(abi.encode(Positions.ILRTADataID(token0, token1, Positions.OrderType.BiDirectional, strike, spread))),
+            liquidity
+        );
 
         address[] memory tokens = new address[](2);
         tokens[0] = token0;
@@ -72,7 +77,12 @@ contract MockPair is Positions {
         SafeTransferLib.safeTransfer(token0, msg.sender, amount0);
         SafeTransferLib.safeTransfer(token1, msg.sender, amount1);
 
-        _burn(msg.sender, dataID(abi.encode(Positions.ILRTADataID(token0, token1, strike, spread))), liquidity);
+        _burn(
+            msg.sender,
+            // solhint-disable-next-line max-line-length
+            dataID(abi.encode(Positions.ILRTADataID(token0, token1, Positions.OrderType.BiDirectional, strike, spread))),
+            liquidity
+        );
     }
 
     function swap(bool isToken0, int256 amountDesired) public returns (int256 amount0, int256 amount1) {
@@ -130,6 +140,8 @@ contract MockPair is Positions {
         view
         returns (Positions.ILRTAData memory)
     {
-        return _dataOf[owner][dataID(abi.encode(Positions.ILRTADataID(token0, token1, strike, spread)))];
+        return _dataOf[owner][dataID(
+            abi.encode(Positions.ILRTADataID(token0, token1, Positions.OrderType.BiDirectional, strike, spread))
+        )];
     }
 }
