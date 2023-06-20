@@ -131,7 +131,7 @@ contract Engine is Positions {
             if (commands[i] == Commands.Swap) {
                 _swap(abi.decode(inputs[i], (SwapParams)), account);
             } else if (commands[i] == Commands.AddLiquidity) {
-                _addLiquidity(abi.decode(inputs[i], (AddLiquidityParams)), account);
+                _addLiquidity(to, abi.decode(inputs[i], (AddLiquidityParams)), account);
             } else if (commands[i] == Commands.Collect) {
                 _collect(abi.decode(inputs[i], (CollectParams)));
             } else if (commands[i] == Commands.RemoveLiquidity) {
@@ -155,21 +155,6 @@ contract Engine is Positions {
 
             if (delta < 0) {
                 SafeTransferLib.safeTransfer(token, to, uint256(-delta));
-            }
-
-            unchecked {
-                i++;
-            }
-        }
-
-        for (uint256 i = 0; i < numLPs;) {
-            int256 delta = account.lpDeltas[i];
-            bytes32 id = account.lpIDs[i];
-
-            if (id == bytes32(0)) break;
-
-            if (delta > 0) {
-                _mint(to, id, uint256(delta));
             }
 
             unchecked {
@@ -229,7 +214,7 @@ contract Engine is Positions {
         emit Swap(pairID);
     }
 
-    function _addLiquidity(AddLiquidityParams memory params, Accounts.Account memory account) private {
+    function _addLiquidity(address to, AddLiquidityParams memory params, Accounts.Account memory account) private {
         (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
 
         int256 liquidity;
@@ -267,10 +252,13 @@ contract Engine is Positions {
 
         account.updateToken(params.token0, toInt256(amount0));
         account.updateToken(params.token1, toInt256(amount1));
-        account.updateILRTA(
+
+        _mint(
+            to,
             dataID(abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.strike, params.spread))),
-            liquidity
+            uint256(liquidity)
         );
+
         emit AddLiquidity(pairID, params.strike, params.spread, uint256(liquidity));
     }
 
