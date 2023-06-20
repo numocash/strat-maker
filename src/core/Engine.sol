@@ -253,6 +253,10 @@ contract Engine is Positions {
         account.updateToken(params.token0, toInt256(amount0));
         account.updateToken(params.token1, toInt256(amount1));
 
+        Positions.ILRTAData storage position = _dataOf[to][dataID(
+            abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.strike, params.spread))
+        )];
+        _getTokensOwed(pair, params.strike, params.spread, position);
         _mint(
             to,
             dataID(abi.encode(Positions.ILRTADataID(params.token0, params.token1, params.strike, params.spread))),

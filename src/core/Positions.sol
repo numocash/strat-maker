@@ -146,27 +146,30 @@ abstract contract Positions is ILRTA {
         returns (uint256 amount0Owed, uint256 amount1Owed)
     {
         unchecked {
-            uint256 token0InPerLiquidityDelta =
-                pair.strikes[strike - int8(spread)].liquidity[spread] - position.token0InPerLiquidityLast;
-            uint256 token1InPerLiquidityDelta =
-                pair.strikes[strike + int8(spread)].liquidity[spread] - position.token1InPerLiquidityLast;
+            if (position.liquidity > 0) {
+                uint256 token0InPerLiquidityDelta =
+                    pair.strikes[strike - int8(spread)].liquidity[spread] - position.token0InPerLiquidityLast;
+                uint256 token1InPerLiquidityDelta =
+                    pair.strikes[strike + int8(spread)].liquidity[spread] - position.token1InPerLiquidityLast;
 
-            uint256 strikePrice = getRatioAtStrike(strike);
-            uint256 strikePrice0To1Inverse = getRatioAtStrike(int24(int8(spread)) - strike);
-            uint256 strikePrice1To0 = getRatioAtStrike(strike + int8(spread));
+                uint256 strikePrice = getRatioAtStrike(strike);
+                uint256 strikePrice0To1Inverse = getRatioAtStrike(int24(int8(spread)) - strike);
+                uint256 strikePrice1To0 = getRatioAtStrike(strike + int8(spread));
 
-            uint256 token0LiquidityVolume =
-                mulDiv(token0InPerLiquidityDelta, position.liquidity, strikePrice0To1Inverse);
-            uint256 token1LiquidityVolume = mulDiv(token1InPerLiquidityDelta, position.liquidity, strikePrice1To0);
+                uint256 token0LiquidityVolume =
+                    mulDiv(token0InPerLiquidityDelta, position.liquidity, strikePrice0To1Inverse);
+                uint256 token1LiquidityVolume = mulDiv(token1InPerLiquidityDelta, position.liquidity, strikePrice1To0);
 
-            amount0Owed = mulDiv(token0LiquidityVolume, strikePrice0To1Inverse - type(uint256).max / strikePrice, Q128);
-            amount1Owed = mulDiv(token1LiquidityVolume, strikePrice1To0 - strikePrice, Q128);
+                amount0Owed =
+                    mulDiv(token0LiquidityVolume, strikePrice0To1Inverse - type(uint256).max / strikePrice, Q128);
+                amount1Owed = mulDiv(token1LiquidityVolume, strikePrice1To0 - strikePrice, Q128);
+
+                position.token0Owed += amount0Owed;
+                position.token1Owed += amount1Owed;
+            }
 
             position.token0InPerLiquidityLast = pair.strikes[strike - int8(spread)].liquidity[spread];
             position.token1InPerLiquidityLast = pair.strikes[strike + int8(spread)].liquidity[spread];
-
-            position.token0Owed += amount0Owed;
-            position.token1Owed += amount1Owed;
         }
     }
 }
