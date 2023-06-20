@@ -29,6 +29,8 @@ library Pairs {
 
     struct Strike {
         uint256[NUM_SPREADS] liquidity;
+        uint256[NUM_SPREADS] token0InPerLiquidity; //Q128.128
+        uint256[NUM_SPREADS] token1InPerLiquidity; // Q128.128
         int24 next0To1;
         int24 next1To0;
         uint8 reference0To1;
@@ -143,6 +145,7 @@ library Pairs {
         while (true) {
             uint256 ratioX128 = getRatioAtStrike(state.cachedStrikeCurrent);
             uint256 amountRemaining;
+            uint256 tokenInPerLiquidityNew;
             {
                 uint256 amountIn;
                 uint256 amountOut;
@@ -157,6 +160,35 @@ library Pairs {
                     amountDesired += toInt256(amountOut);
                     state.amountA -= toInt256(amountOut);
                     state.amountB += toInt256(amountIn);
+                }
+
+                if (state.cachedLiquidity > 0) tokenInPerLiquidityNew = mulDiv(amountIn, Q128, state.cachedLiquidity);
+            }
+
+            if (isSwap0To1) {
+                unchecked {
+                    for (uint256 i = 1; i <= NUM_SPREADS; i++) {
+                        int24 activeStrike = state.cachedStrikeCurrent + int24(int256(i));
+                        int24 spreadStrikeCurrent = state.strikeCurrent[i - 1];
+                        if (activeStrike == spreadStrikeCurrent) {
+                            pair.strikes[activeStrike].token0InPerLiquidity[i - 1] += tokenInPerLiquidityNew;
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            } else {
+                unchecked {
+                    for (uint256 i = 1; i <= NUM_SPREADS; i++) {
+                        int24 activeStrike = state.cachedStrikeCurrent - int24(int256(i));
+                        int24 spreadStrikeCurrent = state.strikeCurrent[i - 1];
+
+                        if (activeStrike == spreadStrikeCurrent) {
+                            pair.strikes[activeStrike].token1InPerLiquidity[i - 1] += tokenInPerLiquidityNew;
+                        } else {
+                            break;
+                        }
+                    }
                 }
             }
 
