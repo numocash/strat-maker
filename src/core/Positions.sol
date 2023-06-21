@@ -18,17 +18,24 @@ abstract contract Positions is ILRTA {
         )
     {}
 
+    enum OrderType {
+        BiDirectional,
+        ZeroToOne,
+        OneToZero
+    }
+
     struct ILRTADataID {
         address token0;
         address token1;
+        OrderType orderType;
         int24 strike;
         uint8 spread;
     }
 
     struct ILRTAData {
         uint256 liquidity;
-        uint256 token0InPerLiquidityLast; //Q128.128
-        uint256 token1InPerLiquidityLast; // Q128.128
+        uint256 liquidity0InPerLiquidityLast; //Q128.128
+        uint256 liquidity1InPerLiquidityLast; // Q128.128
         uint256 token0Owed;
         uint256 token1Owed;
     }
@@ -147,29 +154,32 @@ abstract contract Positions is ILRTA {
     {
         unchecked {
             if (position.liquidity > 0) {
-                uint256 token0InPerLiquidityDelta =
-                    pair.strikes[strike - int8(spread)].liquidity[spread] - position.token0InPerLiquidityLast;
-                uint256 token1InPerLiquidityDelta =
-                    pair.strikes[strike + int8(spread)].liquidity[spread] - position.token1InPerLiquidityLast;
+                // solhint-disable-next-line max-line-length
+                uint256 liquidity0InPerLiquidityDelta = pair.strikes[strike - int8(spread)].liquidity0InPerLiquidity[spread]
+                    - position.liquidity0InPerLiquidityLast;
+
+                // solhint-disable-next-line max-line-length
+                uint256 liquidity1InPerLiquidityDelta = pair.strikes[strike + int8(spread)].liquidity1InPerLiquidity[spread]
+                    - position.liquidity1InPerLiquidityLast;
+
+                uint256 liquidity0Volume = mulDiv(liquidity0InPerLiquidityDelta, position.liquidity, Q128);
+                uint256 liquidity1Volume = mulDiv(liquidity1InPerLiquidityDelta, position.liquidity, Q128);
 
                 uint256 strikePrice = getRatioAtStrike(strike);
-                uint256 strikePrice0To1Inverse = getRatioAtStrike(int24(int8(spread)) - strike);
+                uint256 strikePrice0To1 = getRatioAtStrike(strike - int8(spread));
                 uint256 strikePrice1To0 = getRatioAtStrike(strike + int8(spread));
 
-                uint256 token0LiquidityVolume =
-                    mulDiv(token0InPerLiquidityDelta, position.liquidity, strikePrice0To1Inverse);
-                uint256 token1LiquidityVolume = mulDiv(token1InPerLiquidityDelta, position.liquidity, strikePrice1To0);
-
                 amount0Owed =
-                    mulDiv(token0LiquidityVolume, strikePrice0To1Inverse - type(uint256).max / strikePrice, Q128);
-                amount1Owed = mulDiv(token1LiquidityVolume, strikePrice1To0 - strikePrice, Q128);
+                    mulDiv(liquidity0Volume, Q128, strikePrice0To1) - mulDiv(liquidity0Volume, Q128, strikePrice);
+                amount1Owed = liquidity1Volume - mulDiv(liquidity1Volume, strikePrice, strikePrice1To0);
 
                 position.token0Owed += amount0Owed;
                 position.token1Owed += amount1Owed;
             }
-
-            position.token0InPerLiquidityLast = pair.strikes[strike - int8(spread)].liquidity[spread];
-            position.token1InPerLiquidityLast = pair.strikes[strike + int8(spread)].liquidity[spread];
+            // solhint-disable-next-line max-line-length
+            position.liquidity0InPerLiquidityLast = pair.strikes[strike - int8(spread)].liquidity0InPerLiquidity[spread];
+            // solhint-disable-next-line max-line-length
+            position.liquidity1InPerLiquidityLast = pair.strikes[strike + int8(spread)].liquidity1InPerLiquidity[spread];
         }
     }
 }

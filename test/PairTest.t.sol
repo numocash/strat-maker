@@ -54,7 +54,7 @@ contract AddLiquidityTest is Test, PairHelper {
         basicAddLiquidity();
 
         Pairs.Strike memory strike = pair.getStrike(0);
-        assertEq(strike.liquidity[0], 1e18);
+        assertEq(strike.liquidityBiDirectional[0], 1e18);
     }
 
     function testLiquidityPosition() external {
@@ -134,7 +134,7 @@ contract RemoveLiquidityTest is Test, PairHelper {
         basicAddLiquidity();
         basicRemoveLiquidity();
         Pairs.Strike memory strike = pair.getStrike(0);
-        assertEq(strike.liquidity[0], 0);
+        assertEq(strike.liquidityBiDirectional[0], 0);
     }
 
     function testRemoveLiquidityPosition() external {
