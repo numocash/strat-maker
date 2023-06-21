@@ -27,13 +27,20 @@ library Pairs {
                                DATA TYPES
     <3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3*/
 
-    struct Spread {
-        uint128 composition;
-        int24 strikeCurrent;
+    struct Limit {
+        uint256 liquidity0To1;
+        uint256 liquidity1To0;
+        uint256 liquidity0InPerLiquidity;
+        uint256 liquidity1InPerLiquidity;
     }
 
+    /// @custom:team could we make reference a bitmap
+    /// @custom:team add need settle flags
     struct Strike {
-        uint256[NUM_SPREADS] liquidity;
+        Limit limit;
+        uint256[NUM_SPREADS] liquidityBiDirectional;
+        uint256[NUM_SPREADS] liquidity0InPerLiquidity; //Q128.128
+        uint256[NUM_SPREADS] liquidity1InPerLiquidity; // Q128.128
         int24 next0To1;
         int24 next1To0;
         uint8 reference0To1;
@@ -41,8 +48,9 @@ library Pairs {
     }
 
     struct Pair {
-        Spread[NUM_SPREADS] spreads;
-        int24 strikeCurrent;
+        uint128[NUM_SPREADS] composition;
+        int24[NUM_SPREADS] strikeCurrent;
+        int24 cachedStrikeCurrent;
         uint8 initialized; // 0 = unitialized, 1 = initialized
         mapping(int24 => Strike) strikes;
         BitMaps.BitMap bitMap0To1;
@@ -74,20 +82,27 @@ library Pairs {
                               INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Initialize the pair by setting the initial strike
     function initialize(Pair storage pair, int24 strikeInitial) internal {
         if (pair.initialized != 0) revert Initialized();
         _checkStrike(strikeInitial);
 
-        pair.strikeCurrent = strikeInitial;
+        pair.cachedStrikeCurrent = strikeInitial;
         pair.initialized = 1;
 
         for (uint256 i = 0; i < NUM_SPREADS;) {
-            pair.spreads[0].strikeCurrent = strikeInitial;
+            pair.strikeCurrent[i] = strikeInitial;
 
             unchecked {
                 i++;
             }
         }
+
+        // strike order when swapping 0 -> 1
+        // MAX_STRIKE -> strikeInitial -> MIN_STRIKE
+
+        // strike order when swapping 1 -> 0
+        // MIN_STRIKE -> strikeInitial -> MAX_STRIKE
 
         pair.bitMap0To1.set(MIN_STRIKE);
         pair.bitMap1To0.set(MIN_STRIKE);
@@ -107,11 +122,11 @@ library Pairs {
 
     /// @notice Struct to hold temporary data while completing a swap
     struct SwapState {
-        int24 strikeCurrent;
-        Spread[NUM_SPREADS] spreads;
-        uint256 liquidity;
-        uint128 composition;
-        int256 amountDesired;
+        uint128[NUM_SPREADS] composition;
+        int24[NUM_SPREADS] strikeCurrent;
+        int24 cachedStrikeCurrent;
+        uint256 cachedLiquidity;
+        uint128 cachedComposition;
         // pool's balance change of the token which "amountDesired" refers to
         int256 amountA;
         // pool's balance change of the opposite token
@@ -123,113 +138,112 @@ library Pairs {
     /// @param amountDesired The desired amount change on the pair
     /// @return amount0 The delta of the balance of token0 of the pair
     /// @return amount1 The delta of the balance of token1 of the pair
+    /// @custom:team track available swap liquidity instead of composition
     function swap(Pair storage pair, bool isToken0, int256 amountDesired) internal returns (int256, int256) {
         if (pair.initialized != 1) revert Initialized();
-        bool isExactIn = amountDesired > 0;
-        bool isSwap0To1 = isToken0 == isExactIn;
+        bool isSwap0To1 = isToken0 == amountDesired > 0;
 
         SwapState memory state;
-        {
-            uint256 liquidity;
-            uint128 composition;
-            int24 _strikeCurrent = pair.strikeCurrent;
+        state.composition = pair.composition;
+        state.strikeCurrent = pair.strikeCurrent;
+        state.cachedStrikeCurrent = pair.cachedStrikeCurrent;
 
-            // Find the cheapest liquidity available
-            // KYLE: Composition can be taken from the lowest active spread
-            for (uint256 i = 1; i <= NUM_SPREADS;) {
-                // active strike for spread i
-                int24 activeStrike = isSwap0To1 ? _strikeCurrent + int24(int256(i)) : _strikeCurrent - int24(int256(i));
-                if (activeStrike == pair.spreads[i - 1].strikeCurrent) {
-                    if (pair.strikes[activeStrike].liquidity[i - 1] > 0) {
-                        liquidity += pair.strikes[activeStrike].liquidity[i - 1];
-                        // KYLE: is this rounding correctly
-                        composition += uint128(
-                            mulDiv(
-                                pair.spreads[i - 1].composition, pair.strikes[activeStrike].liquidity[i - 1], liquidity
-                            )
-                        );
-                    }
-                } else {
-                    // exit early because higher spreads are always farther away from the active strike
-                    break;
-                }
-
-                unchecked {
-                    i++;
-                }
-            }
-
-            state = SwapState({
-                strikeCurrent: _strikeCurrent,
-                spreads: pair.spreads,
-                liquidity: liquidity,
-                composition: composition,
-                amountDesired: amountDesired,
-                amountA: 0,
-                amountB: 0
-            });
-        }
+        (state.cachedLiquidity, state.cachedComposition) = _calculateActiveLiquidity(
+            state.composition, state.strikeCurrent, pair.strikes, state.cachedStrikeCurrent, isSwap0To1
+        );
 
         while (true) {
-            uint256 ratioX128 = getRatioAtStrike(state.strikeCurrent);
+            uint256 ratioX128 = getRatioAtStrike(state.cachedStrikeCurrent);
             uint256 amountRemaining;
             {
                 uint256 amountIn;
                 uint256 amountOut;
                 (amountIn, amountOut, amountRemaining) =
-                    computeSwapStep(ratioX128, state.composition, state.liquidity, isToken0, state.amountDesired);
+                    computeSwapStep(ratioX128, state.cachedComposition, state.cachedLiquidity, isToken0, amountDesired);
 
-                if (isExactIn) {
-                    state.amountDesired = state.amountDesired - toInt256(amountIn);
-                    state.amountA = state.amountA + toInt256(amountIn);
-                    state.amountB = state.amountB - toInt256(amountOut);
+                if (amountDesired > 0) {
+                    amountDesired -= toInt256(amountIn);
+                    state.amountA += toInt256(amountIn);
+                    state.amountB -= toInt256(amountOut);
                 } else {
-                    state.amountDesired = state.amountDesired + toInt256(amountOut);
-                    state.amountA = state.amountA - toInt256(amountOut);
-                    state.amountB = state.amountB + toInt256(amountIn);
+                    amountDesired += toInt256(amountOut);
+                    state.amountA -= toInt256(amountOut);
+                    state.amountB += toInt256(amountIn);
+                }
+
+                if (isSwap0To1) {
+                    unchecked {
+                        uint256 swapLiquidityAvailable = mulDiv(
+                            type(uint256).max - state.cachedComposition,
+                            state.cachedLiquidity,
+                            type(uint256).max / ratioX128
+                        );
+
+                        if (swapLiquidityAvailable > 0) {
+                            for (uint256 i = 1; i <= NUM_SPREADS; i++) {
+                                int24 activeStrike = state.cachedStrikeCurrent + int24(int256(i));
+                                int24 spreadStrikeCurrent = state.strikeCurrent[i - 1];
+
+                                if (activeStrike == spreadStrikeCurrent) {
+                                    pair.strikes[activeStrike].liquidity0InPerLiquidity[i - 1] += mulDiv(
+                                        amountIn, type(uint256).max - state.composition[i - 1], swapLiquidityAvailable
+                                    );
+                                } else {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    unchecked {
+                        uint256 swapLiquidityAvailable = mulDiv(state.cachedComposition, state.cachedLiquidity, Q128);
+                        if (swapLiquidityAvailable > 0) {
+                            for (uint256 i = 1; i <= NUM_SPREADS; i++) {
+                                int24 activeStrike = state.cachedStrikeCurrent - int24(int256(i));
+                                int24 spreadStrikeCurrent = state.strikeCurrent[i - 1];
+
+                                if (activeStrike == spreadStrikeCurrent) {
+                                    pair.strikes[activeStrike].liquidity1InPerLiquidity[i - 1] +=
+                                        mulDiv(amountIn, state.composition[i - 1], swapLiquidityAvailable);
+                                } else {
+                                    break;
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
-            if (state.amountDesired == 0) {
+            if (amountDesired == 0) {
                 if (isSwap0To1) {
-                    uint128 composition = uint128(mulDiv(amountRemaining, Q128, state.liquidity));
-                    for (uint256 i = 1; i <= NUM_SPREADS;) {
-                        // active strike for spread i
-                        int24 activeStrike = state.strikeCurrent + int24(int256(i));
+                    uint128 composition = uint128(mulDiv(amountRemaining, Q128, state.cachedLiquidity));
 
-                        if (activeStrike == state.spreads[i - 1].strikeCurrent) {
-                            // KYLE: is this rounding correctly
-                            state.spreads[i - 1].composition = composition;
-                        } else {
-                            // exit early because higher spreads are alwasy farther away from the active strike
-                            break;
-                        }
+                    unchecked {
+                        for (uint256 i = 1; i <= NUM_SPREADS; i++) {
+                            int24 activeStrike = state.cachedStrikeCurrent + int24(int256(i));
+                            int24 spreadStrikeCurrent = state.strikeCurrent[i - 1];
 
-                        unchecked {
-                            i++;
+                            if (activeStrike == spreadStrikeCurrent) {
+                                state.composition[i - 1] = composition;
+                            } else {
+                                break;
+                            }
                         }
                     }
-
-                    // KYLE: is this rounding correctly
-                    state.composition = uint128(mulDiv(amountRemaining, Q128, state.liquidity));
                 } else {
                     uint128 composition =
-                        type(uint128).max - uint128(mulDiv(amountRemaining, ratioX128, state.liquidity));
+                        type(uint128).max - uint128(mulDiv(amountRemaining, ratioX128, state.cachedLiquidity));
 
-                    for (uint256 i = 1; i <= NUM_SPREADS;) {
-                        // active strike for spread i
-                        int24 activeStrike = state.strikeCurrent - int24(int256(i));
+                    unchecked {
+                        for (uint256 i = 1; i <= NUM_SPREADS; i++) {
+                            int24 activeStrike = state.cachedStrikeCurrent - int24(int256(i));
+                            int24 spreadStrikeCurrent = state.strikeCurrent[i - 1];
 
-                        if (activeStrike == state.spreads[i - 1].strikeCurrent) {
-                            // KYLE: is this rounding correctly
-                            state.spreads[i - 1].composition = composition;
-                        } else {
-                            // exit early because higher spreads are alwasy farther away from the active strike
-                            break;
-                        }
-
-                        unchecked {
-                            i++;
+                            if (activeStrike == spreadStrikeCurrent) {
+                                state.composition[i - 1] = composition;
+                            } else {
+                                break;
+                            }
                         }
                     }
                 }
@@ -238,156 +252,87 @@ library Pairs {
             }
 
             if (isSwap0To1) {
-                {
-                    int24 strikePrev = state.strikeCurrent;
-                    if (strikePrev == MIN_STRIKE) revert OutOfBounds();
+                int24 strikePrev = state.cachedStrikeCurrent;
+                if (strikePrev == MIN_STRIKE) revert OutOfBounds();
 
-                    // move state vars to the next tick
-                    state.strikeCurrent = pair.strikes[strikePrev].next0To1;
-                    for (uint256 i = 1; i <= NUM_SPREADS;) {
+                // move state vars to the next strike
+                state.cachedStrikeCurrent = pair.strikes[strikePrev].next0To1;
+                unchecked {
+                    for (uint256 i = 1; i <= NUM_SPREADS; i++) {
+                        int24 activeStrike = state.cachedStrikeCurrent + int24(int256(i));
                         // only update if it was active previously
-                        if (state.spreads[i - 1].strikeCurrent >= state.strikeCurrent + int24(int256(i))) {
-                            int24 activeStrike = state.strikeCurrent + int24(int256(i));
-                            state.spreads[i - 1] = Spread(type(uint128).max, activeStrike);
+                        if (state.strikeCurrent[i - 1] >= activeStrike) {
+                            state.composition[i - 1] = type(uint128).max;
+                            state.strikeCurrent[i - 1] = activeStrike;
                         } else {
-                            // exit early
                             break;
                         }
-
-                        unchecked {
-                            i++;
-                        }
-                    }
-
-                    // Remove strike from linked list and bit map if it has no liquidity
-                    // Only happens when initialized or all liquidity is removed from current strike
-                    if (state.liquidity == 0) {
-                        assert(pair.strikes[strikePrev].reference0To1 == 1);
-
-                        int24 below = -pair.bitMap0To1.nextBelow(-strikePrev);
-                        int24 above = pair.strikes[strikePrev].next0To1;
-
-                        pair.strikes[below].next0To1 = above;
-                        pair.bitMap0To1.unset(-strikePrev);
-
-                        pair.strikes[strikePrev].next0To1 = 0;
-                        pair.strikes[strikePrev].reference0To1 = 0;
                     }
                 }
 
-                uint256 liquidity;
-                uint128 composition;
+                // Remove strike from linked list and bit map if it has no liquidity
+                // Only happens when initialized or all liquidity is removed from current strike
+                if (state.cachedLiquidity == 0) {
+                    assert(pair.strikes[strikePrev].reference0To1 == 1);
 
-                // find all liquidity that has the same strike
-                // KYLE: This can be done much more efficiently with caching and exiting early from the loop
-                // only the newest spreads add to composition
-                for (uint256 i = 1; i <= NUM_SPREADS;) {
-                    // active strike for spread i
-                    int24 activeStrike = state.strikeCurrent + int24(int256(i));
+                    int24 below = -pair.bitMap0To1.nextBelow(-strikePrev);
+                    int24 above = pair.strikes[strikePrev].next0To1;
 
-                    if (activeStrike == state.spreads[i - 1].strikeCurrent) {
-                        if (pair.strikes[activeStrike].liquidity[i - 1] > 0) {
-                            liquidity += pair.strikes[activeStrike].liquidity[i - 1];
-                            // KYLE: is this rounding correctly
-                            composition += uint128(
-                                mulDiv(
-                                    state.spreads[i - 1].composition,
-                                    pair.strikes[activeStrike].liquidity[i - 1],
-                                    liquidity
-                                )
-                            );
-                        }
-                    } else {
-                        // exit early because higher spreads are alwasy farther away from the active strike
-                        break;
-                    }
+                    pair.strikes[below].next0To1 = above;
+                    pair.bitMap0To1.unset(-strikePrev);
 
-                    unchecked {
-                        i++;
-                    }
+                    pair.strikes[strikePrev].next0To1 = 0;
+                    pair.strikes[strikePrev].reference0To1 = 0;
                 }
 
-                state.liquidity = liquidity;
-                state.composition = composition;
+                (state.cachedLiquidity, state.cachedComposition) = _calculateActiveLiquidity(
+                    state.composition, state.strikeCurrent, pair.strikes, state.cachedStrikeCurrent, true
+                );
             } else {
-                {
-                    int24 strikePrev = state.strikeCurrent;
-                    if (strikePrev == MAX_STRIKE) revert OutOfBounds();
+                int24 strikePrev = state.cachedStrikeCurrent;
+                if (strikePrev == MAX_STRIKE) revert OutOfBounds();
 
-                    // move state vars to the next tick
-                    state.strikeCurrent = pair.strikes[strikePrev].next1To0;
-                    for (uint256 i = 1; i <= NUM_SPREADS;) {
+                // move state vars to the next strike
+                state.cachedStrikeCurrent = pair.strikes[strikePrev].next1To0;
+                unchecked {
+                    for (uint256 i = 1; i <= NUM_SPREADS; i++) {
+                        int24 activeStrike = state.cachedStrikeCurrent - int24(int256(i));
                         // only update if it was active previously
-                        if (state.spreads[i - 1].strikeCurrent <= state.strikeCurrent - int24(int256(i))) {
-                            int24 activeStrike = state.strikeCurrent - int24(int256(i));
-                            state.spreads[i - 1] = Spread(0, activeStrike);
+                        if (state.strikeCurrent[i - 1] <= activeStrike) {
+                            state.composition[i - 1] = 0;
+                            state.strikeCurrent[i - 1] = activeStrike;
                         } else {
-                            // exit early
                             break;
                         }
-
-                        unchecked {
-                            i++;
-                        }
-                    }
-
-                    // Remove strike from linked list and bit map if it has no liquidity
-                    // Only happens when initialized or all liquidity is removed from current strike
-                    if (state.liquidity == 0) {
-                        assert(pair.strikes[strikePrev].reference1To0 == 1);
-
-                        int24 below = pair.bitMap1To0.nextBelow(strikePrev);
-                        int24 above = pair.strikes[strikePrev].next1To0;
-
-                        pair.strikes[below].next1To0 = above;
-                        pair.bitMap1To0.unset(strikePrev);
-
-                        pair.strikes[strikePrev].next1To0 = 0;
-                        pair.strikes[strikePrev].reference1To0 = 0;
                     }
                 }
 
-                uint256 liquidity;
-                uint128 composition;
+                // Remove strike from linked list and bit map if it has no liquidity
+                // Only happens when initialized or all liquidity is removed from current strike
+                if (state.cachedLiquidity == 0) {
+                    assert(pair.strikes[strikePrev].reference1To0 == 1);
 
-                // find all liquidity that has the same strike
-                // KYLE: This can be done much more efficiently with caching and exiting early from the loop
-                // only the newest spreads add to composition
-                for (uint256 i = 1; i <= NUM_SPREADS;) {
-                    // active strike for spread i
-                    int24 activeStrike = state.strikeCurrent - int24(int256(i));
+                    int24 below = pair.bitMap1To0.nextBelow(strikePrev);
+                    int24 above = pair.strikes[strikePrev].next1To0;
 
-                    if (activeStrike == state.spreads[i - 1].strikeCurrent) {
-                        if (pair.strikes[activeStrike].liquidity[i - 1] > 0) {
-                            liquidity += pair.strikes[activeStrike].liquidity[i - 1];
-                            // KYLE: is this rounding correctly
-                            composition += uint128(
-                                mulDiv(
-                                    state.spreads[i - 1].composition,
-                                    pair.strikes[activeStrike].liquidity[i - 1],
-                                    liquidity
-                                )
-                            );
-                        }
-                    } else {
-                        // exit early because higher spreads are alwasy farther away from the active strike
-                        break;
-                    }
+                    pair.strikes[below].next1To0 = above;
+                    pair.bitMap1To0.unset(strikePrev);
 
-                    unchecked {
-                        i++;
-                    }
+                    pair.strikes[strikePrev].next1To0 = 0;
+                    pair.strikes[strikePrev].reference1To0 = 0;
                 }
 
-                state.liquidity = liquidity;
-                state.composition = composition;
+                (state.cachedLiquidity, state.cachedComposition) = _calculateActiveLiquidity(
+                    state.composition, state.strikeCurrent, pair.strikes, state.cachedStrikeCurrent, false
+                );
             }
         }
 
         // set spread composition and strike current
-        pair.strikeCurrent = state.strikeCurrent;
+        pair.cachedStrikeCurrent = state.cachedStrikeCurrent;
         for (uint256 i = 0; i < NUM_SPREADS;) {
-            pair.spreads[i] = state.spreads[i];
+            pair.strikeCurrent[i] = state.strikeCurrent[i];
+            pair.composition[i] = state.composition[i];
 
             unchecked {
                 i++;
@@ -423,8 +368,8 @@ library Pairs {
         _updateStrike(pair, strike, spread, liquidity);
 
         (amount0, amount1) = calcAmountsForLiquidity(
-            pair.spreads[spread - 1].strikeCurrent,
-            pair.spreads[spread - 1].composition,
+            pair.strikeCurrent[spread - 1],
+            pair.composition[spread - 1],
             strike,
             liquidity > 0 ? uint256(liquidity) : uint256(-liquidity),
             liquidity > 0
@@ -434,6 +379,40 @@ library Pairs {
     /*//////////////////////////////////////////////////////////////
                              INTERNAL LOGIC
     //////////////////////////////////////////////////////////////*/
+
+    /// @notice sum all the active liquidity
+    function _calculateActiveLiquidity(
+        uint128[NUM_SPREADS] memory composition,
+        int24[NUM_SPREADS] memory strikeCurrent,
+        mapping(int24 => Strike) storage strikes,
+        int24 cachedStrikeCurrent,
+        bool isSwap0To1
+    )
+        private
+        view
+        returns (uint256 cachedLiquidity, uint128 cachedComposition)
+    {
+        unchecked {
+            for (uint256 i = 1; i <= NUM_SPREADS; i++) {
+                int24 activeStrike =
+                    isSwap0To1 ? cachedStrikeCurrent + int24(int256(i)) : cachedStrikeCurrent - int24(int256(i));
+                int24 spreadStrikeCurrent = strikeCurrent[i - 1];
+
+                if (activeStrike == spreadStrikeCurrent) {
+                    uint256 spreadLiquidity = strikes[activeStrike].liquidityBiDirectional[i - 1];
+
+                    if (spreadLiquidity > 0) {
+                        cachedLiquidity += spreadLiquidity;
+                        // KYLE: is this rounding correctly
+                        cachedComposition += uint128(mulDiv(composition[i - 1], spreadLiquidity, cachedLiquidity));
+                    }
+                } else {
+                    // exit early because higher spreads are always farther away from the active strike
+                    break;
+                }
+            }
+        }
+    }
 
     /// @notice Check the validiity of strikes
     function _checkStrike(int24 strike) private pure {
@@ -451,8 +430,8 @@ library Pairs {
     /// @param liquidity The amount of liquidity being added or removed
     /// @custom:team check strike + spread is not greater than max
     function _updateStrike(Pair storage pair, int24 strike, uint8 spread, int256 liquidity) private {
-        uint256 existingLiquidity = pair.strikes[strike].liquidity[spread - 1];
-        pair.strikes[strike].liquidity[spread - 1] = addDelta(existingLiquidity, liquidity);
+        uint256 existingLiquidity = pair.strikes[strike].liquidityBiDirectional[spread - 1];
+        pair.strikes[strike].liquidityBiDirectional[spread - 1] = addDelta(existingLiquidity, liquidity);
 
         unchecked {
             if (existingLiquidity == 0 && liquidity > 0) {
@@ -490,10 +469,10 @@ library Pairs {
                 uint8 reference0To1 = pair.strikes[strike0To1].reference0To1;
                 uint8 reference1To0 = pair.strikes[strike1To0].reference1To0;
 
-                bool remove0To1 = reference0To1 == 1 && pair.strikeCurrent != strike0To1;
-                bool remove1To0 = reference1To0 == 1 && pair.strikeCurrent != strike1To0;
-                if (pair.strikeCurrent != strike0To1) pair.strikes[strike0To1].reference0To1 = reference0To1 - 1;
-                if (pair.strikeCurrent != strike1To0) pair.strikes[strike1To0].reference1To0 = reference1To0 - 1;
+                bool remove0To1 = reference0To1 == 1 && pair.cachedStrikeCurrent != strike0To1;
+                bool remove1To0 = reference1To0 == 1 && pair.cachedStrikeCurrent != strike1To0;
+                if (pair.cachedStrikeCurrent != strike0To1) pair.strikes[strike0To1].reference0To1 = reference0To1 - 1;
+                if (pair.cachedStrikeCurrent != strike1To0) pair.strikes[strike1To0].reference1To0 = reference1To0 - 1;
 
                 if (remove0To1) {
                     int24 below = -pair.bitMap0To1.nextBelow(-strike0To1);

@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
+import {Pairs} from "./Pairs.sol";
+import {mulDiv} from "./math/FullMath.sol";
+import {getRatioAtStrike, Q128} from "./math/strikeMath.sol";
 import {ILRTA} from "ilrta/ILRTA.sol";
 
 abstract contract Positions is ILRTA {
     mapping(address => mapping(bytes32 => ILRTAData)) internal _dataOf;
 
     constructor(address _superSignature)
-        // solhint-disable-next-line max-line-length
         ILRTA(
             _superSignature,
             "Yikes",
@@ -16,15 +18,26 @@ abstract contract Positions is ILRTA {
         )
     {}
 
+    enum OrderType {
+        BiDirectional,
+        ZeroToOne,
+        OneToZero
+    }
+
     struct ILRTADataID {
         address token0;
         address token1;
+        OrderType orderType;
         int24 strike;
         uint8 spread;
     }
 
     struct ILRTAData {
         uint256 liquidity;
+        uint256 liquidity0InPerLiquidityLast; //Q128.128
+        uint256 liquidity1InPerLiquidityLast; // Q128.128
+        uint256 token0Owed;
+        uint256 token1Owed;
     }
 
     struct ILRTATransferDetails {
@@ -128,5 +141,45 @@ abstract contract Positions is ILRTA {
         _dataOf[from][id].liquidity -= amount;
 
         emit Transfer(from, address(0), abi.encode(ILRTATransferDetails({amount: amount, id: id})));
+    }
+
+    function _getTokensOwed(
+        Pairs.Pair storage pair,
+        int24 strike,
+        uint8 spread,
+        Positions.ILRTAData storage position
+    )
+        internal
+        returns (uint256 amount0Owed, uint256 amount1Owed)
+    {
+        unchecked {
+            if (position.liquidity > 0) {
+                // solhint-disable-next-line max-line-length
+                uint256 liquidity0InPerLiquidityDelta = pair.strikes[strike - int8(spread)].liquidity0InPerLiquidity[spread]
+                    - position.liquidity0InPerLiquidityLast;
+
+                // solhint-disable-next-line max-line-length
+                uint256 liquidity1InPerLiquidityDelta = pair.strikes[strike + int8(spread)].liquidity1InPerLiquidity[spread]
+                    - position.liquidity1InPerLiquidityLast;
+
+                uint256 liquidity0Volume = mulDiv(liquidity0InPerLiquidityDelta, position.liquidity, Q128);
+                uint256 liquidity1Volume = mulDiv(liquidity1InPerLiquidityDelta, position.liquidity, Q128);
+
+                uint256 strikePrice = getRatioAtStrike(strike);
+                uint256 strikePrice0To1 = getRatioAtStrike(strike - int8(spread));
+                uint256 strikePrice1To0 = getRatioAtStrike(strike + int8(spread));
+
+                amount0Owed =
+                    mulDiv(liquidity0Volume, Q128, strikePrice0To1) - mulDiv(liquidity0Volume, Q128, strikePrice);
+                amount1Owed = liquidity1Volume - mulDiv(liquidity1Volume, strikePrice, strikePrice1To0);
+
+                position.token0Owed += amount0Owed;
+                position.token1Owed += amount1Owed;
+            }
+            // solhint-disable-next-line max-line-length
+            position.liquidity0InPerLiquidityLast = pair.strikes[strike - int8(spread)].liquidity0InPerLiquidity[spread];
+            // solhint-disable-next-line max-line-length
+            position.liquidity1InPerLiquidityLast = pair.strikes[strike + int8(spread)].liquidity1InPerLiquidity[spread];
+        }
     }
 }
