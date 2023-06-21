@@ -446,6 +446,7 @@ library Pairs {
                 pair.strikes[strike1To0].reference1To0 = reference1To0 + 1;
 
                 if (add0To1) {
+                    // tick0To1s are in decreasing order, double negate to reuse nextBelow function
                     int24 below = -pair.bitMap0To1.nextBelow(-strike0To1);
                     int24 above = pair.strikes[below].next0To1;
 
