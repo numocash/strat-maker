@@ -31,6 +31,8 @@ Yikes is an automated market maker (AMM) that allows for exchange between two as
 
 Yikes is uses the invariant `Liquidity = Price * amount0 + amount1`, also referred to as **constant sum**, with price having units `Price: token1 / token0`.
 
+Simply put, automated market makers create a market between two classes of users. Traders want to swap token0 to token1 or vice versa, presumably because they believe it will benefit them in someway. Liquidity providers lend out combination of token0 and token1, that is used to facilitate traders. They are rewarded for this with a portion of all traders trades. This market aims to connect traders and liquidity providers in a way that leaves them both satisfied with the outcome.
+
 ### Strikes (Aggregate Liquidity)
 
 In order to allow for maximum simplicity and expressiveness, Yikes is an aggregate of up to 2^24 constant sum automated market makers. Each individual market is designated by its **strike** which is directly mapped to a price according to the formula `Price = (1.0001)^strike`, such that each strike is 1 bip away from adjacent strikes. This design is very similar to Uniswap's concentrated liquidity except that liquidity is assigned directly to a fixed price, because of the constant sum invariant. Yikes manages swap routing so that all trades swap through the best available price.
@@ -42,6 +44,10 @@ Yikes allows liquidity providers to impose a fee on their liquidity when used fo
 This design essentially allows for fees to be encoded in strikes for more efficient storage and optimal on-chain routing. Yikes has multiple spread tiers per pair.
 
 It is important to note that with a larger spread, pricing is less exact. For example, a liquidity position that is willing to trade token0 to token1 at strike -10 and trade token 1 to token0 at strike -3 will not be used while the global market price is anywhere between strike -10 and -3. Liquidity providers must find the correct balance for them of high fees and high volume.
+
+### Limit orders
+
+Yikes allows liquidity providers to only allow for their liquidity to be used in one direction, equivalent to a limit order. This is done without any keepers or third parties, instead natively available on any pair.
 
 ## Architecture
 
@@ -61,9 +67,9 @@ Each individual market, described by `token0` and `token1` is an instance of a p
 
 Pairs have several state variables including:
 
-- `spreads`: Information for each spread. This contains composition, which represents the portion of the liquidity that is held in `token1`, as well as the current strike for that specific spread.
-- `strikes`: Information for each strike. Liquidity for each spread is stored. Strikes also contains two, singley-linked lists. These lists relate adjacent strikes together. This is needed because looping to find the next active adjacent strike is infeasible with 2**24 possible strikes.
-- `strikeCurrent`: The last strike that liquidity was traded through.
+- `composition`, and `strikeCurrent`: Information for each spread. Composition represents the portion of the liquidity that is held in `token1`. The current strike is the last strike that was used for a swap for that specific spread.
+- `cachedStrikeCurrent`: The last strike that was traded through for the entire pair. This save computation and can lead to less storage writes elsewhere.
+- `strikes`: Information for each strike. BiDirectional liquidity is the type of liquidity that is conventially stored in an AMM. Yikes also implements limit orders, or directional orders that are automatically closed out after being used to facilitate a trade. Limit orders need to store liquidity information as well as variables that can be used to determine if a specific limit order is closed. Strikes also contains two, singley-linked lists. These lists relate adjacent strikes together. This is needed because looping to find the next active adjacent strike is infeasible with 2**24 possible strikes.
 
 Pairs also contain two functions to manage the state variables:
 
