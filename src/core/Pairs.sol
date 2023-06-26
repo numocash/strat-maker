@@ -205,7 +205,7 @@ library Pairs {
                 //                 int24 spreadStrikeCurrent = state.strikeCurrent[i - 1];
 
                 //                 if (activeStrike == spreadStrikeCurrent) {
-                //                     pair.strikes[activeStrike].liquidity1InPerLiquidity[i - 1] +=
+                //                     pair.strikes[activeStrike].liquidityBiDirectional[i - 1] +=
                 //                         mulDiv(amountIn, state.composition[i - 1], swapLiquidityAvailable);
                 //                 } else {
                 //                     break;
