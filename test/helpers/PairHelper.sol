@@ -22,7 +22,7 @@ contract PairHelper is IExecuteCallback {
         address[] calldata tokens,
         int256[] calldata tokensDelta,
         bytes32[] calldata,
-        int256[] calldata,
+        uint256[] calldata,
         bytes calldata
     )
         external

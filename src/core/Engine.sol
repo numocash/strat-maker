@@ -59,7 +59,6 @@ contract Engine is Positions {
     enum Commands {
         Swap,
         AddLiquidity,
-        Collect,
         RemoveLiquidity,
         CreatePair
     }
@@ -132,8 +131,6 @@ contract Engine is Positions {
                 _swap(abi.decode(inputs[i], (SwapParams)), account);
             } else if (commands[i] == Commands.AddLiquidity) {
                 _addLiquidity(to, abi.decode(inputs[i], (AddLiquidityParams)), account);
-            } else if (commands[i] == Commands.Collect) {
-                _collect(abi.decode(inputs[i], (CollectParams)));
             } else if (commands[i] == Commands.RemoveLiquidity) {
                 _removeLiquidity(abi.decode(inputs[i], (RemoveLiquidityParams)), account);
             } else if (commands[i] == Commands.CreatePair) {
@@ -185,13 +182,13 @@ contract Engine is Positions {
         }
 
         for (uint256 i = 0; i < numLPs;) {
-            int256 delta = account.lpDeltas[i];
+            uint256 delta = account.lpDeltas[i];
             bytes32 id = account.lpIDs[i];
 
             if (id == bytes32(0)) break;
 
             if (delta < 0) {
-                _burn(address(this), id, uint256(-delta));
+                _burn(address(this), id, delta);
             }
 
             unchecked {
@@ -217,10 +214,13 @@ contract Engine is Positions {
     function _addLiquidity(address to, AddLiquidityParams memory params, Accounts.Account memory account) private {
         (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
 
+        uint256 balance;
         int256 liquidity;
         if (params.selector == TokenSelector.LiquidityPosition) {
             if (params.amountDesired < 0) revert InvalidAmountDesired();
-            liquidity = params.amountDesired;
+
+            balance = uint256(params.amountDesired);
+            liquidity = toInt256(_balanceToLiquidity(pair, params.strike, params.spread, balance));
         } else if (params.selector == TokenSelector.Token0) {
             if (params.amountDesired < 0) revert InvalidAmountDesired();
 
@@ -233,8 +233,10 @@ contract Engine is Positions {
                     false
                 )
             );
+            balance = _liquidityToBalance(pair, params.strike, params.spread, uint256(liquidity));
         } else if (params.selector == TokenSelector.Token1) {
             if (params.amountDesired < 0) revert InvalidAmountDesired();
+
             liquidity = toInt256(
                 calcLiquidityForAmount1(
                     pair.strikeCurrent[params.spread - 1],
@@ -244,6 +246,7 @@ contract Engine is Positions {
                     false
                 )
             );
+            balance = _liquidityToBalance(pair, params.strike, params.spread, uint256(liquidity));
         } else {
             revert InvalidSelector();
         }
@@ -253,14 +256,6 @@ contract Engine is Positions {
         account.updateToken(params.token0, toInt256(amount0));
         account.updateToken(params.token1, toInt256(amount1));
 
-        Positions.ILRTAData storage position = _dataOf[to][dataID(
-            abi.encode(
-                Positions.ILRTADataID(
-                    params.token0, params.token1, Positions.OrderType.BiDirectional, params.strike, params.spread
-                )
-            )
-        )];
-        _getTokensOwed(pair, params.strike, params.spread, position);
         _mint(
             to,
             dataID(
@@ -270,36 +265,25 @@ contract Engine is Positions {
                     )
                 )
             ),
-            uint256(liquidity)
+            balance
         );
 
-        emit AddLiquidity(pairID, params.strike, params.spread, uint256(liquidity));
-    }
-
-    function _collect(CollectParams memory params) private {
-        (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
-        Positions.ILRTAData storage position = _dataOf[params.owner][dataID(
-            abi.encode(
-                Positions.ILRTADataID(
-                    params.token0, params.token1, Positions.OrderType.BiDirectional, params.strike, params.spread
-                )
-            )
-        )];
-
-        (uint256 amount0Owed, uint256 amount1Owed) = _getTokensOwed(pair, params.strike, params.spread, position);
-
-        emit Collect(pairID, params.strike, params.spread, params.owner, amount0Owed, amount1Owed);
+        emit AddLiquidity(pairID, params.strike, params.spread, balance);
     }
 
     function _removeLiquidity(RemoveLiquidityParams memory params, Accounts.Account memory account) private {
         (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
 
+        uint256 balance;
         int256 liquidity;
         if (params.selector == TokenSelector.LiquidityPosition) {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
-            liquidity = params.amountDesired;
+
+            balance = uint256(-params.amountDesired);
+            liquidity = -toInt256(_balanceToLiquidity(pair, params.strike, params.spread, balance));
         } else if (params.selector == TokenSelector.Token0) {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
+
             liquidity = -toInt256(
                 calcLiquidityForAmount0(
                     pair.strikeCurrent[params.spread - 1],
@@ -309,8 +293,10 @@ contract Engine is Positions {
                     true
                 )
             );
+            balance = _liquidityToBalance(pair, params.strike, params.spread, uint256(-liquidity));
         } else if (params.selector == TokenSelector.Token1) {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
+
             liquidity = -toInt256(
                 calcLiquidityForAmount1(
                     pair.strikeCurrent[params.spread - 1],
@@ -320,6 +306,7 @@ contract Engine is Positions {
                     true
                 )
             );
+            balance = _liquidityToBalance(pair, params.strike, params.spread, uint256(-liquidity));
         } else {
             revert InvalidSelector();
         }
@@ -336,10 +323,10 @@ contract Engine is Positions {
                     )
                 )
             ),
-            liquidity
+            balance
         );
 
-        emit RemoveLiquidity(pairID, params.strike, params.spread, uint256(-liquidity));
+        emit RemoveLiquidity(pairID, params.strike, params.spread, balance);
     }
 
     function _createPair(CreatePairParams memory params) private {

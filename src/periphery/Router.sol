@@ -57,7 +57,7 @@ contract Router is IExecuteCallback {
         address[] calldata tokens,
         int256[] calldata tokensDelta,
         bytes32[] calldata lpIDs,
-        int256[] calldata lpDeltas,
+        uint256[] calldata lpDeltas,
         bytes calldata data
     )
         external
@@ -88,14 +88,14 @@ contract Router is IExecuteCallback {
 
         if (callbackData.permitTransfers.length > 0) {
             permit3.transferBySuperSignature(
-                callbackData.permitTransfers, requestedTransfer, callbackData.payer, callbackData.dataHash
+                callbackData.payer, callbackData.permitTransfers, requestedTransfer, callbackData.dataHash
             );
         }
 
         // send all liquidity positions individually
         j = 0;
         for (uint256 i = 0; i < lpIDs.length;) {
-            int256 delta = lpDeltas[i];
+            uint256 delta = lpDeltas[i];
             bytes32 id = lpIDs[i];
 
             if (delta < 0 && id != bytes32(0)) {
@@ -103,7 +103,7 @@ contract Router is IExecuteCallback {
                     callbackData.payer,
                     abi.encode(callbackData.positionTransfers[j]),
                     // solhint-disable-next-line max-line-length
-                    ILRTA.RequestedTransfer(msg.sender, abi.encode(Positions.ILRTATransferDetails(id, uint256(-delta)))),
+                    ILRTA.RequestedTransfer(msg.sender, abi.encode(Positions.ILRTATransferDetails(id, delta))),
                     // TODO: this reverts
                     abi.decode(data[1 + j:], (bytes32[]))
                 );

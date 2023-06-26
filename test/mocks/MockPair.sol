@@ -3,6 +3,7 @@ pragma solidity ^0.8.17;
 
 import {Pairs, NUM_SPREADS} from "src/core/Pairs.sol";
 import {Positions} from "src/core/Positions.sol";
+import {toInt256} from "src/core/math/LiquidityMath.sol";
 
 import {BalanceLib} from "src/libraries/BalanceLib.sol";
 import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
@@ -33,18 +34,19 @@ contract MockPair is Positions {
     function addLiquidity(
         int24 strike,
         uint8 spread,
-        uint256 liquidity
+        uint256 balance
     )
         public
         returns (uint256 amount0, uint256 amount1)
     {
-        (amount0, amount1) = pair.updateLiquidity(strike, spread, int256(liquidity));
+        int256 liquidity = toInt256(_balanceToLiquidity(pair, strike, spread, balance));
+        (amount0, amount1) = pair.updateLiquidity(strike, spread, liquidity);
 
         _mint(
             msg.sender,
             // solhint-disable-next-line max-line-length
             dataID(abi.encode(Positions.ILRTADataID(token0, token1, Positions.OrderType.BiDirectional, strike, spread))),
-            liquidity
+            balance
         );
 
         address[] memory tokens = new address[](2);
@@ -58,7 +60,7 @@ contract MockPair is Positions {
         uint256 balance0Before = BalanceLib.getBalance(token0);
         uint256 balance1Before = BalanceLib.getBalance(token1);
 
-        IExecuteCallback(msg.sender).executeCallback(tokens, tokenDeltas, new bytes32[](0), new int256[](0), bytes(""));
+        IExecuteCallback(msg.sender).executeCallback(tokens, tokenDeltas, new bytes32[](0), new uint256[](0), bytes(""));
 
         if (BalanceLib.getBalance(token0) < balance0Before + amount0) revert();
         if (BalanceLib.getBalance(token1) < balance1Before + amount1) revert();
@@ -67,12 +69,14 @@ contract MockPair is Positions {
     function removeLiquidity(
         int24 strike,
         uint8 spread,
-        uint256 liquidity
+        uint256 balance
     )
         public
         returns (uint256 amount0, uint256 amount1)
     {
-        (amount0, amount1) = pair.updateLiquidity(strike, spread, -int256(liquidity));
+        int256 liquidity = -toInt256(_balanceToLiquidity(pair, strike, spread, balance));
+
+        (amount0, amount1) = pair.updateLiquidity(strike, spread, liquidity);
 
         SafeTransferLib.safeTransfer(token0, msg.sender, amount0);
         SafeTransferLib.safeTransfer(token1, msg.sender, amount1);
@@ -81,7 +85,7 @@ contract MockPair is Positions {
             msg.sender,
             // solhint-disable-next-line max-line-length
             dataID(abi.encode(Positions.ILRTADataID(token0, token1, Positions.OrderType.BiDirectional, strike, spread))),
-            liquidity
+            balance
         );
     }
 
@@ -100,14 +104,14 @@ contract MockPair is Positions {
             if (amount1 < 0) SafeTransferLib.safeTransfer(token1, msg.sender, uint256(-amount1));
             uint256 balance0Before = BalanceLib.getBalance(token0);
             IExecuteCallback(msg.sender).executeCallback(
-                tokens, tokenDeltas, new bytes32[](0), new int256[](0), bytes("")
+                tokens, tokenDeltas, new bytes32[](0), new uint256[](0), bytes("")
             );
             if (BalanceLib.getBalance(token0) < balance0Before + uint256(amount0)) revert();
         } else {
             if (amount0 < 0) SafeTransferLib.safeTransfer(token0, msg.sender, uint256(-amount0));
             uint256 balance1Before = BalanceLib.getBalance(token1);
             IExecuteCallback(msg.sender).executeCallback(
-                tokens, tokenDeltas, new bytes32[](0), new int256[](0), bytes("")
+                tokens, tokenDeltas, new bytes32[](0), new uint256[](0), bytes("")
             );
             if (BalanceLib.getBalance(token1) < balance1Before + uint256(amount1)) revert();
         }

@@ -23,7 +23,7 @@ contract EngineHelper is IExecuteCallback {
         address[] calldata tokens,
         int256[] calldata tokensDelta,
         bytes32[] calldata lpIDs,
-        int256[] calldata lpDeltas,
+        uint256[] calldata lpDeltas,
         bytes calldata
     )
         external
@@ -47,13 +47,13 @@ contract EngineHelper is IExecuteCallback {
         }
 
         for (uint256 i = 0; i < lpIDs.length;) {
-            int256 delta = lpDeltas[i];
+            uint256 delta = lpDeltas[i];
 
             if (delta < 0) {
                 bytes32 id = lpIDs[i];
 
                 if (lpIDs[i] != bytes32(0)) {
-                    engine.transfer(msg.sender, abi.encode(Positions.ILRTATransferDetails(id, uint256(-delta))));
+                    engine.transfer(msg.sender, abi.encode(Positions.ILRTATransferDetails(id, delta)));
                 }
             }
 

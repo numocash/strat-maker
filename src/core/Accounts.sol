@@ -11,7 +11,7 @@ library Accounts {
         int256[] tokenDeltas;
         uint256[] balances;
         bytes32[] lpIDs;
-        int256[] lpDeltas;
+        uint256[] lpDeltas;
     }
 
     function newAccount(uint256 numTokens, uint256 numLPs) internal pure returns (Account memory account) {
@@ -23,7 +23,7 @@ library Accounts {
 
         if (numLPs > 0) {
             account.lpIDs = new bytes32[](numLPs);
-            account.lpDeltas = new int256[](numLPs);
+            account.lpDeltas = new uint256[](numLPs);
         }
     }
 
@@ -54,7 +54,7 @@ library Accounts {
         revert InvalidAccountLength();
     }
 
-    function updateILRTA(Account memory account, bytes32 id, int256 delta) internal pure {
+    function updateILRTA(Account memory account, bytes32 id, uint256 delta) internal pure {
         if (delta == 0) return;
 
         for (uint256 i = 0; i < account.lpIDs.length;) {

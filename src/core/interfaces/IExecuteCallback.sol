@@ -7,7 +7,7 @@ interface IExecuteCallback {
         address[] calldata tokens,
         int256[] calldata tokensDelta,
         bytes32[] calldata lpIDs,
-        int256[] calldata lpDeltas,
+        uint256[] calldata lpDeltas,
         bytes calldata data
     )
         external;

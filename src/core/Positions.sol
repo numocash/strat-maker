@@ -2,8 +2,7 @@
 pragma solidity ^0.8.19;
 
 import {Pairs} from "./Pairs.sol";
-import {mulDiv} from "./math/FullMath.sol";
-import {getRatioAtStrike, Q128} from "./math/strikeMath.sol";
+import {mulDiv, mulDivRoundingUp} from "./math/FullMath.sol";
 import {ILRTA} from "ilrta/ILRTA.sol";
 
 abstract contract Positions is ILRTA {
@@ -33,11 +32,7 @@ abstract contract Positions is ILRTA {
     }
 
     struct ILRTAData {
-        uint256 liquidity;
-        uint256 liquidity0InPerLiquidityLast; //Q128.128
-        uint256 liquidity1InPerLiquidityLast; // Q128.128
-        uint256 token0Owed;
-        uint256 token1Owed;
+        uint256 balance;
     }
 
     struct ILRTATransferDetails {
@@ -116,11 +111,11 @@ abstract contract Positions is ILRTA {
     }
 
     function _transfer(address from, address to, ILRTATransferDetails memory transferDetails) private returns (bool) {
-        _dataOf[from][transferDetails.id].liquidity -= transferDetails.amount;
+        _dataOf[from][transferDetails.id].balance -= transferDetails.amount;
 
         // change in liquidity cannot exceed the maximum liquidity in a strike
         unchecked {
-            _dataOf[to][transferDetails.id].liquidity += transferDetails.amount;
+            _dataOf[to][transferDetails.id].balance += transferDetails.amount;
         }
 
         emit Transfer(from, to, abi.encode(transferDetails));
@@ -131,55 +126,39 @@ abstract contract Positions is ILRTA {
     function _mint(address to, bytes32 id, uint256 amount) internal virtual {
         // change in liquidity cannot exceed the maximum liquidity in a strike
         unchecked {
-            _dataOf[to][id].liquidity += amount;
+            _dataOf[to][id].balance += amount;
         }
 
         emit Transfer(address(0), to, abi.encode(ILRTATransferDetails({amount: amount, id: id})));
     }
 
     function _burn(address from, bytes32 id, uint256 amount) internal virtual {
-        _dataOf[from][id].liquidity -= amount;
+        _dataOf[from][id].balance -= amount;
 
         emit Transfer(from, address(0), abi.encode(ILRTATransferDetails({amount: amount, id: id})));
     }
 
-    function _getTokensOwed(
+    function _balanceToLiquidity(
         Pairs.Pair storage pair,
         int24 strike,
         uint8 spread,
-        Positions.ILRTAData storage position
+        uint256 balance
     )
         internal
-        returns (uint256 amount0Owed, uint256 amount1Owed)
+        returns (uint256 liquidity)
     {
-        unchecked {
-            if (position.liquidity > 0) {
-                // solhint-disable-next-line max-line-length
-                uint256 liquidity0InPerLiquidityDelta = pair.strikes[strike - int8(spread)].liquidity0InPerLiquidity[spread]
-                    - position.liquidity0InPerLiquidityLast;
+        return balance;
+    }
 
-                // solhint-disable-next-line max-line-length
-                uint256 liquidity1InPerLiquidityDelta = pair.strikes[strike + int8(spread)].liquidity1InPerLiquidity[spread]
-                    - position.liquidity1InPerLiquidityLast;
-
-                uint256 liquidity0Volume = mulDiv(liquidity0InPerLiquidityDelta, position.liquidity, Q128);
-                uint256 liquidity1Volume = mulDiv(liquidity1InPerLiquidityDelta, position.liquidity, Q128);
-
-                uint256 strikePrice = getRatioAtStrike(strike);
-                uint256 strikePrice0To1 = getRatioAtStrike(strike - int8(spread));
-                uint256 strikePrice1To0 = getRatioAtStrike(strike + int8(spread));
-
-                amount0Owed =
-                    mulDiv(liquidity0Volume, Q128, strikePrice0To1) - mulDiv(liquidity0Volume, Q128, strikePrice);
-                amount1Owed = liquidity1Volume - mulDiv(liquidity1Volume, strikePrice, strikePrice1To0);
-
-                position.token0Owed += amount0Owed;
-                position.token1Owed += amount1Owed;
-            }
-            // solhint-disable-next-line max-line-length
-            position.liquidity0InPerLiquidityLast = pair.strikes[strike - int8(spread)].liquidity0InPerLiquidity[spread];
-            // solhint-disable-next-line max-line-length
-            position.liquidity1InPerLiquidityLast = pair.strikes[strike + int8(spread)].liquidity1InPerLiquidity[spread];
-        }
+    function _liquidityToBalance(
+        Pairs.Pair storage pair,
+        int24 strike,
+        uint8 spread,
+        uint256 liquidity
+    )
+        internal
+        returns (uint256 balance)
+    {
+        return liquidity;
     }
 }
