@@ -15,19 +15,19 @@ Features:
 
 ## Benchmarking
 
-|                   |Yikes   |Uniswap V3|LiquidityBook|Maverick|
-|-------------------|--------|----------|-------------|--------|
-|Loc                |        |          |             |        |
-|Create new pair    |        |          |             |        |
-|Add Liqudity       |        |          |             |        |
-|Small Swap         |        |          |             |        |
-|Large Swap         |        |          |             |        |
+|                   |Dry Powder|Uniswap V3|LiquidityBook|Maverick|
+|-------------------|----------|----------|-------------|--------|
+|Loc                |          |          |             |        |
+|Create new pair    |          |          |             |        |
+|Add Liqudity       |          |          |             |        |
+|Small Swap         |          |          |             |        |
+|Large Swap         |          |          |             |        |
 
 ## Concepts
 
 ### Automated Market Maker
 
-Yikes is an automated market maker (AMM) that allows for exchange between two assets by managing a pool of reserves referred to as a liquidity pool. Automated market makers are guided by an invariant, which determines whether a trade should be accepted.
+Dry Powder is an automated market maker (AMM) that allows for exchange between two assets by managing a pool of reserves referred to as a liquidity pool. Automated market makers are guided by an invariant, which determines whether a trade should be accepted.
 
 Yikes is uses the invariant `Liquidity = Price * amount0 + amount1`, also referred to as **constant sum**, with price having units `Price: token1 / token0`.
 
