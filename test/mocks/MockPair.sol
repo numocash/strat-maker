@@ -39,8 +39,7 @@ contract MockPair is Positions {
         public
         returns (uint256 amount0, uint256 amount1)
     {
-        int256 liquidity = toInt256(_balanceToLiquidity(pair, strike, spread, balance));
-        (amount0, amount1) = pair.updateLiquidity(strike, spread, liquidity);
+        (, amount0, amount1) = pair.updateLiquidity(strike, spread, int256(balance));
 
         _mint(
             msg.sender,
@@ -74,9 +73,7 @@ contract MockPair is Positions {
         public
         returns (uint256 amount0, uint256 amount1)
     {
-        int256 liquidity = -toInt256(_balanceToLiquidity(pair, strike, spread, balance));
-
-        (amount0, amount1) = pair.updateLiquidity(strike, spread, liquidity);
+        (, amount0, amount1) = pair.updateLiquidity(strike, spread, -int256(balance));
 
         SafeTransferLib.safeTransfer(token0, msg.sender, amount0);
         SafeTransferLib.safeTransfer(token1, msg.sender, amount1);

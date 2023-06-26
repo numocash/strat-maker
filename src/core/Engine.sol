@@ -6,6 +6,7 @@ import {toInt256} from "./math/LiquidityMath.sol";
 import {Pairs, NUM_SPREADS} from "./Pairs.sol";
 import {Positions} from "./Positions.sol";
 import {calcLiquidityForAmount0, calcLiquidityForAmount1} from "./math/LiquidityMath.sol";
+import {liquidityToBalance} from "./math/PositionMath.sol";
 
 import {BalanceLib} from "src/libraries/BalanceLib.sol";
 import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
@@ -83,14 +84,6 @@ contract Engine is Positions {
         uint8 spread;
         TokenSelector selector;
         int256 amountDesired;
-    }
-
-    struct CollectParams {
-        address token0;
-        address token1;
-        address owner;
-        int24 strike;
-        uint8 spread;
     }
 
     struct RemoveLiquidityParams {
@@ -214,44 +207,50 @@ contract Engine is Positions {
     function _addLiquidity(address to, AddLiquidityParams memory params, Accounts.Account memory account) private {
         (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
 
-        uint256 balance;
-        int256 liquidity;
+        int256 balance;
         if (params.selector == TokenSelector.LiquidityPosition) {
             if (params.amountDesired < 0) revert InvalidAmountDesired();
 
-            balance = uint256(params.amountDesired);
-            liquidity = toInt256(_balanceToLiquidity(pair, params.strike, params.spread, balance));
+            balance = params.amountDesired;
         } else if (params.selector == TokenSelector.Token0) {
             if (params.amountDesired < 0) revert InvalidAmountDesired();
 
-            liquidity = toInt256(
-                calcLiquidityForAmount0(
-                    pair.strikeCurrent[params.spread - 1],
-                    pair.composition[params.spread - 1],
+            balance = toInt256(
+                liquidityToBalance(
+                    pair,
                     params.strike,
-                    uint256(params.amountDesired),
-                    false
+                    params.spread,
+                    calcLiquidityForAmount0(
+                        pair.strikeCurrent[params.spread - 1],
+                        pair.composition[params.spread - 1],
+                        params.strike,
+                        uint256(params.amountDesired),
+                        false
+                    )
                 )
             );
-            balance = _liquidityToBalance(pair, params.strike, params.spread, uint256(liquidity));
         } else if (params.selector == TokenSelector.Token1) {
             if (params.amountDesired < 0) revert InvalidAmountDesired();
 
-            liquidity = toInt256(
-                calcLiquidityForAmount1(
-                    pair.strikeCurrent[params.spread - 1],
-                    pair.composition[params.spread - 1],
+            balance = toInt256(
+                liquidityToBalance(
+                    pair,
                     params.strike,
-                    uint256(params.amountDesired),
-                    false
+                    params.spread,
+                    calcLiquidityForAmount1(
+                        pair.strikeCurrent[params.spread - 1],
+                        pair.composition[params.spread - 1],
+                        params.strike,
+                        uint256(params.amountDesired),
+                        false
+                    )
                 )
             );
-            balance = _liquidityToBalance(pair, params.strike, params.spread, uint256(liquidity));
         } else {
             revert InvalidSelector();
         }
 
-        (uint256 amount0, uint256 amount1) = pair.updateLiquidity(params.strike, params.spread, liquidity);
+        (, uint256 amount0, uint256 amount1) = pair.updateLiquidity(params.strike, params.spread, balance);
 
         account.updateToken(params.token0, toInt256(amount0));
         account.updateToken(params.token1, toInt256(amount1));
@@ -265,53 +264,58 @@ contract Engine is Positions {
                     )
                 )
             ),
-            balance
+            uint256(balance)
         );
 
-        emit AddLiquidity(pairID, params.strike, params.spread, balance);
+        emit AddLiquidity(pairID, params.strike, params.spread, uint256(balance));
     }
 
     function _removeLiquidity(RemoveLiquidityParams memory params, Accounts.Account memory account) private {
         (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
 
-        uint256 balance;
-        int256 liquidity;
+        int256 balance;
         if (params.selector == TokenSelector.LiquidityPosition) {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
 
-            balance = uint256(-params.amountDesired);
-            liquidity = -toInt256(_balanceToLiquidity(pair, params.strike, params.spread, balance));
+            balance = params.amountDesired;
         } else if (params.selector == TokenSelector.Token0) {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
 
-            liquidity = -toInt256(
-                calcLiquidityForAmount0(
-                    pair.strikeCurrent[params.spread - 1],
-                    pair.composition[params.spread - 1],
+            balance = -toInt256(
+                liquidityToBalance(
+                    pair,
                     params.strike,
-                    uint256(-params.amountDesired),
-                    true
+                    params.spread,
+                    calcLiquidityForAmount0(
+                        pair.strikeCurrent[params.spread - 1],
+                        pair.composition[params.spread - 1],
+                        params.strike,
+                        uint256(-params.amountDesired),
+                        true
+                    )
                 )
             );
-            balance = _liquidityToBalance(pair, params.strike, params.spread, uint256(-liquidity));
         } else if (params.selector == TokenSelector.Token1) {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
 
-            liquidity = -toInt256(
-                calcLiquidityForAmount1(
-                    pair.strikeCurrent[params.spread - 1],
-                    pair.composition[params.spread - 1],
+            balance = -toInt256(
+                liquidityToBalance(
+                    pair,
                     params.strike,
-                    uint256(-params.amountDesired),
-                    true
+                    params.spread,
+                    calcLiquidityForAmount1(
+                        pair.strikeCurrent[params.spread - 1],
+                        pair.composition[params.spread - 1],
+                        params.strike,
+                        uint256(-params.amountDesired),
+                        true
+                    )
                 )
             );
-            balance = _liquidityToBalance(pair, params.strike, params.spread, uint256(-liquidity));
         } else {
             revert InvalidSelector();
         }
-
-        (uint256 amount0, uint256 amount1) = pair.updateLiquidity(params.strike, params.spread, liquidity);
+        (, uint256 amount0, uint256 amount1) = pair.updateLiquidity(params.strike, params.spread, balance);
 
         account.updateToken(params.token0, -toInt256(amount0));
         account.updateToken(params.token1, -toInt256(amount1));
@@ -323,10 +327,10 @@ contract Engine is Positions {
                     )
                 )
             ),
-            balance
+            uint256(-balance)
         );
 
-        emit RemoveLiquidity(pairID, params.strike, params.spread, balance);
+        emit RemoveLiquidity(pairID, params.strike, params.spread, uint256(-balance));
     }
 
     function _createPair(CreatePairParams memory params) private {

@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import {BitMaps} from "./BitMaps.sol";
 import {mulDiv, mulDivRoundingUp} from "./math/FullMath.sol";
 import {addDelta, calcAmountsForLiquidity, toInt256} from "./math/LiquidityMath.sol";
+import {balanceToLiquidity} from "./math/PositionMath.sol";
 import {getRatioAtStrike, MAX_STRIKE, MIN_STRIKE, Q128} from "./math/StrikeMath.sol";
 import {computeSwapStep} from "./math/SwapMath.sol";
 
@@ -352,29 +353,31 @@ library Pairs {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Update a positions liquidity
-    /// @param liquidity The amount of liquidity being added or removed
+    /// @param balance The amount of liquidity tokens being added or removed
     function updateLiquidity(
         Pair storage pair,
         int24 strike,
         uint8 spread,
-        int256 liquidity
+        int256 balance
     )
         internal
-        returns (uint256 amount0, uint256 amount1)
+        returns (uint256 liquidity, uint256 amount0, uint256 amount1)
     {
         if (pair.initialized != 1) revert Initialized();
         _checkStrike(strike);
         _checkSpread(spread);
 
-        _updateStrike(pair, strike, spread, liquidity);
+        bool pos = balance > 0;
+
+        liquidity = balanceToLiquidity(pair, strike, spread, pos ? uint256(balance) : uint256(-balance));
+
+        _updateStrike(pair, strike, spread, balance, pos ? toInt256(liquidity) : -toInt256(liquidity));
 
         (amount0, amount1) = calcAmountsForLiquidity(
-            pair.strikeCurrent[spread - 1],
-            pair.composition[spread - 1],
-            strike,
-            liquidity > 0 ? uint256(liquidity) : uint256(-liquidity),
-            liquidity > 0
+            pair.strikeCurrent[spread - 1], pair.composition[spread - 1], strike, liquidity, pos
         );
+
+        return (liquidity, amount0, amount1);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -430,8 +433,9 @@ library Pairs {
     /// @notice Update a strike
     /// @param liquidity The amount of liquidity being added or removed
     /// @custom:team check strike + spread is not greater than max
-    function _updateStrike(Pair storage pair, int24 strike, uint8 spread, int256 liquidity) private {
+    function _updateStrike(Pair storage pair, int24 strike, uint8 spread, int256 balance, int256 liquidity) private {
         uint256 existingLiquidity = pair.strikes[strike].liquidityBiDirectional[spread - 1];
+        pair.strikes[strike].totalSupply[spread - 1] = addDelta(pair.strikes[strike].totalSupply[spread - 1], balance);
         pair.strikes[strike].liquidityBiDirectional[spread - 1] = addDelta(existingLiquidity, liquidity);
 
         unchecked {

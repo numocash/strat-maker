@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
-import {Pairs} from "./Pairs.sol";
-import {mulDiv, mulDivRoundingUp} from "./math/FullMath.sol";
 import {ILRTA} from "ilrta/ILRTA.sol";
 
 abstract contract Positions is ILRTA {
@@ -136,29 +134,5 @@ abstract contract Positions is ILRTA {
         _dataOf[from][id].balance -= amount;
 
         emit Transfer(from, address(0), abi.encode(ILRTATransferDetails({amount: amount, id: id})));
-    }
-
-    function _balanceToLiquidity(
-        Pairs.Pair storage pair,
-        int24 strike,
-        uint8 spread,
-        uint256 balance
-    )
-        internal
-        returns (uint256 liquidity)
-    {
-        return balance;
-    }
-
-    function _liquidityToBalance(
-        Pairs.Pair storage pair,
-        int24 strike,
-        uint8 spread,
-        uint256 liquidity
-    )
-        internal
-        returns (uint256 balance)
-    {
-        return liquidity;
     }
 }
