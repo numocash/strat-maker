@@ -226,7 +226,8 @@ contract Engine is Positions {
                         params.strike,
                         uint256(params.amountDesired),
                         false
-                    )
+                    ),
+                    false
                 )
             );
         } else if (params.selector == TokenSelector.Token1) {
@@ -243,7 +244,8 @@ contract Engine is Positions {
                         params.strike,
                         uint256(params.amountDesired),
                         false
-                    )
+                    ),
+                    false
                 )
             );
         } else {
@@ -292,7 +294,8 @@ contract Engine is Positions {
                         params.strike,
                         uint256(-params.amountDesired),
                         true
-                    )
+                    ),
+                    true
                 )
             );
         } else if (params.selector == TokenSelector.Token1) {
@@ -309,7 +312,8 @@ contract Engine is Positions {
                         params.strike,
                         uint256(-params.amountDesired),
                         true
-                    )
+                    ),
+                    true
                 )
             );
         } else {

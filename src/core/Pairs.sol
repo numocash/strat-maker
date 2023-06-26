@@ -369,7 +369,7 @@ library Pairs {
 
         bool pos = balance > 0;
 
-        liquidity = balanceToLiquidity(pair, strike, spread, pos ? uint256(balance) : uint256(-balance));
+        liquidity = balanceToLiquidity(pair, strike, spread, pos ? uint256(balance) : uint256(-balance), !pos);
 
         _updateStrike(pair, strike, spread, balance, pos ? toInt256(liquidity) : -toInt256(liquidity));
 
