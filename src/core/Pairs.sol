@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import {BitMaps} from "./BitMaps.sol";
-import {mulDiv} from "./math/FullMath.sol";
+import {mulDiv, mulDivRoundingUp} from "./math/FullMath.sol";
 import {addDelta, calcAmountsForLiquidity, toInt256} from "./math/LiquidityMath.sol";
 import {balanceToLiquidity} from "./math/PositionMath.sol";
 import {getRatioAtStrike, MAX_STRIKE, MIN_STRIKE, Q128} from "./math/StrikeMath.sol";
@@ -41,7 +41,7 @@ library Pairs {
         uint256[NUM_SPREADS] totalSupply;
         uint256[NUM_SPREADS] liquidityBiDirectional;
         uint256[NUM_SPREADS] liquidityBorrowed;
-        uint256 liquidityGrowth;
+        uint256 liquidityGrowthX128;
         int24 next0To1;
         int24 next1To0;
         uint8 reference0To1;
@@ -389,17 +389,51 @@ library Pairs {
     }
 
     function borrowLiquidity(Pair storage pair, int24 strike, uint256 liquidity) internal {
-        if (pair.cachedStrikeCurrent == strike) _accrue(pair, strike);
-        // make sure borrow is possible
-        // remove liquidity
-        // charge fee for borrowing
-        // allow for removing into either token if possible
+        Strike storage strikeObj = pair.strikes[strike];
+        uint8 _activeSpread = strikeObj.activeSpread;
+
+        while (true) {
+            // TODO: should we do this
+            // don't allow for borrowing the current strike
+            if (pair.strikeCurrent[_activeSpread] == strike) revert();
+            uint256 availableLiquidity = strikeObj.liquidityBiDirectional[_activeSpread];
+
+            if (availableLiquidity > liquidity) {
+                strikeObj.liquidityBiDirectional[_activeSpread] = availableLiquidity - liquidity;
+                strikeObj.liquidityBorrowed[_activeSpread] += liquidity;
+                break;
+            } else {
+                // TODO: potentially remove from tick maps
+                strikeObj.liquidityBiDirectional[_activeSpread] = 0;
+                strikeObj.liquidityBorrowed[_activeSpread] += availableLiquidity;
+                _activeSpread++;
+            }
+        }
+        // TODO: charge fee for borrowing
+
+        strikeObj.activeSpread = _activeSpread;
     }
 
-    function repayLiquidity(Pair storage pair, int24 strike, uint256 balance) internal {
-        // accrue interest
-        // determine how much is owed
-        // add liquidity
+    function repayLiquidity(Pair storage pair, int24 strike, uint256 liquidity) internal {
+        Strike storage strikeObj = pair.strikes[strike];
+        int24 _cachedStrikeCurrent = pair.cachedStrikeCurrent;
+        uint8 _activeSpread = strikeObj.activeSpread;
+
+        if (_cachedStrikeCurrent == strike) _accrue(pair, strike);
+
+        while (true) {
+            uint256 borrowedLiquidity = strikeObj.liquidityBorrowed[_activeSpread];
+
+            if (borrowedLiquidity > liquidity) {
+                strikeObj.liquidityBiDirectional[_activeSpread] += liquidity;
+                strikeObj.liquidityBorrowed[_activeSpread] = borrowedLiquidity - liquidity;
+                break;
+            } else {
+                strikeObj.liquidityBiDirectional[_activeSpread] += borrowedLiquidity;
+                strikeObj.liquidityBorrowed[_activeSpread] = 0;
+                _activeSpread--;
+            }
+        }
     }
 
     /// @notice accrue interest to the current strike
@@ -532,22 +566,22 @@ library Pairs {
     function _accrue(Pair storage pair, int24 strike) private {
         uint256 _cachedBlock = pair.cachedBlock;
         uint256 blocks = block.number - _cachedBlock;
-
         if (blocks == 0) return;
 
-        uint256 _liquidityGrowth;
+        uint256 _liquidityGrowthNumerator;
+        uint256 _liquidityBorrowedTotal;
 
-        unchecked {
-            for (uint256 i = 0; i < pair.strikes[strike].activeSpread; i++) {
-                if (i < pair.strikes[strike].activeSpread - 1) {} else {}
-                uint256 borrowLiquidityXSpread = (i + 1) * pair.strikes[strike].liquidityBorrowed[i];
-                // update available liquidity
-                // add to _liquidityGrowth
-            }
+        for (uint256 i = 0; i < pair.strikes[strike].activeSpread; i++) {
+            uint256 _liquidityBorrowed = pair.strikes[strike].liquidityBorrowed[i];
+
+            pair.strikes[strike].liquidityBiDirectional[i] += ((i + 1) * blocks * _liquidityBorrowed) / 10_000;
+            _liquidityGrowthNumerator += (i + 1) * blocks * _liquidityBorrowed;
+            _liquidityBorrowedTotal += _liquidityBorrowed;
         }
 
-        pair.strikes[strike].liquidityGrowth += _liquidityGrowth;
-        // update borrowed liquidity
+        pair.strikes[strike].liquidityGrowthX128 +=
+            mulDivRoundingUp(_liquidityGrowthNumerator, Q128, _liquidityBorrowedTotal);
+        // TODO: same math as repay liquidity
 
         pair.cachedBlock = block.number;
     }

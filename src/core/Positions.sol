@@ -38,7 +38,7 @@ abstract contract Positions is ILRTA {
     }
 
     struct DebtData {
-        uint256 liquidityGrowthLast;
+        uint256 liquidityGrowthX128Last;
         uint256 leverageRatioX128;
     }
 
@@ -149,6 +149,7 @@ abstract contract Positions is ILRTA {
         ILRTATransferDetails memory signatureTransferDetails
     )
         private
+        pure
     {
         if (
             requestedTransferDetails.amount > signatureTransferDetails.amount
