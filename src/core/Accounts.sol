@@ -30,24 +30,19 @@ library Accounts {
     function updateToken(Account memory account, address token, int256 delta) internal view {
         if (delta == 0) return;
 
-        for (uint256 i = 0; i < account.tokens.length;) {
-            if (account.tokens[i] == token) {
-                // change in balance cannot exceed the total supply
-                unchecked {
+        unchecked {
+            for (uint256 i = 0; i < account.tokens.length; i++) {
+                if (account.tokens[i] == token) {
+                    // change in balance cannot exceed the total supply
                     account.tokenDeltas[i] = account.tokenDeltas[i] + delta;
+                    return;
+                } else if (account.tokens[i] == address(0)) {
+                    account.tokens[i] = token;
+                    account.tokenDeltas[i] = delta;
+
+                    if (delta > 0) account.balances[i] = BalanceLib.getBalance(token);
+                    return;
                 }
-                return;
-            } else if (account.tokens[i] == address(0)) {
-                account.tokens[i] = token;
-                account.tokenDeltas[i] = delta;
-
-                if (delta > 0) account.balances[i] = BalanceLib.getBalance(token);
-
-                return;
-            }
-
-            unchecked {
-                i++;
             }
         }
 
@@ -57,21 +52,17 @@ library Accounts {
     function updateILRTA(Account memory account, bytes32 id, uint256 delta) internal pure {
         if (delta == 0) return;
 
-        for (uint256 i = 0; i < account.lpIDs.length;) {
-            if (account.lpIDs[i] == id) {
-                // change in liquidity cannot exceed the maximum liquidity in a strike
-                unchecked {
+        unchecked {
+            for (uint256 i = 0; i < account.lpIDs.length; i++) {
+                if (account.lpIDs[i] == id) {
+                    // change in liquidity cannot exceed the maximum liquidity in a strike
                     account.lpDeltas[i] = account.lpDeltas[i] + delta;
+                    return;
+                } else if (account.lpIDs[i] == bytes32(0)) {
+                    account.lpIDs[i] = id;
+                    account.lpDeltas[i] = delta;
+                    return;
                 }
-                return;
-            } else if (account.lpIDs[i] == bytes32(0)) {
-                account.lpIDs[i] = id;
-                account.lpDeltas[i] = delta;
-                return;
-            }
-
-            unchecked {
-                i++;
             }
         }
 

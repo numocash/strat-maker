@@ -3,6 +3,7 @@ pragma solidity ^0.8.19;
 
 import {mulDiv, mulDivRoundingUp} from "./FullMath.sol";
 import {Pairs} from "../Pairs.sol";
+import {Positions} from "../Positions.sol";
 
 function balanceToLiquidity(
     Pairs.Pair storage pair,
@@ -43,3 +44,25 @@ function liquidityToBalance(
             : mulDiv(liquidity, pair.strikes[strike].totalSupply[spread - 1], totalLiquidity);
     }
 }
+
+function accrueDebtPosition(Pairs.Pair storage pair, int24 strike, Positions.DebtData storage debtData) {
+    if (strike != pair.cachedStrikeCurrent) return;
+
+    // else update debtData
+}
+
+function getLiquidityBorrowed(
+    Pairs.Pair storage pair,
+    int24 strike,
+    Positions.DebtData storage debtData
+)
+    returns (uint256 liquidity)
+{}
+
+function getLiquidityCollateral(
+    Pairs.Pair storage pair,
+    int24 strike,
+    Positions.DebtData storage debtData
+)
+    returns (uint256 liquidity)
+{}

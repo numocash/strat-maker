@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import {BitMaps} from "./BitMaps.sol";
-import {mulDiv, mulDivRoundingUp} from "./math/FullMath.sol";
+import {mulDiv} from "./math/FullMath.sol";
 import {addDelta, calcAmountsForLiquidity, toInt256} from "./math/LiquidityMath.sol";
 import {balanceToLiquidity} from "./math/PositionMath.sol";
 import {getRatioAtStrike, MAX_STRIKE, MIN_STRIKE, Q128} from "./math/StrikeMath.sol";
@@ -15,18 +15,18 @@ int8 constant MAX_CONSECUTIVE = int8(NUM_SPREADS);
 library Pairs {
     using BitMaps for BitMaps.BitMap;
 
-    /*<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                  ERRORS
-    <3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3*/
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     error Initialized();
     error InvalidStrike();
     error InvalidSpread();
     error OutOfBounds();
 
-    /*<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                DATA TYPES
-    <3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3*/
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     struct Limit {
         uint256 liquidity0To1;
@@ -48,23 +48,23 @@ library Pairs {
         uint8 reference1To0;
         bool settle0;
         bool settle1;
-        uint8 activeStrike;
+        uint8 activeSpread;
     }
 
     struct Pair {
-        uint128[NUM_SPREADS] composition;
-        int24[NUM_SPREADS] strikeCurrent;
-        uint256 cachedBlock;
-        int24 cachedStrikeCurrent;
-        uint8 initialized; // 0 = unitialized, 1 = initialized
         mapping(int24 => Strike) strikes;
         BitMaps.BitMap bitMap0To1;
         BitMaps.BitMap bitMap1To0;
+        uint256 cachedBlock;
+        uint128[NUM_SPREADS] composition;
+        int24[NUM_SPREADS] strikeCurrent;
+        int24 cachedStrikeCurrent;
+        uint8 initialized; // 0 = unitialized, 1 = initialized
     }
 
-    /*<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                 GET LOGIC
-    <3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3<3*/
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     function getPairID(address token0, address token1) internal pure returns (bytes32 pairID) {
         return keccak256(abi.encodePacked(token0, token1));
@@ -83,9 +83,9 @@ library Pairs {
         pair = pairs[pairID];
     }
 
-    /*//////////////////////////////////////////////////////////////
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                               INITIALIZATION
-    //////////////////////////////////////////////////////////////*/
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     /// @notice Initialize the pair by setting the initial strike
     function initialize(Pair storage pair, int24 strikeInitial) internal {
@@ -121,9 +121,9 @@ library Pairs {
         pair.strikes[strikeInitial].reference1To0 = 1;
     }
 
-    /*//////////////////////////////////////////////////////////////
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                    SWAP
-    //////////////////////////////////////////////////////////////*/
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     /// @notice Struct to hold temporary data while completing a swap
     struct SwapState {
@@ -354,9 +354,9 @@ library Pairs {
         }
     }
 
-    /*//////////////////////////////////////////////////////////////
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                             LIQUIDITY LOGIC
-    //////////////////////////////////////////////////////////////*/
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     /// @notice Update a positions liquidity
     /// @param balance The amount of liquidity tokens being added or removed
@@ -379,15 +379,17 @@ library Pairs {
 
         _updateStrike(pair, strike, spread, balance, pos ? toInt256(liquidity) : -toInt256(liquidity));
 
-        (amount0, amount1) = calcAmountsForLiquidity(
-            pair.strikeCurrent[spread - 1], pair.composition[spread - 1], strike, liquidity, pos
-        );
+        unchecked {
+            (amount0, amount1) = calcAmountsForLiquidity(
+                pair.strikeCurrent[spread - 1], pair.composition[spread - 1], strike, liquidity, pos
+            );
+        }
 
         return (liquidity, amount0, amount1);
     }
 
-    function borrowLiquidity(Pair storage pair, int24 strike, int256 balance) internal {
-        // accrue interest
+    function borrowLiquidity(Pair storage pair, int24 strike, uint256 liquidity) internal {
+        if (pair.cachedStrikeCurrent == strike) _accrue(pair, strike);
         // make sure borrow is possible
         // remove liquidity
         // charge fee for borrowing
@@ -401,13 +403,13 @@ library Pairs {
     }
 
     /// @notice accrue interest to the current strike
-    function accrue(Pair storage pair, uint8 spread) internal {
-        _accrue(pair, pair.cachedStrikeCurrent, spread);
+    function accrue(Pair storage pair) internal {
+        _accrue(pair, pair.cachedStrikeCurrent);
     }
 
-    /*//////////////////////////////////////////////////////////////
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                              INTERNAL LOGIC
-    //////////////////////////////////////////////////////////////*/
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     /// @notice sum all the active liquidity
     function _calculateActiveLiquidity(
@@ -527,12 +529,26 @@ library Pairs {
         }
     }
 
-    function _accrue(Pair storage pair, int24 strike, uint8 spread) private {
-        // for each spread
-        // update available liquidity
+    function _accrue(Pair storage pair, int24 strike) private {
+        uint256 _cachedBlock = pair.cachedBlock;
+        uint256 blocks = block.number - _cachedBlock;
 
-        // update liquiditygrowth
+        if (blocks == 0) return;
+
+        uint256 _liquidityGrowth;
+
+        unchecked {
+            for (uint256 i = 0; i < pair.strikes[strike].activeSpread; i++) {
+                if (i < pair.strikes[strike].activeSpread - 1) {} else {}
+                uint256 borrowLiquidityXSpread = (i + 1) * pair.strikes[strike].liquidityBorrowed[i];
+                // update available liquidity
+                // add to _liquidityGrowth
+            }
+        }
+
+        pair.strikes[strike].liquidityGrowth += _liquidityGrowth;
         // update borrowed liquidity
-        // write to cached block
+
+        pair.cachedBlock = block.number;
     }
 }

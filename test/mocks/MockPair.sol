@@ -3,8 +3,6 @@ pragma solidity ^0.8.17;
 
 import {Pairs, NUM_SPREADS} from "src/core/Pairs.sol";
 import {Positions} from "src/core/Positions.sol";
-import {toInt256} from "src/core/math/LiquidityMath.sol";
-
 import {BalanceLib} from "src/libraries/BalanceLib.sol";
 import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
 
@@ -43,9 +41,17 @@ contract MockPair is Positions {
 
         _mint(
             msg.sender,
-            // solhint-disable-next-line max-line-length
-            dataID(abi.encode(Positions.ILRTADataID(token0, token1, Positions.OrderType.BiDirectional, strike, spread))),
-            balance
+            dataID(
+                abi.encode(
+                    Positions.ILRTADataID(
+                        Positions.OrderType.BiDirectional,
+                        abi.encode(Positions.BiDirectionalID(token0, token1, strike, spread))
+                    )
+                )
+            ),
+            balance,
+            Positions.OrderType.BiDirectional,
+            bytes("")
         );
 
         address[] memory tokens = new address[](2);
@@ -80,9 +86,17 @@ contract MockPair is Positions {
 
         _burn(
             msg.sender,
-            // solhint-disable-next-line max-line-length
-            dataID(abi.encode(Positions.ILRTADataID(token0, token1, Positions.OrderType.BiDirectional, strike, spread))),
-            balance
+            dataID(
+                abi.encode(
+                    Positions.ILRTADataID(
+                        Positions.OrderType.BiDirectional,
+                        abi.encode(Positions.BiDirectionalID(token0, token1, strike, spread))
+                    )
+                )
+            ),
+            balance,
+            Positions.OrderType.BiDirectional,
+            bytes("")
         );
     }
 
@@ -142,7 +156,12 @@ contract MockPair is Positions {
         returns (Positions.ILRTAData memory)
     {
         return _dataOf[owner][dataID(
-            abi.encode(Positions.ILRTADataID(token0, token1, Positions.OrderType.BiDirectional, strike, spread))
+            abi.encode(
+                Positions.ILRTADataID(
+                    Positions.OrderType.BiDirectional,
+                    abi.encode(Positions.BiDirectionalID(token0, token1, strike, spread))
+                )
+            )
         )];
     }
 }

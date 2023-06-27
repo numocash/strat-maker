@@ -53,7 +53,12 @@ contract EngineHelper is IExecuteCallback {
                 bytes32 id = lpIDs[i];
 
                 if (lpIDs[i] != bytes32(0)) {
-                    engine.transfer(msg.sender, abi.encode(Positions.ILRTATransferDetails(id, delta)));
+                    engine.transfer(
+                        msg.sender,
+                        abi.encode(
+                            Positions.ILRTATransferDetails(id, delta, Positions.OrderType.BiDirectional, bytes(""))
+                        )
+                    );
                 }
             }
 

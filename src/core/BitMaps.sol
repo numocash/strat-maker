@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.19;
 
-import {MAX_STRIKE, MIN_STRIKE} from "./math/StrikeMath.sol";
+import {MIN_STRIKE} from "./math/StrikeMath.sol";
 
 library BitMaps {
     struct BitMap {

@@ -103,7 +103,12 @@ contract Router is IExecuteCallback {
                     callbackData.payer,
                     abi.encode(callbackData.positionTransfers[j]),
                     // solhint-disable-next-line max-line-length
-                    ILRTA.RequestedTransfer(msg.sender, abi.encode(Positions.ILRTATransferDetails(id, delta))),
+                    ILRTA.RequestedTransfer(
+                        msg.sender,
+                        abi.encode(
+                            Positions.ILRTATransferDetails(id, delta, Positions.OrderType.BiDirectional, bytes(""))
+                        )
+                    ),
                     // TODO: this reverts
                     abi.decode(data[1 + j:], (bytes32[]))
                 );

@@ -2,41 +2,87 @@
 pragma solidity ^0.8.19;
 
 import {ILRTA} from "ilrta/ILRTA.sol";
+import {Engine} from "./Engine.sol";
 
 abstract contract Positions is ILRTA {
-    mapping(address => mapping(bytes32 => ILRTAData)) internal _dataOf;
-
-    constructor(address _superSignature)
-        ILRTA(
-            _superSignature,
-            "Yikes",
-            "YIKES",
-            "TransferDetails(address token0,address token1,int24 strike,uint8 spread,uint256 amount)"
-        )
-    {}
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                               DATA TYPES
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     enum OrderType {
         BiDirectional,
-        ZeroToOne,
-        OneToZero
+        Limit,
+        Debt
     }
 
-    struct ILRTADataID {
+    struct BiDirectionalID {
         address token0;
         address token1;
-        OrderType orderType;
         int24 strike;
         uint8 spread;
     }
 
+    struct LimitID {
+        address token0;
+        address token1;
+        int24 strike;
+        bool zeroToOne;
+        uint256 liquidityGrowthLast;
+    }
+
+    struct DebtID {
+        address token0;
+        address token1;
+        int24 strike;
+        Engine.TokenSelector selector;
+    }
+
+    struct DebtData {
+        uint256 liquidityGrowthLast;
+        uint256 leverageRatioX128;
+    }
+
+    struct DebtTransferDetails {
+        address token0;
+        address token1;
+        int24 strike;
+    }
+
+    struct ILRTADataID {
+        OrderType orderType;
+        bytes data;
+    }
+
     struct ILRTAData {
         uint256 balance;
+        OrderType orderType;
+        bytes data;
     }
 
     struct ILRTATransferDetails {
         bytes32 id;
         uint256 amount;
+        OrderType orderType;
+        bytes data;
     }
+
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                                STORAGE
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
+
+    mapping(address => mapping(bytes32 => ILRTAData)) internal _dataOf;
+
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                              CONSTRUCTOR
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
+
+    constructor(address _superSignature)
+        ILRTA(_superSignature, "Numoen Dry Powder", "DP", "TransferDetails(bytes32 id,uint256 amount)")
+    {}
+
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                                 LOGIC
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     function dataID(bytes memory dataIDBytes) public pure override returns (bytes32) {
         return keccak256(dataIDBytes);
@@ -66,18 +112,11 @@ abstract contract Positions is ILRTA {
         ILRTATransferDetails memory signatureTransferDetails =
             abi.decode(signatureTransfer.transferDetails, (ILRTATransferDetails));
 
-        if (
-            transferDetails.amount > signatureTransferDetails.amount
-                || transferDetails.id != signatureTransferDetails.id
-        ) {
-            revert InvalidRequest(abi.encode(signatureTransfer.transferDetails));
-        }
+        _checkTransferRequest(transferDetails, signatureTransferDetails);
 
         verifySignature(from, signatureTransfer, signature);
 
-        return
-        /* solhint-disable-next-line max-line-length */
-        _transfer(from, requestedTransfer.to, abi.decode(requestedTransfer.transferDetails, (ILRTATransferDetails)));
+        return _transfer(from, requestedTransfer.to, transferDetails);
     }
 
     function transferBySuperSignature(
@@ -94,45 +133,64 @@ abstract contract Positions is ILRTA {
             abi.decode(requestedTransfer.transferDetails, (ILRTATransferDetails));
         ILRTATransferDetails memory signatureTransferDetails = abi.decode(transferDetails, (ILRTATransferDetails));
 
+        _checkTransferRequest(requestedTransferDetails, signatureTransferDetails);
+
+        verifySuperSignature(from, transferDetails, dataHash);
+
+        return _transfer(from, requestedTransfer.to, requestedTransferDetails);
+    }
+
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                             INTERNAL LOGIC
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
+
+    function _checkTransferRequest(
+        ILRTATransferDetails memory requestedTransferDetails,
+        ILRTATransferDetails memory signatureTransferDetails
+    )
+        private
+    {
         if (
             requestedTransferDetails.amount > signatureTransferDetails.amount
                 || requestedTransferDetails.id != signatureTransferDetails.id
         ) {
-            revert InvalidRequest(abi.encode(requestedTransferDetails));
+            revert InvalidRequest(abi.encode(signatureTransferDetails));
         }
-
-        verifySuperSignature(from, transferDetails, dataHash);
-
-        return
-        /* solhint-disable-next-line max-line-length */
-        _transfer(from, requestedTransfer.to, abi.decode(requestedTransfer.transferDetails, (ILRTATransferDetails)));
     }
 
     function _transfer(address from, address to, ILRTATransferDetails memory transferDetails) private returns (bool) {
-        _dataOf[from][transferDetails.id].balance -= transferDetails.amount;
+        if (transferDetails.orderType != OrderType.Debt) {
+            _dataOf[from][transferDetails.id].balance -= transferDetails.amount;
+            unchecked {
+                _dataOf[to][transferDetails.id].balance += transferDetails.amount;
+            }
 
-        // change in liquidity cannot exceed the maximum liquidity in a strike
-        unchecked {
-            _dataOf[to][transferDetails.id].balance += transferDetails.amount;
+            emit Transfer(from, to, abi.encode(transferDetails));
+            return true;
+        } else {
+            // TODO: accrue interest to sender and receiver
+            _dataOf[from][transferDetails.id].balance -= transferDetails.amount;
+            unchecked {
+                _dataOf[to][transferDetails.id].balance += transferDetails.amount;
+            }
+
+            emit Transfer(from, to, abi.encode(transferDetails));
+            return true;
         }
-
-        emit Transfer(from, to, abi.encode(transferDetails));
-
-        return true;
     }
 
-    function _mint(address to, bytes32 id, uint256 amount) internal virtual {
+    function _mint(address to, bytes32 id, uint256 amount, OrderType orderType, bytes memory data) internal virtual {
         // change in liquidity cannot exceed the maximum liquidity in a strike
         unchecked {
             _dataOf[to][id].balance += amount;
         }
 
-        emit Transfer(address(0), to, abi.encode(ILRTATransferDetails({amount: amount, id: id})));
+        emit Transfer(address(0), to, abi.encode(ILRTATransferDetails(id, amount, orderType, data)));
     }
 
-    function _burn(address from, bytes32 id, uint256 amount) internal virtual {
+    function _burn(address from, bytes32 id, uint256 amount, OrderType orderType, bytes memory data) internal virtual {
         _dataOf[from][id].balance -= amount;
 
-        emit Transfer(from, address(0), abi.encode(ILRTATransferDetails({amount: amount, id: id})));
+        emit Transfer(from, address(0), abi.encode(ILRTATransferDetails(id, amount, orderType, data)));
     }
 }

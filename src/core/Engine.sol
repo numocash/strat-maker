@@ -15,23 +15,25 @@ import {IExecuteCallback} from "./interfaces/IExecuteCallback.sol";
 
 /// @author Robert Leifke and Kyle Scott
 /// @custom:team return data and events
+/// @custom:team tree for function selector
+/// @custom:team accrue and accruePosition
 contract Engine is Positions {
     using Pairs for Pairs.Pair;
     using Accounts for Accounts.Account;
     using Pairs for mapping(bytes32 => Pairs.Pair);
 
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                                 EVENTS
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
+
     event PairCreated(address indexed token0, address indexed token1, int24 strikeInitial);
     event AddLiquidity(bytes32 indexed pairID, int24 indexed strike, uint8 indexed spread, uint256 liquidity);
-    event Collect(
-        bytes32 indexed pairID,
-        int24 indexed strike,
-        uint8 spread,
-        address indexed owner,
-        uint256 amount0Owed,
-        uint256 amount1Owed
-    );
     event RemoveLiquidity(bytes32 indexed pairID, int24 indexed strike, uint8 indexed spread, uint256 liquidity);
     event Swap(bytes32 indexed pairID);
+
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                                 ERRORS
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     error Reentrancy();
     error InvalidTokenOrder();
@@ -41,25 +43,15 @@ contract Engine is Positions {
     error InvalidSelector();
     error InvalidAmountDesired();
 
-    /// @dev this should be checked when reading any `get` function from another contract to prevent read-only
-    /// reentrancy
-    uint256 public locked = 1;
-
-    modifier nonReentrant() {
-        if (locked != 1) revert Reentrancy();
-
-        locked = 2;
-
-        _;
-
-        locked = 1;
-    }
-
-    mapping(bytes32 => Pairs.Pair) private pairs;
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                               DATA TYPES
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     enum Commands {
         Swap,
         AddLiquidity,
+        BorrowLiquidity,
+        RepayLiquidity,
         RemoveLiquidity,
         CreatePair
     }
@@ -86,6 +78,18 @@ contract Engine is Positions {
         int256 amountDesired;
     }
 
+    struct BorrowLiquidityParams {
+        address token0;
+        address token1;
+        int24 strike;
+    }
+
+    struct RepayLiquidityParams {
+        address token0;
+        address token1;
+        int24 strike;
+    }
+
     struct RemoveLiquidityParams {
         address token0;
         address token1;
@@ -101,7 +105,39 @@ contract Engine is Positions {
         int24 strikeInitial;
     }
 
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                                STORAGE
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
+
+    mapping(bytes32 => Pairs.Pair) private pairs;
+
+    /// @dev this should be checked when reading any `get` function from another contract to prevent read-only
+    /// reentrancy
+    uint256 public locked = 1;
+
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+    MODIFIER
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
+
+    modifier nonReentrant() {
+        if (locked != 1) revert Reentrancy();
+
+        locked = 2;
+
+        _;
+
+        locked = 1;
+    }
+
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+    CONSTRUCTOR
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
+
     constructor(address _superSignature) Positions(_superSignature) {}
+
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+    LOGIC
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     /// @dev Set to address to 0 if creating a pair
     function execute(
@@ -137,6 +173,7 @@ contract Engine is Positions {
             }
         }
 
+        // transfer tokens out
         for (uint256 i = 0; i < numTokens;) {
             int256 delta = account.tokenDeltas[i];
             address token = account.tokens[i];
@@ -152,12 +189,14 @@ contract Engine is Positions {
             }
         }
 
+        // callback if necessary
         if (numTokens > 0 || numLPs > 0) {
             IExecuteCallback(msg.sender).executeCallback(
                 account.tokens, account.tokenDeltas, account.lpIDs, account.lpDeltas, data
             );
         }
 
+        // check tokens in
         for (uint256 i = 0; i < numTokens;) {
             int256 delta = account.tokenDeltas[i];
             address token = account.tokens[i];
@@ -174,14 +213,16 @@ contract Engine is Positions {
             }
         }
 
+        // check liquidity positions in
         for (uint256 i = 0; i < numLPs;) {
             uint256 delta = account.lpDeltas[i];
             bytes32 id = account.lpIDs[i];
 
             if (id == bytes32(0)) break;
 
+            // TODO: fix here
             if (delta < 0) {
-                _burn(address(this), id, delta);
+                _burn(address(this), id, delta, Positions.OrderType.BiDirectional, bytes(""));
             }
 
             unchecked {
@@ -189,6 +230,10 @@ contract Engine is Positions {
             }
         }
     }
+
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+    INTERNAL LOGIC
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     function _swap(SwapParams memory params, Accounts.Account memory account) private {
         (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
@@ -262,11 +307,16 @@ contract Engine is Positions {
             dataID(
                 abi.encode(
                     Positions.ILRTADataID(
-                        params.token0, params.token1, Positions.OrderType.BiDirectional, params.strike, params.spread
+                        Positions.OrderType.BiDirectional,
+                        abi.encode(
+                            Positions.BiDirectionalID(params.token0, params.token1, params.strike, params.spread)
+                        )
                     )
                 )
             ),
-            uint256(balance)
+            uint256(balance),
+            Positions.OrderType.BiDirectional,
+            bytes("")
         );
 
         emit AddLiquidity(pairID, params.strike, params.spread, uint256(balance));
@@ -327,7 +377,10 @@ contract Engine is Positions {
             dataID(
                 abi.encode(
                     Positions.ILRTADataID(
-                        params.token0, params.token1, Positions.OrderType.BiDirectional, params.strike, params.spread
+                        Positions.OrderType.BiDirectional,
+                        abi.encode(
+                            Positions.BiDirectionalID(params.token0, params.token1, params.strike, params.spread)
+                        )
                     )
                 )
             ),
@@ -345,6 +398,10 @@ contract Engine is Positions {
 
         emit PairCreated(params.token0, params.token1, params.strikeInitial);
     }
+
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                               VIEW LOGIC
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     function getPair(
         address token0,
@@ -382,7 +439,12 @@ contract Engine is Positions {
         returns (Positions.ILRTAData memory)
     {
         return _dataOf[owner][dataID(
-            abi.encode(Positions.ILRTADataID(token0, token1, Positions.OrderType.BiDirectional, strike, spread))
+            abi.encode(
+                Positions.ILRTADataID(
+                    Positions.OrderType.BiDirectional,
+                    abi.encode(Positions.BiDirectionalID(token0, token1, strike, spread))
+                )
+            )
         )];
     }
 }
