@@ -36,20 +36,25 @@ library Pairs {
     }
 
     /// @custom:team could we make reference a bitmap
-    /// @custom:team add need settle flags
     struct Strike {
         Limit limit;
-        uint256[NUM_SPREADS] liquidityBiDirectional;
         uint256[NUM_SPREADS] totalSupply;
+        uint256[NUM_SPREADS] liquidityBiDirectional;
+        uint256[NUM_SPREADS] liquidityBorrowed;
+        uint256 liquidityGrowth;
         int24 next0To1;
         int24 next1To0;
         uint8 reference0To1;
         uint8 reference1To0;
+        bool settle0;
+        bool settle1;
+        uint8 activeStrike;
     }
 
     struct Pair {
         uint128[NUM_SPREADS] composition;
         int24[NUM_SPREADS] strikeCurrent;
+        uint256 cachedBlock;
         int24 cachedStrikeCurrent;
         uint8 initialized; // 0 = unitialized, 1 = initialized
         mapping(int24 => Strike) strikes;
@@ -125,6 +130,7 @@ library Pairs {
         uint128[NUM_SPREADS] composition;
         int24[NUM_SPREADS] strikeCurrent;
         int24 cachedStrikeCurrent;
+        uint256 cachedBlock;
         uint256 cachedLiquidity;
         uint128 cachedComposition;
         // pool's balance change of the token which "amountDesired" refers to
@@ -349,12 +355,12 @@ library Pairs {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            UPDATE LIQUIDITY
+                            LIQUIDITY LOGIC
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Update a positions liquidity
     /// @param balance The amount of liquidity tokens being added or removed
-    function updateLiquidity(
+    function provisionLiquidity(
         Pair storage pair,
         int24 strike,
         uint8 spread,
@@ -378,6 +384,25 @@ library Pairs {
         );
 
         return (liquidity, amount0, amount1);
+    }
+
+    function borrowLiquidity(Pair storage pair, int24 strike, int256 balance) internal {
+        // accrue interest
+        // make sure borrow is possible
+        // remove liquidity
+        // charge fee for borrowing
+        // allow for removing into either token if possible
+    }
+
+    function repayLiquidity(Pair storage pair, int24 strike, uint256 balance) internal {
+        // accrue interest
+        // determine how much is owed
+        // add liquidity
+    }
+
+    /// @notice accrue interest to the current strike
+    function accrue(Pair storage pair, uint8 spread) internal {
+        _accrue(pair, pair.cachedStrikeCurrent, spread);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -500,5 +525,14 @@ library Pairs {
                 }
             }
         }
+    }
+
+    function _accrue(Pair storage pair, int24 strike, uint8 spread) private {
+        // for each spread
+        // update available liquidity
+
+        // update liquiditygrowth
+        // update borrowed liquidity
+        // write to cached block
     }
 }

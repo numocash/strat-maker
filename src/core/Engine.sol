@@ -252,7 +252,7 @@ contract Engine is Positions {
             revert InvalidSelector();
         }
 
-        (, uint256 amount0, uint256 amount1) = pair.updateLiquidity(params.strike, params.spread, balance);
+        (, uint256 amount0, uint256 amount1) = pair.provisionLiquidity(params.strike, params.spread, balance);
 
         account.updateToken(params.token0, toInt256(amount0));
         account.updateToken(params.token1, toInt256(amount1));
@@ -319,7 +319,7 @@ contract Engine is Positions {
         } else {
             revert InvalidSelector();
         }
-        (, uint256 amount0, uint256 amount1) = pair.updateLiquidity(params.strike, params.spread, balance);
+        (, uint256 amount0, uint256 amount1) = pair.provisionLiquidity(params.strike, params.spread, balance);
 
         account.updateToken(params.token0, -toInt256(amount0));
         account.updateToken(params.token1, -toInt256(amount1));
