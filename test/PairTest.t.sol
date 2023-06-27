@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {PairHelper} from "./helpers/PairHelper.sol";
 
 import {Pairs, NUM_SPREADS} from "src/core/Pairs.sol";
+import {Engine} from "src/core/Engine.sol";
 import {Positions} from "src/core/Positions.sol";
 import {mulDiv, mulDivRoundingUp} from "src/core/math/FullMath.sol";
 import {getRatioAtStrike} from "src/core/math/StrikeMath.sol";
@@ -407,4 +408,24 @@ contract SwapTest is Test, PairHelper {
     //         assertEq(strikeCurrent, -2);
     //         assertEq(offset, 2);
     //     }
+}
+
+contract BorrowTest is Test, PairHelper {
+    function setUp() external {
+        _setUp();
+    }
+
+    function testBorrowAmounts() external {
+        pair.addLiquidity(1, 1, 1e18);
+        (int256 amount0, int256 amount1) = pair.borrowLiquidity(1, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
+
+        assertEq(uint256(amount0), 1.5e18 - mulDiv(0.5e18, Q128, getRatioAtStrike(1)));
+        assertEq(amount1, 0);
+
+        assertEq(token0.balanceOf(address(this)), 0);
+        assertEq(token1.balanceOf(address(this)), 0);
+
+        assertEq(token0.balanceOf(address(pair)), mulDivRoundingUp(1e18, Q128, getRatioAtStrike(1)) + uint256(amount0));
+        assertEq(token1.balanceOf(address(pair)), 0);
+    }
 }
