@@ -88,10 +88,90 @@ contract MockPair is Positions {
         if (amount0 < 0) SafeTransferLib.safeTransfer(token0, msg.sender, uint256(-amount0));
         if (amount1 < 0) SafeTransferLib.safeTransfer(token1, msg.sender, uint256(-amount1));
 
-        IExecuteCallback(msg.sender).executeCallback(tokens, tokenDeltas, new bytes32[](0), new uint256[](0), bytes(""));
+        IExecuteCallback(msg.sender).executeCallback(
+            IExecuteCallback.CallbackParams(
+                tokens,
+                tokenDeltas,
+                new bytes32[](0),
+                new uint256[](0),
+                new Engine.OrderType[](0),
+                new bytes[](0),
+                bytes("")
+            )
+        );
 
         if (amount0 > 0 && BalanceLib.getBalance(token0) < balance0Before + uint256(amount0)) revert();
         if (amount1 > 0 && BalanceLib.getBalance(token1) < balance1Before + uint256(amount1)) revert();
+    }
+
+    function repayLiquidity(
+        int24 strike,
+        Engine.TokenSelector selectorCollateral,
+        uint256 leverageRatioX128,
+        uint256 liquidity
+    )
+        public
+        returns (int256 amount0, int256 amount1)
+    {
+        pair.repayLiquidity(strike, liquidity);
+
+        {
+            (uint256 _amount0, uint256 _amount1) =
+                getAmountsForLiquidity(pair, strike, pair.strikes[strike].activeSpread, liquidity, true);
+            amount0 = int256(_amount0);
+            amount1 = int256(_amount1);
+        }
+
+        {
+            uint256 liquidityCollateral = mulDiv(liquidity, leverageRatioX128, Q128);
+            if (selectorCollateral == Engine.TokenSelector.Token0) {
+                amount0 -= toInt256(getAmount0Delta(liquidityCollateral, strike, false));
+            } else {
+                amount1 -= toInt256(getAmount1Delta(liquidityCollateral));
+            }
+        }
+
+        {
+            uint256 balance0Before = BalanceLib.getBalance(token0);
+            uint256 balance1Before = BalanceLib.getBalance(token1);
+
+            address[] memory tokens = new address[](2);
+            tokens[0] = token0;
+            tokens[1] = token1;
+
+            int256[] memory tokenDeltas = new int256[](2);
+            tokenDeltas[0] = amount0;
+            tokenDeltas[1] = amount1;
+
+            if (amount0 < 0) SafeTransferLib.safeTransfer(token0, msg.sender, uint256(-amount0));
+            if (amount1 < 0) SafeTransferLib.safeTransfer(token1, msg.sender, uint256(-amount1));
+
+            IExecuteCallback(msg.sender).executeCallback(
+                IExecuteCallback.CallbackParams(
+                    tokens,
+                    tokenDeltas,
+                    new bytes32[](0),
+                    new uint256[](0),
+                    new Engine.OrderType[](0),
+                    new bytes[](0),
+                    bytes("")
+                )
+            );
+
+            if (amount0 > 0 && BalanceLib.getBalance(token0) < balance0Before + uint256(amount0)) revert();
+            if (amount1 > 0 && BalanceLib.getBalance(token1) < balance1Before + uint256(amount1)) revert();
+        }
+
+        _burnDebt(
+            address(this),
+            token0,
+            token1,
+            strike,
+            selectorCollateral,
+            liquidity,
+            pair.strikes[strike].liquidityGrowthX128,
+            leverageRatioX128
+        );
     }
 
     function addLiquidity(
@@ -120,7 +200,17 @@ contract MockPair is Positions {
         uint256 balance0Before = BalanceLib.getBalance(token0);
         uint256 balance1Before = BalanceLib.getBalance(token1);
 
-        IExecuteCallback(msg.sender).executeCallback(tokens, tokenDeltas, new bytes32[](0), new uint256[](0), bytes(""));
+        IExecuteCallback(msg.sender).executeCallback(
+            IExecuteCallback.CallbackParams(
+                tokens,
+                tokenDeltas,
+                new bytes32[](0),
+                new uint256[](0),
+                new Engine.OrderType[](0),
+                new bytes[](0),
+                bytes("")
+            )
+        );
 
         if (BalanceLib.getBalance(token0) < balance0Before + amount0) revert();
         if (BalanceLib.getBalance(token1) < balance1Before + amount1) revert();
@@ -159,14 +249,30 @@ contract MockPair is Positions {
             if (amount1 < 0) SafeTransferLib.safeTransfer(token1, msg.sender, uint256(-amount1));
             uint256 balance0Before = BalanceLib.getBalance(token0);
             IExecuteCallback(msg.sender).executeCallback(
-                tokens, tokenDeltas, new bytes32[](0), new uint256[](0), bytes("")
+                IExecuteCallback.CallbackParams(
+                    tokens,
+                    tokenDeltas,
+                    new bytes32[](0),
+                    new uint256[](0),
+                    new Engine.OrderType[](0),
+                    new bytes[](0),
+                    bytes("")
+                )
             );
             if (BalanceLib.getBalance(token0) < balance0Before + uint256(amount0)) revert();
         } else {
             if (amount0 < 0) SafeTransferLib.safeTransfer(token0, msg.sender, uint256(-amount0));
             uint256 balance1Before = BalanceLib.getBalance(token1);
             IExecuteCallback(msg.sender).executeCallback(
-                tokens, tokenDeltas, new bytes32[](0), new uint256[](0), bytes("")
+                IExecuteCallback.CallbackParams(
+                    tokens,
+                    tokenDeltas,
+                    new bytes32[](0),
+                    new uint256[](0),
+                    new Engine.OrderType[](0),
+                    new bytes[](0),
+                    bytes("")
+                )
             );
             if (BalanceLib.getBalance(token1) < balance1Before + uint256(amount1)) revert();
         }

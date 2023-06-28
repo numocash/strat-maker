@@ -11,7 +11,9 @@ import {
     getLiquidityForAmount1,
     getAmountsForLiquidity,
     getAmount0Delta,
-    getAmount1Delta
+    getAmount1Delta,
+    getLiquidityDeltaAmount0,
+    getLiquidityDeltaAmount1
 } from "./math/LiquidityMath.sol";
 import {balanceToLiquidity, liquidityToBalance} from "./math/PositionMath.sol";
 import {Q128} from "./math/StrikeMath.sol";
@@ -73,6 +75,12 @@ contract Engine is Positions {
         Token0,
         Token1,
         LiquidityPosition
+    }
+
+    enum OrderType {
+        BiDirectional,
+        Limit,
+        Debt
     }
 
     struct SwapParams {
@@ -234,7 +242,15 @@ contract Engine is Positions {
         // callback if necessary
         if (numTokens > 0 || numLPs > 0) {
             IExecuteCallback(msg.sender).executeCallback(
-                account.tokens, account.tokenDeltas, account.lpIDs, account.lpDeltas, data
+                IExecuteCallback.CallbackParams(
+                    account.tokens,
+                    account.tokenDeltas,
+                    account.lpIDs,
+                    account.lpDeltas,
+                    account.orderTypes,
+                    account.datas,
+                    data
+                )
             );
         }
 
@@ -264,7 +280,7 @@ contract Engine is Positions {
 
             // TODO: fix extra data
             if (delta < 0) {
-                _burn(address(this), id, delta, Positions.OrderType.BiDirectional, bytes(""));
+                _burn(address(this), id, delta, account.orderTypes[i], account.datas[i]);
             }
 
             unchecked {
@@ -379,9 +395,10 @@ contract Engine is Positions {
         uint256 liquidityCollateral;
         if (params.selectorCollateral == TokenSelector.Token0) {
             account.updateToken(params.token0, toInt256(params.amountDesiredCollateral));
-            // TODO: update liquidity collateral
+            liquidityCollateral = getLiquidityDeltaAmount0(params.amountDesiredCollateral, params.strike, false);
         } else if (params.selectorCollateral == TokenSelector.Token1) {
             account.updateToken(params.token1, toInt256(params.amountDesiredCollateral));
+            liquidityCollateral = getLiquidityDeltaAmount1(params.amountDesiredCollateral);
         } else {
             revert InvalidSelector();
         }
@@ -425,15 +442,16 @@ contract Engine is Positions {
         account.updateToken(params.token1, toInt256(amount1));
 
         // add unlocked collateral to account
-        // TODO: convert collateral to token
-        uint256 collateral = mulDiv(liquidityDebt, params.leverageRatioX128, Q128);
-        account.updateToken(
-            params.selectorCollateral == TokenSelector.Token0 ? params.token0 : params.token1, -toInt256(collateral)
-        );
+        uint256 liquidityCollateral = mulDiv(liquidityDebt, params.leverageRatioX128, Q128);
+        if (params.selectorCollateral == TokenSelector.Token0) {
+            account.updateToken(params.token0, -toInt256(getAmount0Delta(liquidityCollateral, params.strike, false)));
+        } else {
+            account.updateToken(params.token0, -toInt256(getAmount1Delta(liquidityCollateral)));
+        }
 
         // add burned position to account
         bytes32 id = _debtID(params.token0, params.token1, params.strike, params.selectorCollateral);
-        account.updateILRTA(id, liquidityDebt);
+        account.updateILRTA(id, liquidityDebt, OrderType.Debt, bytes(""));
 
         // emit
     }
@@ -483,7 +501,10 @@ contract Engine is Positions {
         account.updateToken(params.token0, amount0);
         account.updateToken(params.token1, amount1);
         account.updateILRTA(
-            _biDirectionalID(params.token0, params.token1, params.strike, params.spread), uint256(-balance)
+            _biDirectionalID(params.token0, params.token1, params.strike, params.spread),
+            uint256(-balance),
+            OrderType.BiDirectional,
+            bytes("")
         );
 
         emit RemoveLiquidity(pairID, params.strike, params.spread, uint256(-balance));
@@ -496,7 +517,7 @@ contract Engine is Positions {
         if (pair.cachedStrikeCurrent == params.strike) pair.accrue();
 
         // accrue position
-        _accruePositionDebt(
+        accruePositionDebt(
             params.owner,
             params.token0,
             params.token1,

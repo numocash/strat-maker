@@ -18,20 +18,12 @@ contract PairHelper is IExecuteCallback {
         pair = new MockPair(address(0), address(token0), address(token1), 0);
     }
 
-    function executeCallback(
-        address[] calldata tokens,
-        int256[] calldata tokensDelta,
-        bytes32[] calldata,
-        uint256[] calldata,
-        bytes calldata
-    )
-        external
-    {
-        for (uint256 i = 0; i < tokens.length;) {
-            int256 delta = tokensDelta[i];
+    function executeCallback(IExecuteCallback.CallbackParams calldata params) external {
+        for (uint256 i = 0; i < params.tokens.length;) {
+            int256 delta = params.tokensDelta[i];
 
             if (delta > 0) {
-                address token = tokens[i];
+                address token = params.tokens[i];
 
                 if (token == address(token0)) {
                     token0.mint(msg.sender, uint256(delta));

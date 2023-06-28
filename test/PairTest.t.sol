@@ -6,7 +6,6 @@ import {PairHelper} from "./helpers/PairHelper.sol";
 
 import {Pairs, NUM_SPREADS} from "src/core/Pairs.sol";
 import {Engine} from "src/core/Engine.sol";
-import {Positions} from "src/core/Positions.sol";
 import {mulDiv, mulDivRoundingUp} from "src/core/math/FullMath.sol";
 import {getRatioAtStrike} from "src/core/math/StrikeMath.sol";
 import {MAX_STRIKE, MIN_STRIKE, Q128} from "src/core/math/StrikeMath.sol";

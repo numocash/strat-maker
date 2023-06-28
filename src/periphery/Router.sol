@@ -53,27 +53,19 @@ contract Router is IExecuteCallback {
         );
     }
 
-    function executeCallback(
-        address[] calldata tokens,
-        int256[] calldata tokensDelta,
-        bytes32[] calldata lpIDs,
-        uint256[] calldata lpDeltas,
-        bytes calldata data
-    )
-        external
-    {
+    function executeCallback(IExecuteCallback.CallbackParams calldata params) external {
         if (msg.sender != address(engine)) revert InvalidCaller(msg.sender);
-        CallbackData memory callbackData = abi.decode(data, (CallbackData));
+        CallbackData memory callbackData = abi.decode(params.data, (CallbackData));
 
         // build array of transfer requests, then send as a batch
         Permit3.RequestedTransferDetails[] memory requestedTransfer =
             new Permit3.RequestedTransferDetails[](callbackData.permitTransfers.length);
 
         uint256 j = 0;
-        for (uint256 i = 0; i < tokensDelta.length;) {
-            int256 delta = tokensDelta[i];
+        for (uint256 i = 0; i < params.tokensDelta.length;) {
+            int256 delta = params.tokensDelta[i];
 
-            if (delta > 0 && tokens[i] != address(0)) {
+            if (delta > 0 && params.tokens[i] != address(0)) {
                 requestedTransfer[j] = Permit3.RequestedTransferDetails(msg.sender, uint256(delta));
 
                 unchecked {
@@ -92,35 +84,32 @@ contract Router is IExecuteCallback {
             );
         }
 
-        // send all liquidity positions individually
-        j = 0;
-        for (uint256 i = 0; i < lpIDs.length;) {
-            uint256 delta = lpDeltas[i];
-            bytes32 id = lpIDs[i];
+        // // send all liquidity positions individually
+        // j = 0;
+        // for (uint256 i = 0; i < lpIDs.length;) {
+        //     uint256 delta = lpDeltas[i];
+        //     bytes32 id = lpIDs[i];
 
-            if (delta < 0 && id != bytes32(0)) {
-                engine.transferBySuperSignature(
-                    callbackData.payer,
-                    abi.encode(callbackData.positionTransfers[j]),
-                    // solhint-disable-next-line max-line-length
-                    ILRTA.RequestedTransfer(
-                        msg.sender,
-                        abi.encode(
-                            Positions.ILRTATransferDetails(id, delta, Positions.OrderType.BiDirectional, bytes(""))
-                        )
-                    ),
-                    // TODO: this reverts
-                    abi.decode(data[1 + j:], (bytes32[]))
-                );
+        //     if (delta < 0 && id != bytes32(0)) {
+        //         engine.transferBySuperSignature(
+        //             callbackData.payer,
+        //             abi.encode(callbackData.positionTransfers[j]),
+        //             // solhint-disable-next-line max-line-length
+        //             ILRTA.RequestedTransfer(
+        //                 msg.sender, abi.encode(Positions.ILRTATransferDetails(id, delta, orderTypes[i], datas[i]))
+        //             ),
+        //             // TODO: this reverts
+        //             abi.decode(data[1 + j:], (bytes32[]))
+        //         );
 
-                unchecked {
-                    j++;
-                }
-            }
+        //         unchecked {
+        //             j++;
+        //         }
+        //     }
 
-            unchecked {
-                i++;
-            }
-        }
+        //     unchecked {
+        //         i++;
+        //     }
+        // }
     }
 }

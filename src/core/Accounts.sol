@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
+import {Engine} from "./Engine.sol";
 import {BalanceLib} from "src/libraries/BalanceLib.sol";
 
 library Accounts {
@@ -12,6 +13,8 @@ library Accounts {
         uint256[] balances;
         bytes32[] lpIDs;
         uint256[] lpDeltas;
+        Engine.OrderType[] orderTypes;
+        bytes[] datas;
     }
 
     function newAccount(uint256 numTokens, uint256 numLPs) internal pure returns (Account memory account) {
@@ -24,6 +27,8 @@ library Accounts {
         if (numLPs > 0) {
             account.lpIDs = new bytes32[](numLPs);
             account.lpDeltas = new uint256[](numLPs);
+            account.orderTypes = new Engine.OrderType[](numLPs);
+            account.datas = new bytes[](numLPs);
         }
     }
 
@@ -49,7 +54,17 @@ library Accounts {
         revert InvalidAccountLength();
     }
 
-    function updateILRTA(Account memory account, bytes32 id, uint256 delta) internal pure {
+    /// @custom:team what if ids match but not data
+    function updateILRTA(
+        Account memory account,
+        bytes32 id,
+        uint256 delta,
+        Engine.OrderType orderType,
+        bytes memory data
+    )
+        internal
+        pure
+    {
         if (delta == 0) return;
 
         unchecked {
@@ -61,6 +76,8 @@ library Accounts {
                 } else if (account.lpIDs[i] == bytes32(0)) {
                     account.lpIDs[i] = id;
                     account.lpDeltas[i] = delta;
+                    account.orderTypes[i] = orderType;
+                    account.datas[i] = data;
                     return;
                 }
             }

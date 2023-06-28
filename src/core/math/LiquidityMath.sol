@@ -6,8 +6,7 @@ import {getRatioAtStrike, Q128} from "./StrikeMath.sol";
 import {Pairs} from "../Pairs.sol";
 
 /// @notice Calculate amount0 delta when moving completely through the liquidity at the strike.
-/// @dev Assumes inputs are valid
-/// i.e. x = L/Pi
+/// i.e. x = L / Pi
 function getAmount0Delta(uint256 liquidity, int24 strike, bool roundUp) pure returns (uint256 amount0) {
     return roundUp
         ? mulDivRoundingUp(liquidity, Q128, getRatioAtStrike(strike))
@@ -15,10 +14,23 @@ function getAmount0Delta(uint256 liquidity, int24 strike, bool roundUp) pure ret
 }
 
 /// @notice Calculate amount1 delta when moving completely through the liquidity at the strike.
-/// @dev Assumes inputs are valid
 /// i.e. y = L
 function getAmount1Delta(uint256 liquidity) pure returns (uint256 amount1) {
     return liquidity;
+}
+
+/// @notice Calculate liquidity for amount0
+/// i.e. L = x * Pi
+function getLiquidityDeltaAmount0(uint256 amount0, int24 strike, bool roundUp) pure returns (uint256 liquidity) {
+    return roundUp
+        ? mulDivRoundingUp(amount0, getRatioAtStrike(strike), Q128)
+        : mulDiv(amount0, getRatioAtStrike(strike), Q128);
+}
+
+/// @notice Calculate liquidity for amount1
+/// i.e. L = y
+function getLiquidityDeltaAmount1(uint256 amount1) pure returns (uint256 liquidity) {
+    return amount1;
 }
 
 /// @notice Calculate amount0 in a strike for a given composition and liquidity
@@ -95,9 +107,7 @@ function getLiquidityForAmount0(
     int24 _strikeCurrent = pair.strikeCurrent[spread - 1];
 
     if (strike > _strikeCurrent) {
-        return roundUp
-            ? mulDivRoundingUp(amount0, getRatioAtStrike(strike), Q128)
-            : mulDiv(amount0, getRatioAtStrike(strike), Q128);
+        return getLiquidityDeltaAmount0(amount0, strike, roundUp);
     } else if (strike == _strikeCurrent) {
         uint128 composition = pair.composition[spread - 1];
         uint128 token0Composition;
@@ -127,7 +137,7 @@ function getLiquidityForAmount1(
     int24 _strikeCurrent = pair.strikeCurrent[spread - 1];
 
     if (strike < _strikeCurrent) {
-        return amount1;
+        return getLiquidityDeltaAmount1(amount1);
     } else if (strike == _strikeCurrent) {
         uint256 composition = pair.composition[spread - 1];
         return roundUp ? mulDivRoundingUp(amount1, composition, Q128) : mulDiv(amount1, composition, Q128);

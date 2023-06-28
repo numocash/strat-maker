@@ -11,12 +11,6 @@ abstract contract Positions is ILRTA {
                                DATA TYPES
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    enum OrderType {
-        BiDirectional,
-        Limit,
-        Debt
-    }
-
     struct BiDirectionalID {
         address token0;
         address token1;
@@ -52,20 +46,20 @@ abstract contract Positions is ILRTA {
     }
 
     struct ILRTADataID {
-        OrderType orderType;
+        Engine.OrderType orderType;
         bytes data;
     }
 
     struct ILRTAData {
         uint256 balance;
-        OrderType orderType;
+        Engine.OrderType orderType;
         bytes data;
     }
 
     struct ILRTATransferDetails {
         bytes32 id;
         uint256 amount;
-        OrderType orderType;
+        Engine.OrderType orderType;
         bytes data;
     }
 
@@ -143,6 +137,27 @@ abstract contract Positions is ILRTA {
         return _transfer(from, requestedTransfer.to, requestedTransferDetails);
     }
 
+    function accruePositionDebt(
+        address owner,
+        address token0,
+        address token1,
+        int24 strike,
+        Engine.TokenSelector selector,
+        uint256 liquidityGrowthX128
+    )
+        internal
+    {
+        DebtData memory debtData = _dataOfDebt(owner, token0, token1, strike, selector);
+
+        uint256 liquidityGrowthDelta = liquidityGrowthX128 - debtData.liquidityGrowthX128Last;
+        uint256 liquidityAccrued = mulDivRoundingUp(liquidityGrowthDelta, debtData.liquidity, Q128);
+
+        debtData.liquidity = liquidityAccrued > debtData.liquidity ? 0 : debtData.liquidity - liquidityAccrued;
+        debtData.liquidityGrowthX128Last = liquidityGrowthX128;
+
+        _dataOf[owner][_debtID(token0, token1, strike, selector)].data = abi.encode(debtData);
+    }
+
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                              INTERNAL LOGIC
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
@@ -163,7 +178,7 @@ abstract contract Positions is ILRTA {
     }
 
     function _transfer(address from, address to, ILRTATransferDetails memory transferDetails) private returns (bool) {
-        if (transferDetails.orderType != OrderType.Debt) {
+        if (transferDetails.orderType != Engine.OrderType.Debt) {
             _dataOf[from][transferDetails.id].balance -= transferDetails.amount;
             unchecked {
                 _dataOf[to][transferDetails.id].balance += transferDetails.amount;
@@ -195,7 +210,7 @@ abstract contract Positions is ILRTA {
     {
         return dataID(
             abi.encode(
-                ILRTADataID(OrderType.BiDirectional, abi.encode(BiDirectionalID(token0, token1, strike, spread)))
+                ILRTADataID(Engine.OrderType.BiDirectional, abi.encode(BiDirectionalID(token0, token1, strike, spread)))
             )
         );
     }
@@ -214,7 +229,7 @@ abstract contract Positions is ILRTA {
         return dataID(
             abi.encode(
                 ILRTADataID(
-                    OrderType.Limit, abi.encode(LimitID(token0, token1, strike, zeroToOne, liquidityGrowthLast))
+                    Engine.OrderType.Limit, abi.encode(LimitID(token0, token1, strike, zeroToOne, liquidityGrowthLast))
                 )
             )
         );
@@ -230,7 +245,8 @@ abstract contract Positions is ILRTA {
         pure
         returns (bytes32)
     {
-        return dataID(abi.encode(ILRTADataID(OrderType.Debt, abi.encode(DebtID(token0, token1, strike, selector)))));
+        return
+            dataID(abi.encode(ILRTADataID(Engine.OrderType.Debt, abi.encode(DebtID(token0, token1, strike, selector)))));
     }
 
     function _dataOfDebt(
@@ -264,7 +280,9 @@ abstract contract Positions is ILRTA {
             _dataOf[to][id].balance += amount;
         }
 
-        emit Transfer(address(0), to, abi.encode(ILRTATransferDetails(id, amount, OrderType.BiDirectional, bytes(""))));
+        emit Transfer(
+            address(0), to, abi.encode(ILRTATransferDetails(id, amount, Engine.OrderType.BiDirectional, bytes("")))
+        );
     }
 
     function _mintLimit(
@@ -284,7 +302,7 @@ abstract contract Positions is ILRTA {
             _dataOf[to][id].balance += amount;
         }
 
-        emit Transfer(address(0), to, abi.encode(ILRTATransferDetails(id, amount, OrderType.Limit, bytes(""))));
+        emit Transfer(address(0), to, abi.encode(ILRTATransferDetails(id, amount, Engine.OrderType.Limit, bytes(""))));
     }
 
     function _mintDebt(
@@ -312,7 +330,7 @@ abstract contract Positions is ILRTA {
                 ILRTATransferDetails(
                     id,
                     amount,
-                    OrderType.Limit,
+                    Engine.OrderType.Limit,
                     abi.encode(DebtData(amount, liquidityGrowthX128Last, leverageRatioX128))
                 )
             )
@@ -334,11 +352,11 @@ abstract contract Positions is ILRTA {
         _dataOf[from][id].balance -= amount;
 
         emit Transfer(
-            from, address(0), abi.encode(ILRTATransferDetails(id, amount, OrderType.BiDirectional, bytes("")))
+            from, address(0), abi.encode(ILRTATransferDetails(id, amount, Engine.OrderType.BiDirectional, bytes("")))
         );
     }
 
-    function _burn(address from, bytes32 id, uint256 amount, OrderType orderType, bytes memory data) internal {
+    function _burn(address from, bytes32 id, uint256 amount, Engine.OrderType orderType, bytes memory data) internal {
         _dataOf[from][id].balance -= amount;
 
         emit Transfer(from, address(0), abi.encode(ILRTATransferDetails(id, amount, orderType, data)));
@@ -359,7 +377,7 @@ abstract contract Positions is ILRTA {
 
         _dataOf[from][id].balance -= amount;
 
-        emit Transfer(from, address(0), abi.encode(ILRTATransferDetails(id, amount, OrderType.Limit, bytes(""))));
+        emit Transfer(from, address(0), abi.encode(ILRTATransferDetails(id, amount, Engine.OrderType.Limit, bytes(""))));
     }
 
     function _burnDebt(
@@ -385,31 +403,10 @@ abstract contract Positions is ILRTA {
                 ILRTATransferDetails(
                     id,
                     amount,
-                    OrderType.Limit,
+                    Engine.OrderType.Limit,
                     abi.encode(DebtData(amount, liquidityGrowthX128Last, leverageRatioX128))
                 )
             )
         );
-    }
-
-    function _accruePositionDebt(
-        address owner,
-        address token0,
-        address token1,
-        int24 strike,
-        Engine.TokenSelector selector,
-        uint256 liquidityGrowthX128
-    )
-        internal
-    {
-        DebtData memory debtData = _dataOfDebt(owner, token0, token1, strike, selector);
-
-        uint256 liquidityGrowthDelta = liquidityGrowthX128 - debtData.liquidityGrowthX128Last;
-        uint256 liquidityAccrued = mulDivRoundingUp(liquidityGrowthDelta, debtData.liquidity, Q128);
-
-        debtData.liquidity = liquidityAccrued > debtData.liquidity ? 0 : debtData.liquidity - liquidityAccrued;
-        debtData.liquidityGrowthX128Last = liquidityGrowthX128;
-
-        _dataOf[owner][_debtID(token0, token1, strike, selector)].data = abi.encode(debtData);
     }
 }
