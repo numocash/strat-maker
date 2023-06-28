@@ -7,7 +7,8 @@ import {Positions} from "src/core/Positions.sol";
 import {BalanceLib} from "src/libraries/BalanceLib.sol";
 import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
 import {mulDiv} from "src/core/math/FullMath.sol";
-import {getAmount0Delta, getAmount1Delta, toInt256} from "src/core/math/LiquidityMath.sol";
+import {getAmount0Delta, getAmount1Delta, calcAmountsForLiquidity, toInt256} from "src/core/math/LiquidityMath.sol";
+import {balanceToLiquidity} from "src/core/math/PositionMath.sol";
 import {Q128} from "src/core/math/StrikeMath.sol";
 
 import {IExecuteCallback} from "src/core/interfaces/IExecuteCallback.sol";
@@ -101,7 +102,12 @@ contract MockPair is Positions {
         public
         returns (uint256 amount0, uint256 amount1)
     {
-        (, amount0, amount1) = pair.provisionLiquidity(strike, spread, int256(balance));
+        uint256 liquidity = balanceToLiquidity(pair, strike, spread, uint256(balance), true);
+        (amount0, amount1) = calcAmountsForLiquidity(
+            pair.strikeCurrent[spread - 1], pair.composition[spread - 1], strike, uint256(liquidity), true
+        );
+
+        pair.updateStrike(strike, spread, int256(balance), int256(liquidity));
 
         _mintBiDirectional(msg.sender, token0, token1, strike, spread, balance);
 
@@ -130,8 +136,12 @@ contract MockPair is Positions {
         public
         returns (uint256 amount0, uint256 amount1)
     {
-        (, amount0, amount1) = pair.provisionLiquidity(strike, spread, -int256(balance));
+        uint256 liquidity = balanceToLiquidity(pair, strike, spread, uint256(balance), false);
+        (amount0, amount1) = calcAmountsForLiquidity(
+            pair.strikeCurrent[spread - 1], pair.composition[spread - 1], strike, uint256(liquidity), false
+        );
 
+        pair.updateStrike(strike, spread, -int256(balance), -int256(liquidity));
         SafeTransferLib.safeTransfer(token0, msg.sender, amount0);
         SafeTransferLib.safeTransfer(token1, msg.sender, amount1);
 

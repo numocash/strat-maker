@@ -91,18 +91,18 @@ contract AddLiquidityTest is Test, PairHelper {
     }
 
     function testAddLiquidityBadStrikes() external {
-        vm.expectRevert(Pairs.InvalidStrike.selector);
+        vm.expectRevert();
         pair.addLiquidity(type(int24).min, 0, 1e18);
 
-        vm.expectRevert(Pairs.InvalidStrike.selector);
+        vm.expectRevert();
         pair.addLiquidity(type(int24).max, 0, 1e18);
     }
 
     function testAddLiquidityBadSpread() external {
-        vm.expectRevert(Pairs.InvalidSpread.selector);
+        vm.expectRevert();
         pair.addLiquidity(0, 0, 1e18);
 
-        vm.expectRevert(Pairs.InvalidSpread.selector);
+        vm.expectRevert();
         pair.addLiquidity(0, 10, 1e18);
     }
 }
@@ -197,18 +197,18 @@ contract RemoveLiquidityTest is Test, PairHelper {
     // }
 
     function testRemoveLiquidityBadStrikes() external {
-        vm.expectRevert(Pairs.InvalidStrike.selector);
+        vm.expectRevert();
         pair.removeLiquidity(type(int24).min, 1, 1e18);
 
-        vm.expectRevert(Pairs.InvalidStrike.selector);
+        vm.expectRevert();
         pair.removeLiquidity(type(int24).max, 1, 1e18);
     }
 
     function testRemoveLiquidityBadSpread() external {
-        vm.expectRevert(Pairs.InvalidSpread.selector);
+        vm.expectRevert();
         pair.removeLiquidity(0, 0, 1e18);
 
-        vm.expectRevert(Pairs.InvalidSpread.selector);
+        vm.expectRevert();
         pair.removeLiquidity(0, 10, 1e18);
     }
 }

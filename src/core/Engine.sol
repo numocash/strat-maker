@@ -13,7 +13,7 @@ import {
     getAmount0Delta,
     getAmount1Delta
 } from "./math/LiquidityMath.sol";
-import {liquidityToBalance} from "./math/PositionMath.sol";
+import {balanceToLiquidity, liquidityToBalance} from "./math/PositionMath.sol";
 import {Q128} from "./math/StrikeMath.sol";
 
 import {BalanceLib} from "src/libraries/BalanceLib.sol";
@@ -27,6 +27,7 @@ import {IExecuteCallback} from "./interfaces/IExecuteCallback.sol";
 /// @custom:team accrue and accruePosition
 /// @custom:team pass minted position information back to callback
 /// @custom:team don't allow for transferring if a position isn't accrued
+/// @custom:team amount desired is impossible
 contract Engine is Positions {
     using Pairs for Pairs.Pair;
     using Accounts for Accounts.Account;
@@ -274,56 +275,69 @@ contract Engine is Positions {
     function _addLiquidity(address to, AddLiquidityParams memory params, Accounts.Account memory account) private {
         (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
 
+        // calculate how much to add
         int256 balance;
+        int256 liquidity;
+        int256 amount0;
+        int256 amount1;
         if (params.selector == TokenSelector.LiquidityPosition) {
             if (params.amountDesired < 0) revert InvalidAmountDesired();
 
             balance = params.amountDesired;
+            liquidity = toInt256(balanceToLiquidity(pair, params.strike, params.spread, uint256(balance), true));
+            (uint256 _amount0, uint256 _amount1) = calcAmountsForLiquidity(
+                pair.strikeCurrent[params.spread - 1],
+                pair.composition[params.spread - 1],
+                params.strike,
+                uint256(liquidity),
+                true
+            );
+            amount0 = int256(_amount0);
+            amount1 = int256(_amount1);
         } else if (params.selector == TokenSelector.Token0) {
             if (params.amountDesired < 0) revert InvalidAmountDesired();
 
-            balance = toInt256(
-                liquidityToBalance(
-                    pair,
+            liquidity = toInt256(
+                calcLiquidityForAmount0(
+                    pair.strikeCurrent[params.spread - 1],
+                    pair.composition[params.spread - 1],
                     params.strike,
-                    params.spread,
-                    calcLiquidityForAmount0(
-                        pair.strikeCurrent[params.spread - 1],
-                        pair.composition[params.spread - 1],
-                        params.strike,
-                        uint256(params.amountDesired),
-                        false
-                    ),
-                    false
+                    uint256(params.amountDesired),
+                    true
                 )
             );
+            amount0 = params.amountDesired;
+            amount1 = 0;
         } else if (params.selector == TokenSelector.Token1) {
             if (params.amountDesired < 0) revert InvalidAmountDesired();
 
-            balance = toInt256(
-                liquidityToBalance(
-                    pair,
+            liquidity = toInt256(
+                calcLiquidityForAmount1(
+                    pair.strikeCurrent[params.spread - 1],
+                    pair.composition[params.spread - 1],
                     params.strike,
-                    params.spread,
-                    calcLiquidityForAmount1(
-                        pair.strikeCurrent[params.spread - 1],
-                        pair.composition[params.spread - 1],
-                        params.strike,
-                        uint256(params.amountDesired),
-                        false
-                    ),
-                    false
+                    uint256(params.amountDesired),
+                    true
                 )
             );
+            amount0 = 0;
+            amount1 = params.amountDesired;
         } else {
             revert InvalidSelector();
         }
 
-        (, uint256 amount0, uint256 amount1) = pair.provisionLiquidity(params.strike, params.spread, balance);
+        if (params.selector == TokenSelector.Token0 || params.selector == TokenSelector.Token1) {
+            balance = toInt256(liquidityToBalance(pair, params.strike, params.spread, uint256(liquidity), false));
+        }
 
-        account.updateToken(params.token0, toInt256(amount0));
-        account.updateToken(params.token1, toInt256(amount1));
+        // add to pair
+        pair.updateStrike(params.strike, params.spread, balance, liquidity);
 
+        // update accounts
+        account.updateToken(params.token0, amount0);
+        account.updateToken(params.token1, amount1);
+
+        // mint position token
         _mintBiDirectional(to, params.token0, params.token1, params.strike, params.spread, uint256(balance));
 
         emit AddLiquidity(pairID, params.strike, params.spread, uint256(balance));
@@ -413,54 +427,68 @@ contract Engine is Positions {
     function _removeLiquidity(RemoveLiquidityParams memory params, Accounts.Account memory account) private {
         (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
 
+        // calculate how much to remove
         int256 balance;
+        int256 liquidity;
+        int256 amount0;
+        int256 amount1;
         if (params.selector == TokenSelector.LiquidityPosition) {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
 
             balance = params.amountDesired;
+            liquidity = -toInt256(balanceToLiquidity(pair, params.strike, params.spread, uint256(-balance), false));
+            // TODO: fix this function to not have to read composition
+            (uint256 _amount0, uint256 _amount1) = calcAmountsForLiquidity(
+                pair.strikeCurrent[params.spread - 1],
+                pair.composition[params.spread - 1],
+                params.strike,
+                uint256(liquidity),
+                false
+            );
+            amount0 = -int256(_amount0);
+            amount1 = -int256(_amount1);
         } else if (params.selector == TokenSelector.Token0) {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
 
-            balance = -toInt256(
-                liquidityToBalance(
-                    pair,
+            liquidity = -toInt256(
+                calcLiquidityForAmount0(
+                    pair.strikeCurrent[params.spread - 1],
+                    pair.composition[params.spread - 1],
                     params.strike,
-                    params.spread,
-                    calcLiquidityForAmount0(
-                        pair.strikeCurrent[params.spread - 1],
-                        pair.composition[params.spread - 1],
-                        params.strike,
-                        uint256(-params.amountDesired),
-                        true
-                    ),
+                    uint256(-params.amountDesired),
                     true
                 )
             );
+            amount0 = params.amountDesired;
+            amount1 = 0;
         } else if (params.selector == TokenSelector.Token1) {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
 
-            balance = -toInt256(
-                liquidityToBalance(
-                    pair,
+            liquidity = -toInt256(
+                calcLiquidityForAmount1(
+                    pair.strikeCurrent[params.spread - 1],
+                    pair.composition[params.spread - 1],
                     params.strike,
-                    params.spread,
-                    calcLiquidityForAmount1(
-                        pair.strikeCurrent[params.spread - 1],
-                        pair.composition[params.spread - 1],
-                        params.strike,
-                        uint256(-params.amountDesired),
-                        true
-                    ),
+                    uint256(-params.amountDesired),
                     true
                 )
             );
+            amount0 = 0;
+            amount1 = params.amountDesired;
         } else {
             revert InvalidSelector();
         }
-        (, uint256 amount0, uint256 amount1) = pair.provisionLiquidity(params.strike, params.spread, balance);
 
-        account.updateToken(params.token0, -toInt256(amount0));
-        account.updateToken(params.token1, -toInt256(amount1));
+        if (params.selector == TokenSelector.Token0 || params.selector == TokenSelector.Token1) {
+            balance = -toInt256(liquidityToBalance(pair, params.strike, params.spread, uint256(-liquidity), true));
+        }
+
+        // remove from pair
+        pair.updateStrike(params.strike, params.spread, balance, liquidity);
+
+        // update accounts
+        account.updateToken(params.token0, amount0);
+        account.updateToken(params.token1, amount1);
         account.updateILRTA(
             _biDirectionalID(params.token0, params.token1, params.strike, params.spread), uint256(-balance)
         );
