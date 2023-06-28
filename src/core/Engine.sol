@@ -9,6 +9,7 @@ import {mulDiv} from "./math/FullMath.sol";
 import {
     calcLiquidityForAmount0,
     calcLiquidityForAmount1,
+    calcAmountsForLiquidity,
     getAmount0Delta,
     getAmount1Delta
 } from "./math/LiquidityMath.sol";
@@ -24,6 +25,8 @@ import {IExecuteCallback} from "./interfaces/IExecuteCallback.sol";
 /// @custom:team return data and events
 /// @custom:team tree for function selector
 /// @custom:team accrue and accruePosition
+/// @custom:team pass minted position information back to callback
+/// @custom:team don't allow for transferring if a position isn't accrued
 contract Engine is Positions {
     using Pairs for Pairs.Pair;
     using Accounts for Accounts.Account;
@@ -99,6 +102,10 @@ contract Engine is Positions {
         address token0;
         address token1;
         int24 strike;
+        TokenSelector selectorCollateral;
+        uint256 leverageRatioX128;
+        TokenSelector selectorDebt;
+        uint256 amountDesiredDebt;
     }
 
     struct RemoveLiquidityParams {
@@ -173,6 +180,8 @@ contract Engine is Positions {
                 _addLiquidity(to, abi.decode(inputs[i], (AddLiquidityParams)), account);
             } else if (commands[i] == Commands.BorrowLiquidity) {
                 _borrowLiquidity(to, abi.decode(inputs[i], (BorrowLiquidityParams)), account);
+            } else if (commands[i] == Commands.RepayLiquidity) {
+                _repayLiquidity(to, abi.decode(inputs[i], (RepayLiquidityParams)), account);
             } else if (commands[i] == Commands.RemoveLiquidity) {
                 _removeLiquidity(abi.decode(inputs[i], (RemoveLiquidityParams)), account);
             } else if (commands[i] == Commands.CreatePair) {
@@ -315,22 +324,7 @@ contract Engine is Positions {
         account.updateToken(params.token0, toInt256(amount0));
         account.updateToken(params.token1, toInt256(amount1));
 
-        _mint(
-            to,
-            dataID(
-                abi.encode(
-                    Positions.ILRTADataID(
-                        Positions.OrderType.BiDirectional,
-                        abi.encode(
-                            Positions.BiDirectionalID(params.token0, params.token1, params.strike, params.spread)
-                        )
-                    )
-                )
-            ),
-            uint256(balance),
-            Positions.OrderType.BiDirectional,
-            bytes("")
-        );
+        _mintBiDirectional(to, params.token0, params.token1, params.strike, params.spread, uint256(balance));
 
         emit AddLiquidity(pairID, params.strike, params.spread, uint256(balance));
     }
@@ -375,29 +369,43 @@ contract Engine is Positions {
             revert InvalidSelector();
         }
 
-        // TODO: accrue user interest before minting
-
         // mint position to user
-        _mint(
+        _mintDebt(
             to,
-            dataID(
-                abi.encode(
-                    Positions.ILRTADataID(
-                        Positions.OrderType.Debt,
-                        abi.encode(
-                            Positions.DebtID(params.token0, params.token1, params.strike, params.selectorCollateral)
-                        )
-                    )
-                )
-            ),
+            params.token0,
+            params.token1,
+            params.strike,
+            params.selectorCollateral,
             liquidityDebt,
-            Positions.OrderType.Debt,
-            abi.encode(
-                Positions.DebtData(
-                    pair.strikes[params.strike].liquidityGrowthX128, mulDiv(liquidityCollateral, Q128, liquidityDebt)
-                )
-            )
+            pair.strikes[params.strike].liquidityGrowthX128,
+            mulDiv(liquidityCollateral, Q128, liquidityDebt)
         );
+
+        // emit
+    }
+
+    function _repayLiquidity(address to, RepayLiquidityParams memory params, Accounts.Account memory account) private {
+        (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
+
+        bytes32 id = _debtID(params.token0, params.token1, params.strike, params.selectorCollateral);
+
+        // calculate liquidity debt
+        uint256 liquidityDebt;
+        uint256 leverageRatioX128;
+        // (liquidityDebt, ,leverageRatioX128) = _debtDataOf()
+
+        pair.repayLiquidity(params.strike, liquidityDebt);
+
+        // (uint256 amount0, uint256 amount1) = calcAmountsForLiquidity(
+        //     pair.cachedStrikeCurrent, pair.composition[pair], params.strike, liquidityDebt, true
+        // );
+
+        // calculate tokens owed and add to account
+
+        // add unlocked collateral to account
+        // uint256 collateral = mulDiv(liquidityDebt, , Q128);
+
+        // add burned position to account
 
         // emit
     }
@@ -454,17 +462,7 @@ contract Engine is Positions {
         account.updateToken(params.token0, -toInt256(amount0));
         account.updateToken(params.token1, -toInt256(amount1));
         account.updateILRTA(
-            dataID(
-                abi.encode(
-                    Positions.ILRTADataID(
-                        Positions.OrderType.BiDirectional,
-                        abi.encode(
-                            Positions.BiDirectionalID(params.token0, params.token1, params.strike, params.spread)
-                        )
-                    )
-                )
-            ),
-            uint256(-balance)
+            _biDirectionalID(params.token0, params.token1, params.strike, params.spread), uint256(-balance)
         );
 
         emit RemoveLiquidity(pairID, params.strike, params.spread, uint256(-balance));
@@ -507,24 +505,46 @@ contract Engine is Positions {
         return pair.strikes[strike];
     }
 
-    function getPosition(
+    function getPositionBiDirectional(
+        address owner,
         address token0,
         address token1,
-        address owner,
         int24 strike,
         uint8 spread
     )
         external
         view
-        returns (Positions.ILRTAData memory)
+        returns (uint256 balance)
     {
-        return _dataOf[owner][dataID(
-            abi.encode(
-                Positions.ILRTADataID(
-                    Positions.OrderType.BiDirectional,
-                    abi.encode(Positions.BiDirectionalID(token0, token1, strike, spread))
-                )
-            )
-        )];
+        return _biDirectionalDataOf(owner, token0, token1, strike, spread);
+    }
+
+    function getPositionLimit(
+        address owner,
+        address token0,
+        address token1,
+        int24 strike,
+        bool zeroToOne,
+        uint256 liquidityGrowthLast
+    )
+        external
+        view
+        returns (uint256 balance)
+    {
+        return _limitDataOf(owner, token0, token1, strike, zeroToOne, liquidityGrowthLast);
+    }
+
+    function getPositionDebt(
+        address owner,
+        address token0,
+        address token1,
+        int24 strike,
+        Engine.TokenSelector selector
+    )
+        external
+        view
+        returns (uint256 balance, uint256 liquidityGrowthX128Last, uint256 leverageRatioX128)
+    {
+        return _debtDataOf(owner, token0, token1, strike, selector);
     }
 }

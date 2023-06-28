@@ -60,9 +60,8 @@ contract AddLiquidityTest is Test, PairHelper {
 
     function testLiquidityPosition() external {
         basicAddLiquidity();
-        Positions.ILRTAData memory positionInfo = pair.getPosition(address(this), 0, 1);
 
-        assertEq(positionInfo.balance, 1e18);
+        assertEq(pair.getPositionBiDirectional(address(this), 0, 1), 1e18);
     }
 
     function testAddLiquidityStrikeMapBasic() external {
@@ -141,9 +140,8 @@ contract RemoveLiquidityTest is Test, PairHelper {
     function testRemoveLiquidityPosition() external {
         basicAddLiquidity();
         basicRemoveLiquidity();
-        Positions.ILRTAData memory positionInfo = pair.getPosition(address(this), 0, 1);
 
-        assertEq(positionInfo.balance, 0);
+        assertEq(pair.getPositionBiDirectional(address(this), 0, 1), 0);
     }
 
     function testGasRemoveLiquidityCloseStrikes() external {

@@ -180,18 +180,237 @@ abstract contract Positions is ILRTA {
         }
     }
 
-    function _mint(address to, bytes32 id, uint256 amount, OrderType orderType, bytes memory data) internal virtual {
+    function _biDirectionalID(
+        address token0,
+        address token1,
+        int24 strike,
+        uint8 spread
+    )
+        internal
+        pure
+        returns (bytes32)
+    {
+        return dataID(
+            abi.encode(
+                ILRTADataID(OrderType.BiDirectional, abi.encode(BiDirectionalID(token0, token1, strike, spread)))
+            )
+        );
+    }
+
+    function _limitID(
+        address token0,
+        address token1,
+        int24 strike,
+        bool zeroToOne,
+        uint256 liquidityGrowthLast
+    )
+        internal
+        pure
+        returns (bytes32)
+    {
+        return dataID(
+            abi.encode(
+                ILRTADataID(
+                    OrderType.Limit, abi.encode(LimitID(token0, token1, strike, zeroToOne, liquidityGrowthLast))
+                )
+            )
+        );
+    }
+
+    function _debtID(
+        address token0,
+        address token1,
+        int24 strike,
+        Engine.TokenSelector selector
+    )
+        internal
+        pure
+        returns (bytes32)
+    {
+        return dataID(abi.encode(ILRTADataID(OrderType.Debt, abi.encode(DebtID(token0, token1, strike, selector)))));
+    }
+
+    function _biDirectionalDataOf(
+        address owner,
+        address token0,
+        address token1,
+        int24 strike,
+        uint8 spread
+    )
+        internal
+        view
+        returns (uint256 balance)
+    {
+        return _dataOf[owner][_biDirectionalID(token0, token1, strike, spread)].balance;
+    }
+
+    function _limitDataOf(
+        address owner,
+        address token0,
+        address token1,
+        int24 strike,
+        bool zeroToOne,
+        uint256 liquidityGrowthLast
+    )
+        internal
+        view
+        returns (uint256 balance)
+    {
+        return _dataOf[owner][_limitID(token0, token1, strike, zeroToOne, liquidityGrowthLast)].balance;
+    }
+
+    function _debtDataOf(
+        address owner,
+        address token0,
+        address token1,
+        int24 strike,
+        Engine.TokenSelector selector
+    )
+        internal
+        view
+        returns (uint256 balance, uint256 liquidityGrowthX128Last, uint256 leverageRatioX128)
+    {
+        ILRTAData memory data = _dataOf[owner][_debtID(token0, token1, strike, selector)];
+        DebtData memory debtData = abi.decode(data.data, (DebtData));
+
+        return (data.balance, debtData.liquidityGrowthX128Last, debtData.leverageRatioX128);
+    }
+
+    function _mintBiDirectional(
+        address to,
+        address token0,
+        address token1,
+        int24 strike,
+        uint8 spread,
+        uint256 amount
+    )
+        internal
+    {
+        bytes32 id = _biDirectionalID(token0, token1, strike, spread);
         // change in liquidity cannot exceed the maximum liquidity in a strike
         unchecked {
             _dataOf[to][id].balance += amount;
         }
 
-        emit Transfer(address(0), to, abi.encode(ILRTATransferDetails(id, amount, orderType, data)));
+        emit Transfer(address(0), to, abi.encode(ILRTATransferDetails(id, amount, OrderType.BiDirectional, bytes(""))));
     }
 
-    function _burn(address from, bytes32 id, uint256 amount, OrderType orderType, bytes memory data) internal virtual {
+    function _mintLimit(
+        address to,
+        address token0,
+        address token1,
+        int24 strike,
+        bool zeroToOne,
+        uint256 liquidityGrowthLast,
+        uint256 amount
+    )
+        internal
+    {
+        bytes32 id = _limitID(token0, token1, strike, zeroToOne, liquidityGrowthLast);
+
+        unchecked {
+            _dataOf[to][id].balance += amount;
+        }
+
+        emit Transfer(address(0), to, abi.encode(ILRTATransferDetails(id, amount, OrderType.Limit, bytes(""))));
+    }
+
+    function _mintDebt(
+        address to,
+        address token0,
+        address token1,
+        int24 strike,
+        Engine.TokenSelector selector,
+        uint256 amount,
+        uint256 liquidityGrowthX128Last,
+        uint256 leverageRatioX128
+    )
+        internal
+    {
+        bytes32 id = _debtID(token0, token1, strike, selector);
+
+        unchecked {
+            _dataOf[to][id].balance += amount;
+        }
+
+        emit Transfer(
+            address(0),
+            to,
+            abi.encode(
+                ILRTATransferDetails(
+                    id, amount, OrderType.Limit, abi.encode(DebtData(liquidityGrowthX128Last, leverageRatioX128))
+                )
+            )
+        );
+    }
+
+    function _burnBiDirectional(
+        address from,
+        address token0,
+        address token1,
+        int24 strike,
+        uint8 spread,
+        uint256 amount
+    )
+        internal
+    {
+        bytes32 id = _biDirectionalID(token0, token1, strike, spread);
+
+        _dataOf[from][id].balance -= amount;
+
+        emit Transfer(
+            from, address(0), abi.encode(ILRTATransferDetails(id, amount, OrderType.BiDirectional, bytes("")))
+        );
+    }
+
+    function _burn(address from, bytes32 id, uint256 amount, OrderType orderType, bytes memory data) internal {
         _dataOf[from][id].balance -= amount;
 
         emit Transfer(from, address(0), abi.encode(ILRTATransferDetails(id, amount, orderType, data)));
+    }
+
+    function _burnLimit(
+        address from,
+        address token0,
+        address token1,
+        int24 strike,
+        bool zeroToOne,
+        uint256 liquidityGrowthLast,
+        uint256 amount
+    )
+        internal
+    {
+        bytes32 id = _limitID(token0, token1, strike, zeroToOne, liquidityGrowthLast);
+
+        _dataOf[from][id].balance -= amount;
+
+        emit Transfer(from, address(0), abi.encode(ILRTATransferDetails(id, amount, OrderType.Limit, bytes(""))));
+    }
+
+    function _burnDebt(
+        address from,
+        address token0,
+        address token1,
+        int24 strike,
+        Engine.TokenSelector selector,
+        uint256 amount,
+        uint256 liquidityGrowthX128Last,
+        uint256 leverageRatioX128
+    )
+        internal
+    {
+        bytes32 id = _debtID(token0, token1, strike, selector);
+
+        _dataOf[from][id].balance -= amount;
+
+        emit Transfer(
+            from,
+            address(0),
+            abi.encode(
+                ILRTATransferDetails(
+                    id, amount, OrderType.Limit, abi.encode(DebtData(liquidityGrowthX128Last, leverageRatioX128))
+                )
+            )
+        );
     }
 }

@@ -62,23 +62,15 @@ contract MockPair is Positions {
         }
 
         // mint position to user
-        _mint(
+        _mintDebt(
             msg.sender,
-            dataID(
-                abi.encode(
-                    Positions.ILRTADataID(
-                        Positions.OrderType.Debt,
-                        abi.encode(Positions.DebtID(token0, token1, strike, selectorCollateral))
-                    )
-                )
-            ),
+            token0,
+            token1,
+            strike,
+            selectorCollateral,
             liquidityDebt,
-            Positions.OrderType.Debt,
-            abi.encode(
-                Positions.DebtData(
-                    pair.strikes[strike].liquidityGrowthX128, mulDiv(liquidityCollateral, Q128, liquidityDebt)
-                )
-            )
+            pair.strikes[strike].liquidityGrowthX128,
+            mulDiv(liquidityCollateral, Q128, liquidityDebt)
         );
 
         address[] memory tokens = new address[](2);
@@ -111,20 +103,7 @@ contract MockPair is Positions {
     {
         (, amount0, amount1) = pair.provisionLiquidity(strike, spread, int256(balance));
 
-        _mint(
-            msg.sender,
-            dataID(
-                abi.encode(
-                    Positions.ILRTADataID(
-                        Positions.OrderType.BiDirectional,
-                        abi.encode(Positions.BiDirectionalID(token0, token1, strike, spread))
-                    )
-                )
-            ),
-            balance,
-            Positions.OrderType.BiDirectional,
-            bytes("")
-        );
+        _mintBiDirectional(msg.sender, token0, token1, strike, spread, balance);
 
         address[] memory tokens = new address[](2);
         tokens[0] = token0;
@@ -156,20 +135,7 @@ contract MockPair is Positions {
         SafeTransferLib.safeTransfer(token0, msg.sender, amount0);
         SafeTransferLib.safeTransfer(token1, msg.sender, amount1);
 
-        _burn(
-            msg.sender,
-            dataID(
-                abi.encode(
-                    Positions.ILRTADataID(
-                        Positions.OrderType.BiDirectional,
-                        abi.encode(Positions.BiDirectionalID(token0, token1, strike, spread))
-                    )
-                )
-            ),
-            balance,
-            Positions.OrderType.BiDirectional,
-            bytes("")
-        );
+        _burnBiDirectional(msg.sender, token0, token1, strike, spread, balance);
     }
 
     function swap(bool isToken0, int256 amountDesired) public returns (int256 amount0, int256 amount1) {
@@ -218,22 +184,40 @@ contract MockPair is Positions {
         return pair.strikes[strike];
     }
 
-    function getPosition(
+    function getPositionBiDirectional(
         address owner,
         int24 strike,
         uint8 spread
     )
         external
         view
-        returns (Positions.ILRTAData memory)
+        returns (uint256 balance)
     {
-        return _dataOf[owner][dataID(
-            abi.encode(
-                Positions.ILRTADataID(
-                    Positions.OrderType.BiDirectional,
-                    abi.encode(Positions.BiDirectionalID(token0, token1, strike, spread))
-                )
-            )
-        )];
+        return _biDirectionalDataOf(owner, token0, token1, strike, spread);
+    }
+
+    function getPositionLimit(
+        address owner,
+        int24 strike,
+        bool zeroToOne,
+        uint256 liquidityGrowthLast
+    )
+        external
+        view
+        returns (uint256 balance)
+    {
+        return _limitDataOf(owner, token0, token1, strike, zeroToOne, liquidityGrowthLast);
+    }
+
+    function getPositionDebt(
+        address owner,
+        int24 strike,
+        Engine.TokenSelector selector
+    )
+        external
+        view
+        returns (uint256 balance, uint256 liquidityGrowthX128Last, uint256 leverageRatioX128)
+    {
+        return _debtDataOf(owner, token0, token1, strike, selector);
     }
 }
