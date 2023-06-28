@@ -3,8 +3,7 @@ pragma solidity ^0.8.19;
 
 import {BitMaps} from "./BitMaps.sol";
 import {mulDiv, mulDivRoundingUp} from "./math/FullMath.sol";
-import {addDelta, calcAmountsForLiquidity, toInt256} from "./math/LiquidityMath.sol";
-import {balanceToLiquidity} from "./math/PositionMath.sol";
+import {addDelta, toInt256} from "./math/LiquidityMath.sol";
 import {getRatioAtStrike, MAX_STRIKE, MIN_STRIKE, Q128} from "./math/StrikeMath.sol";
 import {computeSwapStep} from "./math/SwapMath.sol";
 

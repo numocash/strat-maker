@@ -3,6 +3,7 @@ pragma solidity ^0.8.19;
 
 import {mulDiv, mulDivRoundingUp} from "./FullMath.sol";
 import {getRatioAtStrike, Q128} from "./StrikeMath.sol";
+import {Pairs} from "../Pairs.sol";
 
 /// @notice Calculate amount0 delta when moving completely through the liquidity at the strike.
 /// @dev Assumes inputs are valid
@@ -55,21 +56,24 @@ function getAmount1FromComposition(
 }
 
 /// @notice Calculate amount{0,1} needed for the given liquidity change
-function calcAmountsForLiquidity(
-    int24 strikeCurrent,
-    uint128 composition,
+function getAmountsForLiquidity(
+    Pairs.Pair storage pair,
     int24 strike,
+    uint8 spread,
     uint256 liquidity,
     bool roundUp
 )
-    pure
+    view
     returns (uint256 amount0, uint256 amount1)
 {
-    if (strike > strikeCurrent) {
+    int24 _strikeCurrent = pair.strikeCurrent[spread - 1];
+
+    if (strike > _strikeCurrent) {
         return (getAmount0Delta(liquidity, strike, roundUp), 0);
-    } else if (strike < strikeCurrent) {
+    } else if (strike < _strikeCurrent) {
         return (0, getAmount1Delta(liquidity));
     } else {
+        uint128 composition = pair.composition[spread - 1];
         return (
             getAmount0FromComposition(composition, liquidity, getRatioAtStrike(strike), roundUp),
             getAmount1FromComposition(composition, liquidity, roundUp)
@@ -78,48 +82,54 @@ function calcAmountsForLiquidity(
 }
 
 /// @notice Calculate max liquidity received if adding the given amount0
-function calcLiquidityForAmount0(
-    int24 strikeCurrent,
-    uint128 composition,
+function getLiquidityForAmount0(
+    Pairs.Pair storage pair,
     int24 strike,
+    uint8 spread,
     uint256 amount0,
     bool roundUp
 )
-    pure
+    view
     returns (uint256 liquidity)
 {
-    if (strike > strikeCurrent) {
+    int24 _strikeCurrent = pair.strikeCurrent[spread - 1];
+
+    if (strike > _strikeCurrent) {
         return roundUp
             ? mulDivRoundingUp(amount0, getRatioAtStrike(strike), Q128)
             : mulDiv(amount0, getRatioAtStrike(strike), Q128);
-    } else if (strike == strikeCurrent) {
+    } else if (strike == _strikeCurrent) {
+        uint128 composition = pair.composition[spread - 1];
         uint128 token0Composition;
         unchecked {
             token0Composition = type(uint128).max - composition;
         }
 
         return roundUp
-            ? mulDivRoundingUp(amount0, getRatioAtStrike(strikeCurrent), token0Composition)
-            : mulDiv(amount0, getRatioAtStrike(strikeCurrent), token0Composition);
+            ? mulDivRoundingUp(amount0, getRatioAtStrike(_strikeCurrent), token0Composition)
+            : mulDiv(amount0, getRatioAtStrike(_strikeCurrent), token0Composition);
     } else {
         return 0;
     }
 }
 
 /// @notice Calculate max liquidity received if adding the given amount1
-function calcLiquidityForAmount1(
-    int24 strikeCurrent,
-    uint128 composition,
+function getLiquidityForAmount1(
+    Pairs.Pair storage pair,
     int24 strike,
+    uint8 spread,
     uint256 amount1,
     bool roundUp
 )
-    pure
+    view
     returns (uint256 liquidity)
 {
-    if (strike < strikeCurrent) {
+    int24 _strikeCurrent = pair.strikeCurrent[spread - 1];
+
+    if (strike < _strikeCurrent) {
         return amount1;
-    } else if (strike == strikeCurrent) {
+    } else if (strike == _strikeCurrent) {
+        uint256 composition = pair.composition[spread - 1];
         return roundUp ? mulDivRoundingUp(amount1, composition, Q128) : mulDiv(amount1, composition, Q128);
     } else {
         return 0;

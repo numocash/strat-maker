@@ -7,9 +7,9 @@ import {Pairs, NUM_SPREADS} from "./Pairs.sol";
 import {Positions} from "./Positions.sol";
 import {mulDiv} from "./math/FullMath.sol";
 import {
-    calcLiquidityForAmount0,
-    calcLiquidityForAmount1,
-    calcAmountsForLiquidity,
+    getLiquidityForAmount0,
+    getLiquidityForAmount1,
+    getAmountsForLiquidity,
     getAmount0Delta,
     getAmount1Delta
 } from "./math/LiquidityMath.sol";
@@ -285,26 +285,15 @@ contract Engine is Positions {
 
             balance = params.amountDesired;
             liquidity = toInt256(balanceToLiquidity(pair, params.strike, params.spread, uint256(balance), true));
-            (uint256 _amount0, uint256 _amount1) = calcAmountsForLiquidity(
-                pair.strikeCurrent[params.spread - 1],
-                pair.composition[params.spread - 1],
-                params.strike,
-                uint256(liquidity),
-                true
-            );
+            (uint256 _amount0, uint256 _amount1) =
+                getAmountsForLiquidity(pair, params.strike, params.spread, uint256(liquidity), true);
             amount0 = int256(_amount0);
             amount1 = int256(_amount1);
         } else if (params.selector == TokenSelector.Token0) {
             if (params.amountDesired < 0) revert InvalidAmountDesired();
 
             liquidity = toInt256(
-                calcLiquidityForAmount0(
-                    pair.strikeCurrent[params.spread - 1],
-                    pair.composition[params.spread - 1],
-                    params.strike,
-                    uint256(params.amountDesired),
-                    true
-                )
+                getLiquidityForAmount0(pair, params.strike, params.spread, uint256(params.amountDesired), true)
             );
             amount0 = params.amountDesired;
             amount1 = 0;
@@ -312,13 +301,7 @@ contract Engine is Positions {
             if (params.amountDesired < 0) revert InvalidAmountDesired();
 
             liquidity = toInt256(
-                calcLiquidityForAmount1(
-                    pair.strikeCurrent[params.spread - 1],
-                    pair.composition[params.spread - 1],
-                    params.strike,
-                    uint256(params.amountDesired),
-                    true
-                )
+                getLiquidityForAmount1(pair, params.strike, params.spread, uint256(params.amountDesired), true)
             );
             amount0 = 0;
             amount1 = params.amountDesired;
@@ -438,41 +421,20 @@ contract Engine is Positions {
             balance = params.amountDesired;
             liquidity = -toInt256(balanceToLiquidity(pair, params.strike, params.spread, uint256(-balance), false));
             // TODO: fix this function to not have to read composition
-            (uint256 _amount0, uint256 _amount1) = calcAmountsForLiquidity(
-                pair.strikeCurrent[params.spread - 1],
-                pair.composition[params.spread - 1],
-                params.strike,
-                uint256(liquidity),
-                false
-            );
+            (uint256 _amount0, uint256 _amount1) =
+                getAmountsForLiquidity(pair, params.strike, params.spread, uint256(liquidity), false);
             amount0 = -int256(_amount0);
             amount1 = -int256(_amount1);
         } else if (params.selector == TokenSelector.Token0) {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
 
-            liquidity = -toInt256(
-                calcLiquidityForAmount0(
-                    pair.strikeCurrent[params.spread - 1],
-                    pair.composition[params.spread - 1],
-                    params.strike,
-                    uint256(-params.amountDesired),
-                    true
-                )
-            );
+            liquidity = -toInt256(getLiquidityForAmount0(pair, params.strike, params.spread, uint256(-params.amountDesired), true));
             amount0 = params.amountDesired;
             amount1 = 0;
         } else if (params.selector == TokenSelector.Token1) {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
 
-            liquidity = -toInt256(
-                calcLiquidityForAmount1(
-                    pair.strikeCurrent[params.spread - 1],
-                    pair.composition[params.spread - 1],
-                    params.strike,
-                    uint256(-params.amountDesired),
-                    true
-                )
-            );
+            liquidity = -toInt256(getLiquidityForAmount1(pair, params.strike, params.spread, uint256(-params.amountDesired), true));
             amount0 = 0;
             amount1 = params.amountDesired;
         } else {
