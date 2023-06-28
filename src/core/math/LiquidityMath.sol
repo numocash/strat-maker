@@ -74,6 +74,52 @@ function getAmount1FromComposition(
 }
 
 /// @notice Calculate amount{0,1} needed for the given liquidity change
+function getAmount0ForLiquidity(
+    Pairs.Pair storage pair,
+    int24 strike,
+    uint8 spread,
+    uint256 liquidity,
+    bool roundUp
+)
+    view
+    returns (uint256 amount0)
+{
+    int24 _strikeCurrent = pair.strikeCurrent[spread - 1];
+
+    if (strike > _strikeCurrent) {
+        return getAmount0Delta(liquidity, strike, roundUp);
+    } else if (strike < _strikeCurrent) {
+        return 0;
+    } else {
+        uint128 composition = pair.composition[spread - 1];
+        return getAmount0FromComposition(composition, liquidity, getRatioAtStrike(strike), roundUp);
+    }
+}
+
+/// @notice Calculate amount{0,1} needed for the given liquidity change
+function getAmount1ForLiquidity(
+    Pairs.Pair storage pair,
+    int24 strike,
+    uint8 spread,
+    uint256 liquidity,
+    bool roundUp
+)
+    view
+    returns (uint256 amount1)
+{
+    int24 _strikeCurrent = pair.strikeCurrent[spread - 1];
+
+    if (strike < _strikeCurrent) {
+        return getAmount1Delta(liquidity);
+    } else if (strike > _strikeCurrent) {
+        return 0;
+    } else {
+        uint128 composition = pair.composition[spread - 1];
+        return getAmount1FromComposition(composition, liquidity, roundUp);
+    }
+}
+
+/// @notice Calculate amount{0,1} needed for the given liquidity change
 function getAmountsForLiquidity(
     Pairs.Pair storage pair,
     int24 strike,

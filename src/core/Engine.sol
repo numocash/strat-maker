@@ -13,7 +13,9 @@ import {
     getAmount0Delta,
     getAmount1Delta,
     getLiquidityDeltaAmount0,
-    getLiquidityDeltaAmount1
+    getLiquidityDeltaAmount1,
+    getAmount0ForLiquidity,
+    getAmount1ForLiquidity
 } from "./math/LiquidityMath.sol";
 import {
     balanceToLiquidity,
@@ -339,14 +341,14 @@ contract Engine is Positions {
                 getLiquidityForAmount0(pair, params.strike, params.spread, uint256(params.amountDesired), true)
             );
             amount0 = params.amountDesired;
-            amount1 = 0;
+            amount1 = toInt256(getAmount1ForLiquidity(pair, params.strike, params.spread, uint256(liquidity), true));
         } else if (params.selector == TokenSelector.Token1) {
             if (params.amountDesired < 0) revert InvalidAmountDesired();
 
             liquidity = toInt256(
                 getLiquidityForAmount1(pair, params.strike, params.spread, uint256(params.amountDesired), true)
             );
-            amount0 = 0;
+            amount0 = toInt256(getAmount0ForLiquidity(pair, params.strike, params.spread, uint256(liquidity), true));
             amount1 = params.amountDesired;
         } else {
             revert InvalidSelector();
@@ -501,15 +503,14 @@ contract Engine is Positions {
         } else if (params.selector == TokenSelector.Token0) {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
 
-            liquidity = -toInt256(getLiquidityForAmount0(pair, params.strike, params.spread, uint256(-params.amountDesired), true));
+            liquidity = -toInt256(getLiquidityForAmount0(pair, params.strike, params.spread, uint256(-params.amountDesired), false));
             amount0 = params.amountDesired;
-            // TODO: amount 1 can be greater than 0
-            amount1 = 0;
+            amount1 = -toInt256(getAmount1ForLiquidity(pair, params.strike, params.spread, uint256(-liquidity), false));
         } else if (params.selector == TokenSelector.Token1) {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
 
-            liquidity = -toInt256(getLiquidityForAmount1(pair, params.strike, params.spread, uint256(-params.amountDesired), true));
-            amount0 = 0;
+            liquidity = -toInt256(getLiquidityForAmount1(pair, params.strike, params.spread, uint256(-params.amountDesired), false));
+            amount0 = -toInt256(getAmount0ForLiquidity(pair, params.strike, params.spread, uint256(-liquidity), false));
             amount1 = params.amountDesired;
         } else {
             revert InvalidSelector();
