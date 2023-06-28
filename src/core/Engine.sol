@@ -15,7 +15,12 @@ import {
     getLiquidityDeltaAmount0,
     getLiquidityDeltaAmount1
 } from "./math/LiquidityMath.sol";
-import {balanceToLiquidity, liquidityToBalance} from "./math/PositionMath.sol";
+import {
+    balanceToLiquidity,
+    liquidityToBalance,
+    debtBalanceToLiquidity,
+    debtLiquidityToBalance
+} from "./math/PositionMath.sol";
 import {Q128} from "./math/StrikeMath.sol";
 
 import {BalanceLib} from "src/libraries/BalanceLib.sol";
@@ -278,7 +283,6 @@ contract Engine is Positions {
 
             if (id == bytes32(0)) break;
 
-            // TODO: fix extra data
             if (delta < 0) {
                 _burn(address(this), id, delta, account.orderTypes[i], account.datas[i]);
             }
@@ -410,6 +414,7 @@ contract Engine is Positions {
             params.token1,
             params.strike,
             params.selectorCollateral,
+            debtLiquidityToBalance(liquidityDebt, pair.strikes[params.strike].liquidityGrowthX128, false),
             liquidityDebt,
             pair.strikes[params.strike].liquidityGrowthX128,
             mulDiv(liquidityCollateral, Q128, liquidityDebt)
@@ -421,10 +426,14 @@ contract Engine is Positions {
     function _repayLiquidity(RepayLiquidityParams memory params, Accounts.Account memory account) private {
         (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
 
+        uint256 _liquidityGrowthX128 = pair.strikes[params.strike].liquidityGrowthX128;
+
         // calculate liquidity to repay
+        uint256 amount;
         uint256 liquidityDebt;
         if (params.selectorDebt == TokenSelector.LiquidityPosition) {
-            liquidityDebt = params.amountDesiredDebt;
+            amount = params.amountDesiredDebt;
+            liquidityDebt = debtBalanceToLiquidity(amount, _liquidityGrowthX128, true);
         } else if (params.selectorDebt == TokenSelector.Token0) {
             revert InvalidSelector();
         } else if (params.selectorDebt == TokenSelector.Token1) {
@@ -442,16 +451,27 @@ contract Engine is Positions {
         account.updateToken(params.token1, toInt256(amount1));
 
         // add unlocked collateral to account
-        uint256 liquidityCollateral = mulDiv(liquidityDebt, params.leverageRatioX128, Q128);
-        if (params.selectorCollateral == TokenSelector.Token0) {
-            account.updateToken(params.token0, -toInt256(getAmount0Delta(liquidityCollateral, params.strike, false)));
-        } else {
-            account.updateToken(params.token0, -toInt256(getAmount1Delta(liquidityCollateral)));
+        {
+            uint256 liquidityCollateral = mulDiv(liquidityDebt, params.leverageRatioX128, Q128);
+            if (params.selectorCollateral == TokenSelector.Token0) {
+                account.updateToken(
+                    params.token0, -toInt256(getAmount0Delta(liquidityCollateral, params.strike, false))
+                );
+            } else {
+                account.updateToken(params.token0, -toInt256(getAmount1Delta(liquidityCollateral)));
+            }
         }
 
         // add burned position to account
-        bytes32 id = _debtID(params.token0, params.token1, params.strike, params.selectorCollateral);
-        account.updateILRTA(id, liquidityDebt, OrderType.Debt, bytes(""));
+        {
+            bytes32 id = _debtID(params.token0, params.token1, params.strike, params.selectorCollateral);
+            account.updateILRTA(
+                id,
+                amount,
+                OrderType.Debt,
+                abi.encode(DebtData(liquidityDebt, _liquidityGrowthX128, params.leverageRatioX128))
+            );
+        }
 
         // emit
     }

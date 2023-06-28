@@ -312,6 +312,7 @@ abstract contract Positions is ILRTA {
         int24 strike,
         Engine.TokenSelector selector,
         uint256 amount,
+        uint256 liquidityAmount,
         uint256 liquidityGrowthX128Last,
         uint256 leverageRatioX128
     )
@@ -331,7 +332,7 @@ abstract contract Positions is ILRTA {
                     id,
                     amount,
                     Engine.OrderType.Limit,
-                    abi.encode(DebtData(amount, liquidityGrowthX128Last, leverageRatioX128))
+                    abi.encode(DebtData(liquidityAmount, liquidityGrowthX128Last, leverageRatioX128))
                 )
             )
         );
@@ -387,6 +388,7 @@ abstract contract Positions is ILRTA {
         int24 strike,
         Engine.TokenSelector selector,
         uint256 amount,
+        uint256 liquidityAmount,
         uint256 liquidityGrowthX128Last,
         uint256 leverageRatioX128
     )
@@ -404,7 +406,7 @@ abstract contract Positions is ILRTA {
                     id,
                     amount,
                     Engine.OrderType.Limit,
-                    abi.encode(DebtData(amount, liquidityGrowthX128Last, leverageRatioX128))
+                    abi.encode(DebtData(liquidityAmount, liquidityGrowthX128Last, leverageRatioX128))
                 )
             )
         );

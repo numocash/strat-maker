@@ -46,6 +46,33 @@ function liquidityToBalance(
     }
 }
 
+function debtBalanceToLiquidity(
+    uint256 balance,
+    uint256 liquidityGrowthX128,
+    bool roundUp
+)
+    pure
+    returns (uint256 liquidity)
+{
+    return (
+        roundUp
+            ? mulDivRoundingUp(balance, Q128, liquidityGrowthX128 + Q128)
+            : mulDiv(balance, Q128, liquidityGrowthX128 + Q128)
+    );
+}
+
+function debtLiquidityToBalance(
+    uint256 liquidity,
+    uint256 liquidityGrowthX128,
+    bool roundUp
+)
+    pure
+    returns (uint256 balance)
+{
+    return liquidity
+        + (roundUp ? mulDivRoundingUp(liquidity, liquidityGrowthX128, Q128) : mulDiv(liquidity, liquidityGrowthX128, Q128));
+}
+
 function getLiquidityBorrowed(
     Pairs.Pair storage pair,
     int24 strike,
