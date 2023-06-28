@@ -130,6 +130,8 @@ library Pairs {
         int24 cachedStrikeCurrent;
         uint256 liquiditySwap;
         uint256 liquidityTotal;
+        uint256[NUM_SPREADS] liquiditySwapSpread;
+        uint256[NUM_SPREADS] liquidityTotalSpread;
         // pool's balance change of the token which "amountDesired" refers to
         int256 amountA;
         // pool's balance change of the opposite token
@@ -159,14 +161,17 @@ library Pairs {
                 int24 spreadStrikeCurrent = state.strikeCurrent[i - 1];
 
                 if (activeStrike == spreadStrikeCurrent) {
-                    uint256 spreadLiquidity = pair.strikes[activeStrike].liquidityBiDirectional[i - 1];
-                    state.liquidityTotal += spreadLiquidity;
-
-                    state.liquiditySwap = mulDiv(
+                    uint256 liquidityTotal = pair.strikes[activeStrike].liquidityBiDirectional[i - 1];
+                    uint256 liquiditySwap = mulDiv(
                         isSwap0To1 ? pair.composition[i - 1] : type(uint128).max - pair.composition[i - 1],
-                        spreadLiquidity,
+                        liquidityTotal,
                         Q128
                     );
+
+                    state.liquidityTotalSpread[i - 1] = liquidityTotal;
+                    state.liquiditySwapSpread[i - 1] = liquiditySwap;
+                    state.liquidityTotal += liquidityTotal;
+                    state.liquiditySwap += liquiditySwap;
                 } else {
                     break;
                 }
@@ -192,6 +197,7 @@ library Pairs {
                     state.amountB += toInt256(amountIn);
                 }
 
+                // calculate and store liquidity gained from fees
                 // if (isSwap0To1) {
                 //     unchecked {
                 //         uint256 swapLiquidityAvailable = mulDiv(
@@ -296,12 +302,17 @@ library Pairs {
                             uint256 liquidity = pair.strikes[activeStrike].liquidityBiDirectional[i - 1];
                             state.liquidityTotal += liquidity;
                             state.liquiditySwap += liquidity;
+                            state.liquidityTotalSpread[i - 1] = liquidity;
+                            state.liquiditySwapSpread[i - 1] = liquidity;
                         } else if (state.strikeCurrent[i - 1] == activeStrike) {
                             uint256 liquidity = pair.strikes[activeStrike].liquidityBiDirectional[i - 1];
                             uint128 composition = pair.composition[i - 1];
+                            uint256 liquiditySwap = mulDiv(liquidity, composition, Q128);
 
                             state.liquidityTotal += liquidity;
-                            state.liquiditySwap += mulDiv(liquidity, composition, Q128);
+                            state.liquiditySwap += liquiditySwap;
+                            state.liquidityTotalSpread[i - 1] = liquidity;
+                            state.liquiditySwapSpread[i - 1] = liquiditySwap;
                         } else {
                             break;
                         }
@@ -329,15 +340,19 @@ library Pairs {
                             state.strikeCurrent[i - 1] = activeStrike;
 
                             uint256 liquidity = pair.strikes[activeStrike].liquidityBiDirectional[i - 1];
-
                             state.liquidityTotal += liquidity;
                             state.liquiditySwap += liquidity;
+                            state.liquidityTotalSpread[i - 1] = liquidity;
+                            state.liquiditySwapSpread[i - 1] = liquidity;
                         } else if (state.strikeCurrent[i - 1] == activeStrike) {
                             uint256 liquidity = pair.strikes[activeStrike].liquidityBiDirectional[i - 1];
                             uint128 composition = type(uint128).max - pair.composition[i - 1];
+                            uint256 liquiditySwap = mulDiv(liquidity, composition, Q128);
 
                             state.liquidityTotal += liquidity;
-                            state.liquiditySwap += mulDiv(liquidity, composition, Q128);
+                            state.liquiditySwap += liquiditySwap;
+                            state.liquidityTotalSpread[i - 1] = liquidity;
+                            state.liquiditySwapSpread[i - 1] = liquiditySwap;
                         } else {
                             break;
                         }
