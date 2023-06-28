@@ -424,5 +424,39 @@ contract BorrowTest is Test, PairHelper {
 
         assertEq(token0.balanceOf(address(pair)), mulDivRoundingUp(1e18, Q128, getRatioAtStrike(1)) + uint256(amount0));
         assertEq(token1.balanceOf(address(pair)), 0);
+
+        (uint256 balance, uint256 liquidity, uint256 liquidityGrowthX128Last, uint256 leverageRatioX128) =
+            pair.getPositionDebt(address(this), 1, Engine.TokenSelector.Token0);
+
+        assertEq(balance, 0.5e18);
+        assertEq(liquidity, 0.5e18);
+        assertEq(liquidityGrowthX128Last, 0);
+        assertEq(leverageRatioX128, mulDiv(mulDiv(1.5e18, getRatioAtStrike(1), Q128), Q128, 0.5e18));
+    }
+}
+
+contract RepayTest is Test, PairHelper {
+    function setUp() external {
+        _setUp();
+    }
+
+    function testRepayAmounts() external {
+        pair.addLiquidity(1, 1, 1e18);
+        pair.borrowLiquidity(1, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
+        (,,, uint256 leverageRatioX128) = pair.getPositionDebt(address(this), 1, Engine.TokenSelector.Token0);
+        (int256 amount0, int256 amount1) =
+            pair.repayLiquidity(1, Engine.TokenSelector.Token0, leverageRatioX128, 0.5e18);
+
+        uint256 tokens0Owed = mulDivRoundingUp(0.5e18, Q128, getRatioAtStrike(1));
+        uint256 tokens0Collateral = mulDiv((mulDiv(0.5e18, leverageRatioX128, Q128)), Q128, getRatioAtStrike(1));
+
+        assertEq(amount0, int256(tokens0Owed) - int256(tokens0Collateral));
+        assertEq(amount1, 0);
+
+        // assertEq(token0.balanceOf(address(this)), tokens0Collateral);
+        assertEq(token1.balanceOf(address(this)), 0);
+
+        // assertEq(token0.balanceOf(address(pair)), mulDivRoundingUp(1e18, Q128, getRatioAtStrike(1)));
+        assertEq(token1.balanceOf(address(pair)), 0);
     }
 }

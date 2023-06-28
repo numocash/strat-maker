@@ -445,8 +445,9 @@ contract Engine is Positions {
         pair.repayLiquidity(params.strike, liquidityDebt);
 
         // calculate tokens owed and add to account
-        (uint256 amount0, uint256 amount1) =
-            getAmountsForLiquidity(pair, params.strike, pair.strikes[params.strike].activeSpread, liquidityDebt, true);
+        (uint256 amount0, uint256 amount1) = getAmountsForLiquidity(
+            pair, params.strike, pair.strikes[params.strike].activeSpread + 1, liquidityDebt, true
+        );
         account.updateToken(params.token0, toInt256(amount0));
         account.updateToken(params.token1, toInt256(amount1));
 
@@ -637,6 +638,6 @@ contract Engine is Positions {
         balance = _dataOf[owner][_debtID(token0, token1, strike, selector)].balance;
         Positions.DebtData memory debtData = _dataOfDebt(owner, token0, token1, strike, selector);
 
-        return (balance, debtData.liquidity, debtData.liquidityGrowthX128Last, leverageRatioX128);
+        return (balance, debtData.liquidity, debtData.liquidityGrowthX128Last, debtData.leverageRatioX128);
     }
 }

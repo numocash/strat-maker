@@ -442,7 +442,7 @@ library Pairs {
             if (pair.strikeCurrent[_activeSpread] == strike) revert();
             uint256 availableLiquidity = strikeObj.liquidityBiDirectional[_activeSpread];
 
-            if (availableLiquidity > liquidity) {
+            if (availableLiquidity >= liquidity) {
                 strikeObj.liquidityBiDirectional[_activeSpread] = availableLiquidity - liquidity;
                 strikeObj.liquidityBorrowed[_activeSpread] += liquidity;
                 break;
@@ -450,6 +450,7 @@ library Pairs {
                 // TODO: potentially remove from tick maps
                 strikeObj.liquidityBiDirectional[_activeSpread] = 0;
                 strikeObj.liquidityBorrowed[_activeSpread] += availableLiquidity;
+                liquidity -= availableLiquidity;
                 _activeSpread++;
             }
         }
@@ -468,13 +469,14 @@ library Pairs {
         while (true) {
             uint256 borrowedLiquidity = strikeObj.liquidityBorrowed[_activeSpread];
 
-            if (borrowedLiquidity > liquidity) {
+            if (borrowedLiquidity >= liquidity) {
                 strikeObj.liquidityBiDirectional[_activeSpread] += liquidity;
                 strikeObj.liquidityBorrowed[_activeSpread] = borrowedLiquidity - liquidity;
                 break;
             } else {
                 strikeObj.liquidityBiDirectional[_activeSpread] += borrowedLiquidity;
                 strikeObj.liquidityBorrowed[_activeSpread] = 0;
+                liquidity -= borrowedLiquidity;
                 _activeSpread--;
             }
         }

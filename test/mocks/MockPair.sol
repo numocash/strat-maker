@@ -20,6 +20,8 @@ import {Q128} from "src/core/math/StrikeMath.sol";
 
 import {IExecuteCallback} from "src/core/interfaces/IExecuteCallback.sol";
 
+import {console2} from "forge-std/console2.sol";
+
 contract MockPair is Positions {
     using Pairs for Pairs.Pair;
 
@@ -134,7 +136,7 @@ contract MockPair is Positions {
 
         {
             (uint256 _amount0, uint256 _amount1) =
-                getAmountsForLiquidity(pair, strike, pair.strikes[strike].activeSpread, liquidity, true);
+                getAmountsForLiquidity(pair, strike, pair.strikes[strike].activeSpread + 1, liquidity, true);
             amount0 = int256(_amount0);
             amount1 = int256(_amount1);
         }
@@ -180,7 +182,7 @@ contract MockPair is Positions {
         }
 
         _burnDebt(
-            address(this),
+            msg.sender,
             token0,
             token1,
             strike,
@@ -351,6 +353,6 @@ contract MockPair is Positions {
         balance = _dataOf[owner][_debtID(token0, token1, strike, selector)].balance;
         Positions.DebtData memory debtData = _dataOfDebt(owner, token0, token1, strike, selector);
 
-        return (balance, debtData.liquidity, debtData.liquidityGrowthX128Last, leverageRatioX128);
+        return (balance, debtData.liquidity, debtData.liquidityGrowthX128Last, debtData.leverageRatioX128);
     }
 }

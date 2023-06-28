@@ -320,6 +320,8 @@ abstract contract Positions is ILRTA {
     {
         bytes32 id = _debtID(token0, token1, strike, selector);
 
+        _dataOf[to][id].data = abi.encode(DebtData(liquidityAmount, liquidityGrowthX128Last, leverageRatioX128));
+
         unchecked {
             _dataOf[to][id].balance += amount;
         }
