@@ -1,7 +1,7 @@
 # Yikes [![GitHub Actions][gha-badge]][gha]
 
-[gha]: https://github.com/kyscott18/yikes/actions
-[gha-badge]: https://github.com/kyscott18/yikes/actions/workflows/main.yml/badge.svg
+[gha]: https://github.com/numoen/dry-powder/actions
+[gha-badge]: https://github.com/numoen/dry-powder/actions/workflows/main.yml/badge.svg
 
 An ERC20 exchange protocol on the Ethereum Virtual Machine.
 
