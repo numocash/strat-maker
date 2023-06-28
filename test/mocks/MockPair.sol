@@ -199,7 +199,7 @@ contract MockPair is Positions {
         view
         returns (uint256 balance)
     {
-        return _biDirectionalDataOf(owner, token0, token1, strike, spread);
+        return _dataOf[owner][_biDirectionalID(token0, token1, strike, spread)].balance;
     }
 
     function getPositionLimit(
@@ -212,7 +212,7 @@ contract MockPair is Positions {
         view
         returns (uint256 balance)
     {
-        return _limitDataOf(owner, token0, token1, strike, zeroToOne, liquidityGrowthLast);
+        return _dataOf[owner][_limitID(token0, token1, strike, zeroToOne, liquidityGrowthLast)].balance;
     }
 
     function getPositionDebt(
@@ -222,8 +222,11 @@ contract MockPair is Positions {
     )
         external
         view
-        returns (uint256 balance, uint256 liquidityGrowthX128Last, uint256 leverageRatioX128)
+        returns (uint256 balance, uint256 liquidity, uint256 liquidityGrowthX128Last, uint256 leverageRatioX128)
     {
-        return _debtDataOf(owner, token0, token1, strike, selector);
+        balance = _dataOf[owner][_debtID(token0, token1, strike, selector)].balance;
+        Positions.DebtData memory debtData = _dataOfDebt(owner, token0, token1, strike, selector);
+
+        return (balance, debtData.liquidity, debtData.liquidityGrowthX128Last, leverageRatioX128);
     }
 }

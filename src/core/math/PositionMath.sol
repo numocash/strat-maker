@@ -2,6 +2,7 @@
 pragma solidity ^0.8.19;
 
 import {mulDiv, mulDivRoundingUp} from "./FullMath.sol";
+import {Q128} from "./StrikeMath.sol";
 import {Pairs} from "../Pairs.sol";
 import {Positions} from "../Positions.sol";
 
@@ -43,12 +44,6 @@ function liquidityToBalance(
             ? mulDivRoundingUp(liquidity, pair.strikes[strike].totalSupply[spread - 1], totalLiquidity)
             : mulDiv(liquidity, pair.strikes[strike].totalSupply[spread - 1], totalLiquidity);
     }
-}
-
-function accrueDebtPosition(Pairs.Pair storage pair, int24 strike, Positions.DebtData storage debtData) {
-    if (strike != pair.cachedStrikeCurrent) return;
-
-    // else update debtData
 }
 
 function getLiquidityBorrowed(

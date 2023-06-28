@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
-import {ILRTA} from "ilrta/ILRTA.sol";
 import {Engine} from "./Engine.sol";
+import {mulDivRoundingUp} from "./math/FullMath.sol";
+import {Q128} from "./math/StrikeMath.sol";
+import {ILRTA} from "ilrta/ILRTA.sol";
 
 abstract contract Positions is ILRTA {
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
@@ -38,6 +40,7 @@ abstract contract Positions is ILRTA {
     }
 
     struct DebtData {
+        uint256 liquidity;
         uint256 liquidityGrowthX128Last;
         uint256 leverageRatioX128;
     }
@@ -230,36 +233,7 @@ abstract contract Positions is ILRTA {
         return dataID(abi.encode(ILRTADataID(OrderType.Debt, abi.encode(DebtID(token0, token1, strike, selector)))));
     }
 
-    function _biDirectionalDataOf(
-        address owner,
-        address token0,
-        address token1,
-        int24 strike,
-        uint8 spread
-    )
-        internal
-        view
-        returns (uint256 balance)
-    {
-        return _dataOf[owner][_biDirectionalID(token0, token1, strike, spread)].balance;
-    }
-
-    function _limitDataOf(
-        address owner,
-        address token0,
-        address token1,
-        int24 strike,
-        bool zeroToOne,
-        uint256 liquidityGrowthLast
-    )
-        internal
-        view
-        returns (uint256 balance)
-    {
-        return _dataOf[owner][_limitID(token0, token1, strike, zeroToOne, liquidityGrowthLast)].balance;
-    }
-
-    function _debtDataOf(
+    function _dataOfDebt(
         address owner,
         address token0,
         address token1,
@@ -268,12 +242,10 @@ abstract contract Positions is ILRTA {
     )
         internal
         view
-        returns (uint256 balance, uint256 liquidityGrowthX128Last, uint256 leverageRatioX128)
+        returns (DebtData memory)
     {
         ILRTAData memory data = _dataOf[owner][_debtID(token0, token1, strike, selector)];
-        DebtData memory debtData = abi.decode(data.data, (DebtData));
-
-        return (data.balance, debtData.liquidityGrowthX128Last, debtData.leverageRatioX128);
+        return abi.decode(data.data, (DebtData));
     }
 
     function _mintBiDirectional(
@@ -338,7 +310,10 @@ abstract contract Positions is ILRTA {
             to,
             abi.encode(
                 ILRTATransferDetails(
-                    id, amount, OrderType.Limit, abi.encode(DebtData(liquidityGrowthX128Last, leverageRatioX128))
+                    id,
+                    amount,
+                    OrderType.Limit,
+                    abi.encode(DebtData(amount, liquidityGrowthX128Last, leverageRatioX128))
                 )
             )
         );
@@ -408,9 +383,33 @@ abstract contract Positions is ILRTA {
             address(0),
             abi.encode(
                 ILRTATransferDetails(
-                    id, amount, OrderType.Limit, abi.encode(DebtData(liquidityGrowthX128Last, leverageRatioX128))
+                    id,
+                    amount,
+                    OrderType.Limit,
+                    abi.encode(DebtData(amount, liquidityGrowthX128Last, leverageRatioX128))
                 )
             )
         );
+    }
+
+    function _accruePositionDebt(
+        address owner,
+        address token0,
+        address token1,
+        int24 strike,
+        Engine.TokenSelector selector,
+        uint256 liquidityGrowthX128
+    )
+        internal
+    {
+        DebtData memory debtData = _dataOfDebt(owner, token0, token1, strike, selector);
+
+        uint256 liquidityGrowthDelta = liquidityGrowthX128 - debtData.liquidityGrowthX128Last;
+        uint256 liquidityAccrued = mulDivRoundingUp(liquidityGrowthDelta, debtData.liquidity, Q128);
+
+        debtData.liquidity = liquidityAccrued > debtData.liquidity ? 0 : debtData.liquidity - liquidityAccrued;
+        debtData.liquidityGrowthX128Last = liquidityGrowthX128;
+
+        _dataOf[owner][_debtID(token0, token1, strike, selector)].data = abi.encode(debtData);
     }
 }
