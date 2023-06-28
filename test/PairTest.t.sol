@@ -453,7 +453,7 @@ contract RepayTest is Test, PairHelper {
         assertEq(amount0, int256(tokens0Owed) - int256(tokens0Collateral));
         assertEq(amount1, 0);
 
-        // assertEq(token0.balanceOf(address(this)), tokens0Collateral);
+        assertEq(token0.balanceOf(address(this)), tokens0Collateral - tokens0Owed);
         assertEq(token1.balanceOf(address(this)), 0);
 
         // assertEq(token0.balanceOf(address(pair)), mulDivRoundingUp(1e18, Q128, getRatioAtStrike(1)));
