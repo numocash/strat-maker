@@ -2,7 +2,9 @@
 pragma solidity ^0.8.19;
 
 import {mulDiv, mulDivRoundingUp} from "./FullMath.sol";
-import {getAmount0FromComposition, getAmount1FromComposition} from "./LiquidityMath.sol";
+import {
+    getAmount0Delta, getAmount1Delta, getAmount0FromComposition, getAmount1FromComposition
+} from "./LiquidityMath.sol";
 import {Q128} from "./StrikeMath.sol";
 
 /// @notice Compoutes the result of a swap within a strike
@@ -13,7 +15,6 @@ import {Q128} from "./StrikeMath.sol";
 /// @return amountRemaining The amount of output token still remaining in the strike
 function computeSwapStep(
     uint256 ratioX128,
-    uint128 composition,
     uint256 liquidity,
     bool isToken0,
     int256 amountDesired
@@ -23,15 +24,7 @@ function computeSwapStep(
 {
     bool isExactIn = amountDesired > 0;
     if (isExactIn) {
-        uint128 compositionInverse;
-
-        unchecked {
-            compositionInverse = type(uint128).max - composition;
-        }
-
-        uint256 maxAmountIn = isToken0
-            ? getAmount0FromComposition(compositionInverse, liquidity, ratioX128, true)
-            : getAmount1FromComposition(compositionInverse, liquidity, true);
+        uint256 maxAmountIn = isToken0 ? getAmount0Delta(liquidity, ratioX128, true) : getAmount1Delta(liquidity);
 
         bool allLiquiditySwapped = uint256(amountDesired) > maxAmountIn;
 
@@ -42,9 +35,7 @@ function computeSwapStep(
             amountRemaining = allLiquiditySwapped ? 0 : maxAmountIn - uint256(amountDesired);
         }
     } else {
-        uint256 maxAmountOut = isToken0
-            ? getAmount0FromComposition(composition, liquidity, ratioX128, false)
-            : getAmount1FromComposition(composition, liquidity, false);
+        uint256 maxAmountOut = isToken0 ? getAmount0Delta(liquidity, ratioX128, false) : getAmount1Delta(liquidity);
 
         bool allLiquiditySwapped = uint256(-amountDesired) > maxAmountOut;
 

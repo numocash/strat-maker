@@ -19,20 +19,12 @@ contract EngineHelper is IExecuteCallback {
         (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
     }
 
-    function executeCallback(
-        address[] calldata tokens,
-        int256[] calldata tokensDelta,
-        bytes32[] calldata lpIDs,
-        int256[] calldata lpDeltas,
-        bytes calldata
-    )
-        external
-    {
-        for (uint256 i = 0; i < tokens.length;) {
-            int256 delta = tokensDelta[i];
+    function executeCallback(IExecuteCallback.CallbackParams calldata params) external {
+        for (uint256 i = 0; i < params.tokens.length;) {
+            int256 delta = params.tokensDelta[i];
 
             if (delta > 0) {
-                address token = tokens[i];
+                address token = params.tokens[i];
 
                 if (token == address(token0)) {
                     token0.mint(msg.sender, uint256(delta));
@@ -46,14 +38,17 @@ contract EngineHelper is IExecuteCallback {
             }
         }
 
-        for (uint256 i = 0; i < lpIDs.length;) {
-            int256 delta = lpDeltas[i];
+        for (uint256 i = 0; i < params.lpIDs.length;) {
+            uint256 delta = params.lpDeltas[i];
 
             if (delta < 0) {
-                bytes32 id = lpIDs[i];
+                bytes32 id = params.lpIDs[i];
 
-                if (lpIDs[i] != bytes32(0)) {
-                    engine.transfer(msg.sender, abi.encode(Positions.ILRTATransferDetails(id, uint256(-delta))));
+                if (params.lpIDs[i] != bytes32(0)) {
+                    engine.transfer(
+                        msg.sender,
+                        abi.encode(Positions.ILRTATransferDetails(id, delta, params.orderTypes[i], params.datas[i]))
+                    );
                 }
             }
 

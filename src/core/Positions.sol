@@ -1,49 +1,85 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
-import {Pairs} from "./Pairs.sol";
-import {mulDiv} from "./math/FullMath.sol";
-import {getRatioAtStrike, Q128} from "./math/strikeMath.sol";
+import {Engine} from "./Engine.sol";
+import {mulDivRoundingUp} from "./math/FullMath.sol";
+import {Q128} from "./math/StrikeMath.sol";
 import {ILRTA} from "ilrta/ILRTA.sol";
 
 abstract contract Positions is ILRTA {
-    mapping(address => mapping(bytes32 => ILRTAData)) internal _dataOf;
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                               DATA TYPES
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    constructor(address _superSignature)
-        ILRTA(
-            _superSignature,
-            "Yikes",
-            "YIKES",
-            "TransferDetails(address token0,address token1,int24 strike,uint8 spread,uint256 amount)"
-        )
-    {}
-
-    enum OrderType {
-        BiDirectional,
-        ZeroToOne,
-        OneToZero
-    }
-
-    struct ILRTADataID {
+    struct BiDirectionalID {
         address token0;
         address token1;
-        OrderType orderType;
         int24 strike;
         uint8 spread;
     }
 
-    struct ILRTAData {
+    struct LimitID {
+        address token0;
+        address token1;
+        int24 strike;
+        bool zeroToOne;
+        uint256 liquidityGrowthLast;
+    }
+
+    struct DebtID {
+        address token0;
+        address token1;
+        int24 strike;
+        Engine.TokenSelector selector;
+    }
+
+    struct DebtData {
         uint256 liquidity;
-        uint256 liquidity0InPerLiquidityLast; //Q128.128
-        uint256 liquidity1InPerLiquidityLast; // Q128.128
-        uint256 token0Owed;
-        uint256 token1Owed;
+        uint256 liquidityGrowthX128Last;
+        uint256 leverageRatioX128;
+    }
+
+    struct DebtTransferDetails {
+        address token0;
+        address token1;
+        int24 strike;
+    }
+
+    struct ILRTADataID {
+        Engine.OrderType orderType;
+        bytes data;
+    }
+
+    struct ILRTAData {
+        uint256 balance;
+        Engine.OrderType orderType;
+        bytes data;
     }
 
     struct ILRTATransferDetails {
         bytes32 id;
         uint256 amount;
+        Engine.OrderType orderType;
+        bytes data;
     }
+
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                                STORAGE
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
+
+    mapping(address => mapping(bytes32 => ILRTAData)) internal _dataOf;
+
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                              CONSTRUCTOR
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
+
+    constructor(address _superSignature)
+        ILRTA(_superSignature, "Numoen Dry Powder", "DP", "TransferDetails(bytes32 id,uint256 amount)")
+    {}
+
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                                 LOGIC
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     function dataID(bytes memory dataIDBytes) public pure override returns (bytes32) {
         return keccak256(dataIDBytes);
@@ -73,18 +109,11 @@ abstract contract Positions is ILRTA {
         ILRTATransferDetails memory signatureTransferDetails =
             abi.decode(signatureTransfer.transferDetails, (ILRTATransferDetails));
 
-        if (
-            transferDetails.amount > signatureTransferDetails.amount
-                || transferDetails.id != signatureTransferDetails.id
-        ) {
-            revert InvalidRequest(abi.encode(signatureTransfer.transferDetails));
-        }
+        _checkTransferRequest(transferDetails, signatureTransferDetails);
 
         verifySignature(from, signatureTransfer, signature);
 
-        return
-        /* solhint-disable-next-line max-line-length */
-        _transfer(from, requestedTransfer.to, abi.decode(requestedTransfer.transferDetails, (ILRTATransferDetails)));
+        return _transfer(from, requestedTransfer.to, transferDetails);
     }
 
     function transferBySuperSignature(
@@ -101,85 +130,287 @@ abstract contract Positions is ILRTA {
             abi.decode(requestedTransfer.transferDetails, (ILRTATransferDetails));
         ILRTATransferDetails memory signatureTransferDetails = abi.decode(transferDetails, (ILRTATransferDetails));
 
+        _checkTransferRequest(requestedTransferDetails, signatureTransferDetails);
+
+        verifySuperSignature(from, transferDetails, dataHash);
+
+        return _transfer(from, requestedTransfer.to, requestedTransferDetails);
+    }
+
+    function accruePositionDebt(
+        address owner,
+        address token0,
+        address token1,
+        int24 strike,
+        Engine.TokenSelector selector,
+        uint256 liquidityGrowthX128
+    )
+        internal
+    {
+        DebtData memory debtData = _dataOfDebt(owner, token0, token1, strike, selector);
+
+        uint256 liquidityGrowthDelta = liquidityGrowthX128 - debtData.liquidityGrowthX128Last;
+        uint256 liquidityAccrued = mulDivRoundingUp(liquidityGrowthDelta, debtData.liquidity, Q128);
+
+        debtData.liquidity = liquidityAccrued > debtData.liquidity ? 0 : debtData.liquidity - liquidityAccrued;
+        debtData.liquidityGrowthX128Last = liquidityGrowthX128;
+
+        _dataOf[owner][_debtID(token0, token1, strike, selector)].data = abi.encode(debtData);
+    }
+
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                             INTERNAL LOGIC
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
+
+    function _checkTransferRequest(
+        ILRTATransferDetails memory requestedTransferDetails,
+        ILRTATransferDetails memory signatureTransferDetails
+    )
+        private
+        pure
+    {
         if (
             requestedTransferDetails.amount > signatureTransferDetails.amount
                 || requestedTransferDetails.id != signatureTransferDetails.id
         ) {
-            revert InvalidRequest(abi.encode(requestedTransferDetails));
+            revert InvalidRequest(abi.encode(signatureTransferDetails));
         }
-
-        verifySuperSignature(from, transferDetails, dataHash);
-
-        return
-        /* solhint-disable-next-line max-line-length */
-        _transfer(from, requestedTransfer.to, abi.decode(requestedTransfer.transferDetails, (ILRTATransferDetails)));
     }
 
     function _transfer(address from, address to, ILRTATransferDetails memory transferDetails) private returns (bool) {
-        _dataOf[from][transferDetails.id].liquidity -= transferDetails.amount;
+        if (transferDetails.orderType != Engine.OrderType.Debt) {
+            _dataOf[from][transferDetails.id].balance -= transferDetails.amount;
+            unchecked {
+                _dataOf[to][transferDetails.id].balance += transferDetails.amount;
+            }
 
-        // change in liquidity cannot exceed the maximum liquidity in a strike
-        unchecked {
-            _dataOf[to][transferDetails.id].liquidity += transferDetails.amount;
+            emit Transfer(from, to, abi.encode(transferDetails));
+            return true;
+        } else {
+            // TODO: accrue interest to sender and receiver
+            _dataOf[from][transferDetails.id].balance -= transferDetails.amount;
+            unchecked {
+                _dataOf[to][transferDetails.id].balance += transferDetails.amount;
+            }
+
+            emit Transfer(from, to, abi.encode(transferDetails));
+            return true;
         }
-
-        emit Transfer(from, to, abi.encode(transferDetails));
-
-        return true;
     }
 
-    function _mint(address to, bytes32 id, uint256 amount) internal virtual {
-        // change in liquidity cannot exceed the maximum liquidity in a strike
-        unchecked {
-            _dataOf[to][id].liquidity += amount;
-        }
-
-        emit Transfer(address(0), to, abi.encode(ILRTATransferDetails({amount: amount, id: id})));
-    }
-
-    function _burn(address from, bytes32 id, uint256 amount) internal virtual {
-        _dataOf[from][id].liquidity -= amount;
-
-        emit Transfer(from, address(0), abi.encode(ILRTATransferDetails({amount: amount, id: id})));
-    }
-
-    function _getTokensOwed(
-        Pairs.Pair storage pair,
+    function _biDirectionalID(
+        address token0,
+        address token1,
         int24 strike,
-        uint8 spread,
-        Positions.ILRTAData storage position
+        uint8 spread
     )
         internal
-        returns (uint256 amount0Owed, uint256 amount1Owed)
+        pure
+        returns (bytes32)
     {
+        return dataID(
+            abi.encode(
+                ILRTADataID(Engine.OrderType.BiDirectional, abi.encode(BiDirectionalID(token0, token1, strike, spread)))
+            )
+        );
+    }
+
+    function _limitID(
+        address token0,
+        address token1,
+        int24 strike,
+        bool zeroToOne,
+        uint256 liquidityGrowthLast
+    )
+        internal
+        pure
+        returns (bytes32)
+    {
+        return dataID(
+            abi.encode(
+                ILRTADataID(
+                    Engine.OrderType.Limit, abi.encode(LimitID(token0, token1, strike, zeroToOne, liquidityGrowthLast))
+                )
+            )
+        );
+    }
+
+    function _debtID(
+        address token0,
+        address token1,
+        int24 strike,
+        Engine.TokenSelector selector
+    )
+        internal
+        pure
+        returns (bytes32)
+    {
+        return
+            dataID(abi.encode(ILRTADataID(Engine.OrderType.Debt, abi.encode(DebtID(token0, token1, strike, selector)))));
+    }
+
+    function _dataOfDebt(
+        address owner,
+        address token0,
+        address token1,
+        int24 strike,
+        Engine.TokenSelector selector
+    )
+        internal
+        view
+        returns (DebtData memory)
+    {
+        ILRTAData memory data = _dataOf[owner][_debtID(token0, token1, strike, selector)];
+        return abi.decode(data.data, (DebtData));
+    }
+
+    function _mintBiDirectional(
+        address to,
+        address token0,
+        address token1,
+        int24 strike,
+        uint8 spread,
+        uint256 amount
+    )
+        internal
+    {
+        bytes32 id = _biDirectionalID(token0, token1, strike, spread);
+        // change in liquidity cannot exceed the maximum liquidity in a strike
         unchecked {
-            if (position.liquidity > 0) {
-                // solhint-disable-next-line max-line-length
-                uint256 liquidity0InPerLiquidityDelta = pair.strikes[strike - int8(spread)].liquidity0InPerLiquidity[spread]
-                    - position.liquidity0InPerLiquidityLast;
-
-                // solhint-disable-next-line max-line-length
-                uint256 liquidity1InPerLiquidityDelta = pair.strikes[strike + int8(spread)].liquidity1InPerLiquidity[spread]
-                    - position.liquidity1InPerLiquidityLast;
-
-                uint256 liquidity0Volume = mulDiv(liquidity0InPerLiquidityDelta, position.liquidity, Q128);
-                uint256 liquidity1Volume = mulDiv(liquidity1InPerLiquidityDelta, position.liquidity, Q128);
-
-                uint256 strikePrice = getRatioAtStrike(strike);
-                uint256 strikePrice0To1 = getRatioAtStrike(strike - int8(spread));
-                uint256 strikePrice1To0 = getRatioAtStrike(strike + int8(spread));
-
-                amount0Owed =
-                    mulDiv(liquidity0Volume, Q128, strikePrice0To1) - mulDiv(liquidity0Volume, Q128, strikePrice);
-                amount1Owed = liquidity1Volume - mulDiv(liquidity1Volume, strikePrice, strikePrice1To0);
-
-                position.token0Owed += amount0Owed;
-                position.token1Owed += amount1Owed;
-            }
-            // solhint-disable-next-line max-line-length
-            position.liquidity0InPerLiquidityLast = pair.strikes[strike - int8(spread)].liquidity0InPerLiquidity[spread];
-            // solhint-disable-next-line max-line-length
-            position.liquidity1InPerLiquidityLast = pair.strikes[strike + int8(spread)].liquidity1InPerLiquidity[spread];
+            _dataOf[to][id].balance += amount;
         }
+
+        emit Transfer(
+            address(0), to, abi.encode(ILRTATransferDetails(id, amount, Engine.OrderType.BiDirectional, bytes("")))
+        );
+    }
+
+    function _mintLimit(
+        address to,
+        address token0,
+        address token1,
+        int24 strike,
+        bool zeroToOne,
+        uint256 liquidityGrowthLast,
+        uint256 amount
+    )
+        internal
+    {
+        bytes32 id = _limitID(token0, token1, strike, zeroToOne, liquidityGrowthLast);
+
+        unchecked {
+            _dataOf[to][id].balance += amount;
+        }
+
+        emit Transfer(address(0), to, abi.encode(ILRTATransferDetails(id, amount, Engine.OrderType.Limit, bytes(""))));
+    }
+
+    function _mintDebt(
+        address to,
+        address token0,
+        address token1,
+        int24 strike,
+        Engine.TokenSelector selector,
+        uint256 amount,
+        uint256 liquidityAmount,
+        uint256 liquidityGrowthX128Last,
+        uint256 leverageRatioX128
+    )
+        internal
+    {
+        bytes32 id = _debtID(token0, token1, strike, selector);
+
+        _dataOf[to][id].data = abi.encode(DebtData(liquidityAmount, liquidityGrowthX128Last, leverageRatioX128));
+
+        unchecked {
+            _dataOf[to][id].balance += amount;
+        }
+
+        emit Transfer(
+            address(0),
+            to,
+            abi.encode(
+                ILRTATransferDetails(
+                    id,
+                    amount,
+                    Engine.OrderType.Limit,
+                    abi.encode(DebtData(liquidityAmount, liquidityGrowthX128Last, leverageRatioX128))
+                )
+            )
+        );
+    }
+
+    function _burnBiDirectional(
+        address from,
+        address token0,
+        address token1,
+        int24 strike,
+        uint8 spread,
+        uint256 amount
+    )
+        internal
+    {
+        bytes32 id = _biDirectionalID(token0, token1, strike, spread);
+
+        _dataOf[from][id].balance -= amount;
+
+        emit Transfer(
+            from, address(0), abi.encode(ILRTATransferDetails(id, amount, Engine.OrderType.BiDirectional, bytes("")))
+        );
+    }
+
+    function _burn(address from, bytes32 id, uint256 amount, Engine.OrderType orderType, bytes memory data) internal {
+        _dataOf[from][id].balance -= amount;
+
+        emit Transfer(from, address(0), abi.encode(ILRTATransferDetails(id, amount, orderType, data)));
+    }
+
+    function _burnLimit(
+        address from,
+        address token0,
+        address token1,
+        int24 strike,
+        bool zeroToOne,
+        uint256 liquidityGrowthLast,
+        uint256 amount
+    )
+        internal
+    {
+        bytes32 id = _limitID(token0, token1, strike, zeroToOne, liquidityGrowthLast);
+
+        _dataOf[from][id].balance -= amount;
+
+        emit Transfer(from, address(0), abi.encode(ILRTATransferDetails(id, amount, Engine.OrderType.Limit, bytes(""))));
+    }
+
+    function _burnDebt(
+        address from,
+        address token0,
+        address token1,
+        int24 strike,
+        Engine.TokenSelector selector,
+        uint256 amount,
+        uint256 liquidityAmount,
+        uint256 liquidityGrowthX128Last,
+        uint256 leverageRatioX128
+    )
+        internal
+    {
+        bytes32 id = _debtID(token0, token1, strike, selector);
+
+        _dataOf[from][id].balance -= amount;
+
+        emit Transfer(
+            from,
+            address(0),
+            abi.encode(
+                ILRTATransferDetails(
+                    id,
+                    amount,
+                    Engine.OrderType.Limit,
+                    abi.encode(DebtData(liquidityAmount, liquidityGrowthX128Last, leverageRatioX128))
+                )
+            )
+        );
     }
 }
