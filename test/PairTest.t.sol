@@ -222,18 +222,18 @@ contract SwapTest is Test, PairHelper {
     function testSwapToken1ExactInBasic() external {
         basicAddLiquidity();
         // 1->0
-        (int256 amount0, int256 amount1) = pair.swap(false, 1e18);
+        (int256 amount0, int256 amount1) = pair.swap(false, 1e18 - 1);
 
-        uint256 amountOut = mulDiv(1e18, Q128, getRatioAtStrike(1));
+        uint256 amountOut = mulDiv(1e18 - 1, Q128, getRatioAtStrike(1));
 
         assertEq(amount0, -int256(amountOut));
-        assertEq(amount1, 1e18);
+        assertEq(amount1, 1e18 - 1);
 
         assertEq(token0.balanceOf(address(this)), amountOut);
         assertEq(token1.balanceOf(address(this)), 0);
 
         assertEq(token0.balanceOf(address(pair)), 1e18 - amountOut);
-        assertEq(token1.balanceOf(address(pair)), 1e18);
+        assertEq(token1.balanceOf(address(pair)), 1e18 - 1);
 
         (uint128[NUM_SPREADS] memory composition, int24[NUM_SPREADS] memory strikeCurrent, int24 cachedStrikeCurrent,) =
             pair.getPair();
@@ -246,18 +246,18 @@ contract SwapTest is Test, PairHelper {
     function testSwapToken0ExactOutBasic() external {
         basicAddLiquidity();
         // 1->0
-        uint256 amountOut = mulDiv(1e18, Q128, getRatioAtStrike(1));
+        uint256 amountOut = mulDiv(1e18 - 1, Q128, getRatioAtStrike(1));
 
         (int256 amount0, int256 amount1) = pair.swap(true, -int256(amountOut));
 
         assertEq(amount0, -int256(amountOut));
-        assertEq(amount1, 1e18);
+        assertEq(amount1, 1e18 - 1);
 
         assertEq(token0.balanceOf(address(this)), amountOut);
         assertEq(token1.balanceOf(address(this)), 0);
 
         assertEq(token0.balanceOf(address(pair)), 1e18 - amountOut);
-        assertEq(token1.balanceOf(address(pair)), 1e18);
+        assertEq(token1.balanceOf(address(pair)), 1e18 - 1);
 
         (uint128[NUM_SPREADS] memory composition, int24[NUM_SPREADS] memory strikeCurrent, int24 cachedStrikeCurrent,) =
             pair.getPair();
@@ -270,7 +270,7 @@ contract SwapTest is Test, PairHelper {
     function testSwapToken0ExactInBasic() external {
         pair.addLiquidity(-1, 1, 1e18);
         // 0->1
-        uint256 amountIn = mulDivRoundingUp(1e18, Q128, getRatioAtStrike(-2));
+        uint256 amountIn = mulDiv(1e18 + 1, Q128, getRatioAtStrike(-2));
         (int256 amount0, int256 amount1) = pair.swap(true, int256(amountIn));
 
         assertEq(amount0, int256(amountIn), "amount0");
@@ -294,18 +294,18 @@ contract SwapTest is Test, PairHelper {
         pair.addLiquidity(-1, 1, 1e18);
         // 0->1
 
-        (int256 amount0, int256 amount1) = pair.swap(false, -1e18 + 1);
+        (int256 amount0, int256 amount1) = pair.swap(false, -1e18);
 
-        uint256 amountIn = mulDivRoundingUp(1e18 - 1, Q128, getRatioAtStrike(-2));
+        uint256 amountIn = mulDivRoundingUp(1e18, Q128, getRatioAtStrike(-2));
 
         assertEq(amount0, int256(amountIn), "amount0");
-        assertEq(amount1, -1e18 + 1, "amount1");
+        assertEq(amount1, -1e18, "amount1");
 
         assertEq(token0.balanceOf(address(this)), 0, "balance0");
-        assertEq(token1.balanceOf(address(this)), 1e18 - 1, "balance1");
+        assertEq(token1.balanceOf(address(this)), 1e18, "balance1");
 
         assertEq(token0.balanceOf(address(pair)), amountIn, "balance0 pair");
-        assertEq(token1.balanceOf(address(pair)), 1, "balance1 pair");
+        assertEq(token1.balanceOf(address(pair)), 0, "balance1 pair");
 
         (uint128[NUM_SPREADS] memory composition, int24[NUM_SPREADS] memory strikeCurrent, int24 cachedStrikeCurrent,) =
             pair.getPair();

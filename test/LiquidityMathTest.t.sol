@@ -17,15 +17,17 @@ import {mulDiv} from "src/core/math/FullMath.sol";
 
 contract LiquidityMathTest is Test {
     function testGetAmount0Delta() external {
-        assertEq(getAmount0Delta(1e18, 0, false), 1e18, "strike0");
-        assertEq(getAmount0Delta(1e18, 0, true), 1e18, "strike0 round up");
+        assertEq(getAmount0Delta(1e18, int24(0), false), 1e18, "strike0");
+        assertEq(getAmount0Delta(1e18, int24(0), true), 1e18, "strike0 round up");
 
-        assertEq(getAmount0Delta(5e18, 0, false), 5e18, "strike0 with more than 1 liq");
-        assertEq(getAmount0Delta(5e18, 0, true), 5e18, "strike0 with more than 1 liq round up");
+        assertEq(getAmount0Delta(5e18, int24(0), false), 5e18, "strike0 with more than 1 liq");
+        assertEq(getAmount0Delta(5e18, int24(0), true), 5e18, "strike0 with more than 1 liq round up");
 
-        assertEq(getAmount0Delta(1e18, 1, false), mulDiv(1e18, Q128, getRatioAtStrike(1)), "positive strike");
+        assertEq(getAmount0Delta(1e18, int24(1), false), mulDiv(1e18, Q128, getRatioAtStrike(1)), "positive strike");
         assertEq(
-            getAmount0Delta(1e18, 1, true), mulDiv(1e18, Q128, getRatioAtStrike(1)) + 1, "positive strike round up"
+            getAmount0Delta(1e18, int24(1), true),
+            mulDiv(1e18, Q128, getRatioAtStrike(1)) + 1,
+            "positive strike round up"
         );
 
         assertEq(

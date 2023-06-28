@@ -195,7 +195,8 @@ contract EngineTest is Test, EngineHelper {
         commands[0] = Engine.Commands.Swap;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(Engine.SwapParams(address(token0), address(token1), Engine.TokenSelector.Token1, 1e18));
+        inputs[0] =
+            abi.encode(Engine.SwapParams(address(token0), address(token1), Engine.TokenSelector.Token1, 1e18 - 1));
 
         engine.execute(address(this), commands, inputs, 2, 0, bytes(""));
     }
@@ -332,7 +333,8 @@ contract EngineTest is Test, EngineHelper {
         commands[0] = Engine.Commands.Swap;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(Engine.SwapParams(address(token0), address(token1), Engine.TokenSelector.Token1, 1e18));
+        inputs[0] =
+            abi.encode(Engine.SwapParams(address(token0), address(token1), Engine.TokenSelector.Token1, 1e18 - 1));
 
         vm.resumeGasMetering();
 

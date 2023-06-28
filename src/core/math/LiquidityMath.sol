@@ -13,6 +13,12 @@ function getAmount0Delta(uint256 liquidity, int24 strike, bool roundUp) pure ret
         : mulDiv(liquidity, Q128, getRatioAtStrike(strike));
 }
 
+/// @notice Calculate amount0 delta when moving completely through the liquidity at the strike.
+/// i.e. x = L / Pi
+function getAmount0Delta(uint256 liquidity, uint256 ratioX128, bool roundUp) pure returns (uint256 amount0) {
+    return roundUp ? mulDivRoundingUp(liquidity, Q128, ratioX128) : mulDiv(liquidity, Q128, ratioX128);
+}
+
 /// @notice Calculate amount1 delta when moving completely through the liquidity at the strike.
 /// i.e. y = L
 function getAmount1Delta(uint256 liquidity) pure returns (uint256 amount1) {
