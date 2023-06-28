@@ -182,7 +182,7 @@ contract Engine is Positions {
             } else if (commands[i] == Commands.BorrowLiquidity) {
                 _borrowLiquidity(to, abi.decode(inputs[i], (BorrowLiquidityParams)), account);
             } else if (commands[i] == Commands.RepayLiquidity) {
-                _repayLiquidity(to, abi.decode(inputs[i], (RepayLiquidityParams)), account);
+                _repayLiquidity(abi.decode(inputs[i], (RepayLiquidityParams)), account);
             } else if (commands[i] == Commands.RemoveLiquidity) {
                 _removeLiquidity(abi.decode(inputs[i], (RemoveLiquidityParams)), account);
             } else if (commands[i] == Commands.CreatePair) {
@@ -381,28 +381,38 @@ contract Engine is Positions {
         // emit
     }
 
-    function _repayLiquidity(address to, RepayLiquidityParams memory params, Accounts.Account memory account) private {
+    function _repayLiquidity(RepayLiquidityParams memory params, Accounts.Account memory account) private {
         (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
 
-        bytes32 id = _debtID(params.token0, params.token1, params.strike, params.selectorCollateral);
-
-        // calculate liquidity debt
+        // calculate liquidity to repay
         uint256 liquidityDebt;
-        uint256 leverageRatioX128;
-        // (liquidityDebt, ,leverageRatioX128) = _debtDataOf()
+        if (params.selectorDebt == TokenSelector.LiquidityPosition) {
+            liquidityDebt = params.amountDesiredDebt;
+        } else if (params.selectorDebt == TokenSelector.Token0) {
+            revert InvalidSelector();
+        } else if (params.selectorDebt == TokenSelector.Token1) {
+            revert InvalidSelector();
+        } else {
+            revert InvalidSelector();
+        }
 
         pair.repayLiquidity(params.strike, liquidityDebt);
 
-        // (uint256 amount0, uint256 amount1) = calcAmountsForLiquidity(
-        //     pair.cachedStrikeCurrent, pair.composition[pair], params.strike, liquidityDebt, true
-        // );
-
         // calculate tokens owed and add to account
+        (uint256 amount0, uint256 amount1) =
+            getAmountsForLiquidity(pair, params.strike, pair.strikes[params.strike].activeSpread, liquidityDebt, true);
+        account.updateToken(params.token0, toInt256(amount0));
+        account.updateToken(params.token1, toInt256(amount1));
 
         // add unlocked collateral to account
-        // uint256 collateral = mulDiv(liquidityDebt, , Q128);
+        uint256 collateral = mulDiv(liquidityDebt, params.leverageRatioX128, Q128);
+        account.updateToken(
+            params.selectorCollateral == TokenSelector.Token0 ? params.token0 : params.token1, -toInt256(collateral)
+        );
 
         // add burned position to account
+        bytes32 id = _debtID(params.token0, params.token1, params.strike, params.selectorCollateral);
+        account.updateILRTA(id, liquidityDebt);
 
         // emit
     }
