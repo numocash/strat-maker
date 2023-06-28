@@ -44,10 +44,14 @@ contract Engine is Positions {
                                  EVENTS
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    event PairCreated(address indexed token0, address indexed token1, int24 strikeInitial);
-    event AddLiquidity(bytes32 indexed pairID, int24 indexed strike, uint8 indexed spread, uint256 liquidity);
-    event RemoveLiquidity(bytes32 indexed pairID, int24 indexed strike, uint8 indexed spread, uint256 liquidity);
     event Swap(bytes32 indexed pairID);
+    event AddLiquidity(bytes32 indexed pairID, int24 indexed strike, uint8 indexed spread, uint256 liquidity);
+    event BorrowLiquidity(bytes32 indexed pairID);
+    event RepayLiquidity(bytes32 indexed pairID);
+    event AccruePosition(bytes32 indexed pairID);
+    event Accrue(bytes32 indexed pairID);
+    event RemoveLiquidity(bytes32 indexed pairID, int24 indexed strike, uint8 indexed spread, uint256 liquidity);
+    event PairCreated(address indexed token0, address indexed token1, int24 strikeInitial);
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                  ERRORS
@@ -420,7 +424,7 @@ contract Engine is Positions {
             mulDiv(liquidityCollateral, Q128, liquidityDebt)
         );
 
-        // emit
+        emit BorrowLiquidity(pairID);
     }
 
     function _repayLiquidity(RepayLiquidityParams memory params, Accounts.Account memory account) private {
@@ -451,8 +455,8 @@ contract Engine is Positions {
         account.updateToken(params.token0, toInt256(amount0));
         account.updateToken(params.token1, toInt256(amount1));
 
-        // add unlocked collateral to account
         {
+            // add unlocked collateral to account
             uint256 liquidityCollateral = mulDiv(liquidityDebt, params.leverageRatioX128, Q128);
             if (params.selectorCollateral == TokenSelector.Token0) {
                 account.updateToken(
@@ -463,8 +467,8 @@ contract Engine is Positions {
             }
         }
 
-        // add burned position to account
         {
+            // add burned position to account
             bytes32 id = _debtID(params.token0, params.token1, params.strike, params.selectorCollateral);
             account.updateILRTA(
                 id,
@@ -474,7 +478,7 @@ contract Engine is Positions {
             );
         }
 
-        // emit
+        emit RepayLiquidity(pairID);
     }
 
     function _removeLiquidity(RemoveLiquidityParams memory params, Accounts.Account memory account) private {
@@ -547,7 +551,7 @@ contract Engine is Positions {
             pair.strikes[params.strike].liquidityGrowthX128
         );
 
-        // emit
+        emit AccruePosition(pairID);
     }
 
     function _accrue(AccrueParams memory params) private {
@@ -555,7 +559,7 @@ contract Engine is Positions {
 
         pair.accrue();
 
-        // emit
+        emit Accrue(pairID);
     }
 
     function _createPair(CreatePairParams memory params) private {

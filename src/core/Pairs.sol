@@ -279,18 +279,7 @@ library Pairs {
 
                 // Remove strike from linked list and bit map if it has no liquidity
                 // Only happens when initialized or all liquidity is removed from current strike
-                if (state.cachedLiquidity == 0) {
-                    assert(pair.strikes[strikePrev].reference0To1 == 1);
-
-                    int24 below = -pair.bitMap0To1.nextBelow(-strikePrev);
-                    int24 above = pair.strikes[strikePrev].next0To1;
-
-                    pair.strikes[below].next0To1 = above;
-                    pair.bitMap0To1.unset(-strikePrev);
-
-                    pair.strikes[strikePrev].next0To1 = 0;
-                    pair.strikes[strikePrev].reference0To1 = 0;
-                }
+                if (state.cachedLiquidity == 0) _removeStrike0To1(pair, strikePrev);
 
                 (state.cachedLiquidity, state.cachedComposition) = _calculateActiveLiquidity(
                     state.composition, state.strikeCurrent, pair.strikes, state.cachedStrikeCurrent, true
@@ -316,18 +305,7 @@ library Pairs {
 
                 // Remove strike from linked list and bit map if it has no liquidity
                 // Only happens when initialized or all liquidity is removed from current strike
-                if (state.cachedLiquidity == 0) {
-                    assert(pair.strikes[strikePrev].reference1To0 == 1);
-
-                    int24 below = pair.bitMap1To0.nextBelow(strikePrev);
-                    int24 above = pair.strikes[strikePrev].next1To0;
-
-                    pair.strikes[below].next1To0 = above;
-                    pair.bitMap1To0.unset(strikePrev);
-
-                    pair.strikes[strikePrev].next1To0 = 0;
-                    pair.strikes[strikePrev].reference1To0 = 0;
-                }
+                if (state.cachedLiquidity == 0) _removeStrike1To0(pair, strikePrev);
 
                 (state.cachedLiquidity, state.cachedComposition) = _calculateActiveLiquidity(
                     state.composition, state.strikeCurrent, pair.strikes, state.cachedStrikeCurrent, false
@@ -372,62 +350,15 @@ library Pairs {
             if (existingLiquidity == 0 && liquidity > 0) {
                 int24 strike0To1 = strike - int8(spread);
                 int24 strike1To0 = strike + int8(spread);
-                uint8 reference0To1 = pair.strikes[strike0To1].reference0To1;
-                uint8 reference1To0 = pair.strikes[strike1To0].reference1To0;
 
-                bool add0To1 = reference0To1 == 0;
-                bool add1To0 = reference1To0 == 0;
-                pair.strikes[strike0To1].reference0To1 = reference0To1 + 1;
-                pair.strikes[strike1To0].reference1To0 = reference1To0 + 1;
-
-                if (add0To1) {
-                    // tick0To1s are in decreasing order, double negate to reuse nextBelow function
-                    int24 below = -pair.bitMap0To1.nextBelow(-strike0To1);
-                    int24 above = pair.strikes[below].next0To1;
-
-                    pair.strikes[strike0To1].next0To1 = above;
-                    pair.strikes[below].next0To1 = strike0To1;
-                    pair.bitMap0To1.set(-strike0To1);
-                }
-
-                if (add1To0) {
-                    int24 below = pair.bitMap1To0.nextBelow(strike1To0);
-                    int24 above = pair.strikes[below].next1To0;
-
-                    pair.strikes[strike1To0].next1To0 = above;
-                    pair.strikes[below].next1To0 = strike1To0;
-                    pair.bitMap1To0.set(strike1To0);
-                }
+                _addStrike0To1(pair, strike0To1);
+                _addStrike1To0(pair, strike1To0);
             } else if (liquidity < 0 && existingLiquidity == uint256(-liquidity)) {
                 int24 strike0To1 = strike - int8(spread);
                 int24 strike1To0 = strike + int8(spread);
-                uint8 reference0To1 = pair.strikes[strike0To1].reference0To1;
-                uint8 reference1To0 = pair.strikes[strike1To0].reference1To0;
 
-                bool remove0To1 = reference0To1 == 1 && pair.cachedStrikeCurrent != strike0To1;
-                bool remove1To0 = reference1To0 == 1 && pair.cachedStrikeCurrent != strike1To0;
-                if (pair.cachedStrikeCurrent != strike0To1) pair.strikes[strike0To1].reference0To1 = reference0To1 - 1;
-                if (pair.cachedStrikeCurrent != strike1To0) pair.strikes[strike1To0].reference1To0 = reference1To0 - 1;
-
-                if (remove0To1) {
-                    int24 below = -pair.bitMap0To1.nextBelow(-strike0To1);
-                    int24 above = pair.strikes[strike0To1].next0To1;
-
-                    pair.strikes[below].next0To1 = above;
-                    pair.bitMap0To1.unset(-strike0To1);
-
-                    pair.strikes[strike0To1].next0To1 = 0;
-                }
-
-                if (remove1To0) {
-                    int24 below = pair.bitMap1To0.nextBelow(strike1To0);
-                    int24 above = pair.strikes[strike1To0].next1To0;
-
-                    pair.strikes[below].next1To0 = above;
-                    pair.bitMap1To0.unset(strike1To0);
-
-                    pair.strikes[strike1To0].next1To0 = 0;
-                }
+                _removeStrike0To1(pair, strike0To1);
+                _removeStrike1To0(pair, strike1To0);
             }
         }
     }
@@ -447,7 +378,9 @@ library Pairs {
                 strikeObj.liquidityBorrowed[_activeSpread] += liquidity;
                 break;
             } else {
-                // TODO: potentially remove from tick maps
+                _removeStrike0To1(pair, strike - int8(_activeSpread));
+                _removeStrike1To0(pair, strike + int8(_activeSpread));
+
                 strikeObj.liquidityBiDirectional[_activeSpread] = 0;
                 strikeObj.liquidityBorrowed[_activeSpread] += availableLiquidity;
                 liquidity -= availableLiquidity;
@@ -478,6 +411,9 @@ library Pairs {
                 strikeObj.liquidityBorrowed[_activeSpread] = 0;
                 liquidity -= borrowedLiquidity;
                 _activeSpread--;
+
+                _addStrike0To1(pair, strike - int8(_activeSpread));
+                _addStrike1To0(pair, strike + int8(_activeSpread));
             }
         }
     }
@@ -558,5 +494,63 @@ library Pairs {
         // TODO: same math as repay liquidity
 
         pair.cachedBlock = block.number;
+    }
+
+    function _addStrike0To1(Pair storage pair, int24 strike) private {
+        uint8 reference0To1 = pair.strikes[strike].reference0To1;
+        pair.strikes[strike].reference0To1 = reference0To1 + 1;
+
+        if (reference0To1 == 0) {
+            int24 below = -pair.bitMap0To1.nextBelow(-strike);
+            int24 above = pair.strikes[below].next0To1;
+
+            pair.strikes[strike].next0To1 = above;
+            pair.strikes[below].next0To1 = strike;
+            pair.bitMap0To1.set(-strike);
+        }
+    }
+
+    function _addStrike1To0(Pair storage pair, int24 strike) private {
+        uint8 reference1To0 = pair.strikes[strike].reference1To0;
+        pair.strikes[strike].reference1To0 = reference1To0 + 1;
+
+        if (reference1To0 == 0) {
+            int24 below = pair.bitMap1To0.nextBelow(strike);
+            int24 above = pair.strikes[below].next1To0;
+
+            pair.strikes[strike].next1To0 = above;
+            pair.strikes[below].next1To0 = strike;
+            pair.bitMap1To0.set(strike);
+        }
+    }
+
+    function _removeStrike0To1(Pair storage pair, int24 strike) private {
+        uint8 reference0To1 = pair.strikes[strike].reference0To1;
+        if (pair.cachedStrikeCurrent != strike) pair.strikes[strike].reference0To1 = reference0To1 - 1;
+
+        if (reference0To1 == 1 && pair.cachedStrikeCurrent != strike) {
+            int24 below = -pair.bitMap0To1.nextBelow(-strike);
+            int24 above = pair.strikes[strike].next0To1;
+
+            pair.strikes[below].next0To1 = above;
+            pair.bitMap0To1.unset(-strike);
+
+            pair.strikes[strike].next0To1 = 0;
+        }
+    }
+
+    function _removeStrike1To0(Pair storage pair, int24 strike) private {
+        uint8 reference1To0 = pair.strikes[strike].reference1To0;
+        if (pair.cachedStrikeCurrent != strike) pair.strikes[strike].reference1To0 = reference1To0 - 1;
+
+        if (reference1To0 == 1 && pair.cachedStrikeCurrent != strike) {
+            int24 below = pair.bitMap1To0.nextBelow(strike);
+            int24 above = pair.strikes[strike].next1To0;
+
+            pair.strikes[below].next1To0 = above;
+            pair.bitMap1To0.unset(strike);
+
+            pair.strikes[strike].next1To0 = 0;
+        }
     }
 }
