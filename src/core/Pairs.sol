@@ -143,7 +143,6 @@ library Pairs {
     /// @param amountDesired The desired amount change on the pair
     /// @return amount0 The delta of the balance of token0 of the pair
     /// @return amount1 The delta of the balance of token1 of the pair
-    /// @custom:team track available swap liquidity instead of composition
     function swap(Pair storage pair, bool isToken0, int256 amountDesired) internal returns (int256, int256) {
         if (pair.initialized != 1) revert Initialized();
         bool isSwap0To1 = isToken0 == amountDesired > 0;
@@ -384,14 +383,15 @@ library Pairs {
 
     /// @notice Update a strike
     /// @param liquidity The amount of liquidity being added or removed
-    /// @custom:team check strike + spread is not greater than max
     function updateStrike(Pair storage pair, int24 strike, uint8 spread, int256 balance, int256 liquidity) internal {
-        _checkStrike(strike);
+        _checkStrike(strike - int8(spread));
+        _checkStrike(strike + int8(spread));
+
         _checkSpread(spread);
 
         uint256 existingLiquidity = pair.strikes[strike].liquidityBiDirectional[spread - 1];
-        pair.strikes[strike].totalSupply[spread - 1] = addDelta(pair.strikes[strike].totalSupply[spread - 1], balance);
         pair.strikes[strike].liquidityBiDirectional[spread - 1] = addDelta(existingLiquidity, liquidity);
+        pair.strikes[strike].totalSupply[spread - 1] = addDelta(pair.strikes[strike].totalSupply[spread - 1], balance);
 
         unchecked {
             if (existingLiquidity == 0 && liquidity > 0) {
@@ -441,10 +441,9 @@ library Pairs {
 
     function repayLiquidity(Pair storage pair, int24 strike, uint256 liquidity) internal {
         Strike storage strikeObj = pair.strikes[strike];
-        int24 _cachedStrikeCurrent = pair.cachedStrikeCurrent;
         uint8 _activeSpread = strikeObj.activeSpread;
 
-        if (_cachedStrikeCurrent == strike) _accrue(pair, strike);
+        if (pair.cachedStrikeCurrent == strike) _accrue(pair, strike);
 
         while (true) {
             uint256 borrowedLiquidity = strikeObj.liquidityBorrowed[_activeSpread];
@@ -463,6 +462,8 @@ library Pairs {
                 _addStrike1To0(pair, strike + int8(_activeSpread));
             }
         }
+
+        strikeObj.activeSpread = _activeSpread;
     }
 
     /// @notice accrue interest to the current strike
@@ -474,6 +475,29 @@ library Pairs {
                              INTERNAL LOGIC
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
+    function _accrue(Pair storage pair, int24 strike) private {
+        uint256 _cachedBlock = pair.cachedBlock;
+        uint256 blocks = block.number - _cachedBlock;
+        if (blocks == 0) return;
+
+        uint256 liquidityGrowthNumerator;
+        uint256 liquidityBorrowedTotal;
+
+        for (uint256 i = 0; i < pair.strikes[strike].activeSpread; i++) {
+            uint256 liquidityBorrowed = pair.strikes[strike].liquidityBorrowed[i];
+
+            pair.strikes[strike].liquidityBiDirectional[i] += ((i + 1) * blocks * liquidityBorrowed) / 10_000;
+            liquidityGrowthNumerator += (i + 1) * blocks * liquidityBorrowed;
+            liquidityBorrowedTotal += liquidityBorrowed;
+        }
+
+        pair.strikes[strike].liquidityGrowthX128 +=
+            mulDivRoundingUp(liquidityGrowthNumerator, Q128, liquidityBorrowedTotal);
+        // TODO: same math as repay liquidity
+
+        pair.cachedBlock = block.number;
+    }
+
     /// @notice Check the validiity of strikes
     function _checkStrike(int24 strike) private pure {
         if (MIN_STRIKE > strike || strike > MAX_STRIKE) {
@@ -484,29 +508,6 @@ library Pairs {
     /// @notice Check the validity of the spread
     function _checkSpread(uint8 spread) private pure {
         if (spread == 0 || spread > NUM_SPREADS + 1) revert InvalidSpread();
-    }
-
-    function _accrue(Pair storage pair, int24 strike) private {
-        uint256 _cachedBlock = pair.cachedBlock;
-        uint256 blocks = block.number - _cachedBlock;
-        if (blocks == 0) return;
-
-        uint256 _liquidityGrowthNumerator;
-        uint256 _liquidityBorrowedTotal;
-
-        for (uint256 i = 0; i < pair.strikes[strike].activeSpread; i++) {
-            uint256 _liquidityBorrowed = pair.strikes[strike].liquidityBorrowed[i];
-
-            pair.strikes[strike].liquidityBiDirectional[i] += ((i + 1) * blocks * _liquidityBorrowed) / 10_000;
-            _liquidityGrowthNumerator += (i + 1) * blocks * _liquidityBorrowed;
-            _liquidityBorrowedTotal += _liquidityBorrowed;
-        }
-
-        pair.strikes[strike].liquidityGrowthX128 +=
-            mulDivRoundingUp(_liquidityGrowthNumerator, Q128, _liquidityBorrowedTotal);
-        // TODO: same math as repay liquidity
-
-        pair.cachedBlock = block.number;
     }
 
     function _addStrike0To1(Pair storage pair, int24 strike) private {

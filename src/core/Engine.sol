@@ -33,7 +33,6 @@ import {IExecuteCallback} from "./interfaces/IExecuteCallback.sol";
 /// @author Robert Leifke and Kyle Scott
 /// @custom:team return data and events
 /// @custom:team tree for function selector
-/// @custom:team accrue and accruePosition
 /// @custom:team pass minted position information back to callback
 /// @custom:team don't allow for transferring if a position isn't accrued
 /// @custom:team amount desired is impossible
@@ -457,8 +456,8 @@ contract Engine is Positions {
         account.updateToken(params.token0, toInt256(amount0));
         account.updateToken(params.token1, toInt256(amount1));
 
+        // add unlocked collateral to account
         {
-            // add unlocked collateral to account
             uint256 liquidityCollateral = mulDiv(liquidityDebt, params.leverageRatioX128, Q128);
             if (params.selectorCollateral == TokenSelector.Token0) {
                 account.updateToken(
@@ -469,8 +468,8 @@ contract Engine is Positions {
             }
         }
 
+        // add burned position to account
         {
-            // add burned position to account
             bytes32 id = _debtID(params.token0, params.token1, params.strike, params.selectorCollateral);
             account.updateILRTA(
                 id,
