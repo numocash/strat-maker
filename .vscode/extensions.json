@@ -2,6 +2,7 @@
   "recommendations": [
     "rome.rome",
     "NomicFoundation.hardhat-solidity",
-    "tamasfe.even-better-toml"
+    "tamasfe.even-better-toml",
+    "beaugunderson.solidity-extended"
   ]
 }
