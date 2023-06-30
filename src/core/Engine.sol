@@ -207,29 +207,49 @@ contract Engine is Positions {
 
         Accounts.Account memory account = Accounts.newAccount(numTokens, numLPs);
 
-        for (uint256 i = 0; i < commands.length;) {
-            if (commands[i] == Commands.Swap) {
-                _swap(abi.decode(inputs[i], (SwapParams)), account);
-            } else if (commands[i] == Commands.AddLiquidity) {
-                _addLiquidity(to, abi.decode(inputs[i], (AddLiquidityParams)), account);
-            } else if (commands[i] == Commands.BorrowLiquidity) {
-                _borrowLiquidity(to, abi.decode(inputs[i], (BorrowLiquidityParams)), account);
-            } else if (commands[i] == Commands.RepayLiquidity) {
-                _repayLiquidity(abi.decode(inputs[i], (RepayLiquidityParams)), account);
-            } else if (commands[i] == Commands.RemoveLiquidity) {
-                _removeLiquidity(abi.decode(inputs[i], (RemoveLiquidityParams)), account);
-            } else if (commands[i] == Commands.AccruePosition) {
-                _accruePosition(abi.decode(inputs[i], (AccruePositionParams)));
-            } else if (commands[i] == Commands.Accrue) {
-                _accrue(abi.decode(inputs[i], (AccrueParams)));
-            } else if (commands[i] == Commands.CreatePair) {
-                _createPair(abi.decode(inputs[i], (CreatePairParams)));
+        uint256 root = 0;
+        uint256 end = commands.length - 1;
+        uint256 mid;
+
+        // Binary search
+        while (root <= end) {
+            mid = (root + end) / 2;
+
+            // Check if the current command is the target command.
+            if (commands[mid] == Commands.Swap) {
+            _swap(abi.decode(inputs[mid], (SwapParams)), account);
+            break;
+            } else if (commands[mid] == Commands.AddLiquidity) {
+            _addLiquidity(to, abi.decode(inputs[mid], (AddLiquidityParams)), account);
+            break;
+            } else if (commands[mid] == Commands.BorrowLiquidity) {
+            _borrowLiquidity(to, abi.decode(inputs[mid], (BorrowLiquidityParams)), account);
+            break;
+            } else if (commands[mid] == Commands.RepayLiquidity) {
+            _repayLiquidity(abi.decode(inputs[mid], (RepayLiquidityParams)), account);
+            break;
+            } else if (commands[mid] == Commands.RemoveLiquidity) {
+            _removeLiquidity(abi.decode(inputs[mid], (RemoveLiquidityParams)), account);
+            break;
+            } else if (commands[mid] == Commands.AccruePosition) {
+            _accruePosition(abi.decode(inputs[mid], (AccruePositionParams)));
+            break;
+            } else if (commands[mid] == Commands.Accrue) {
+            _accrue(abi.decode(inputs[mid], (AccrueParams)));
+            break;
+            } else if (commands[mid] == Commands.CreatePair) {
+            _createPair(abi.decode(inputs[mid], (CreatePairParams)));
+            break;
             } else {
-                revert InvalidCommand();
+            // revert if not found
+            revert InvalidCommand();
             }
 
-            unchecked {
-                i++;
+            // Update the bst variables.
+            if (commands[mid] < Commands.Swap) {
+                root = mid + 1;
+            } else {
+                end = mid - 1;
             }
         }
 
@@ -502,13 +522,15 @@ contract Engine is Positions {
         } else if (params.selector == TokenSelector.Token0) {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
 
-            liquidity = -toInt256(getLiquidityForAmount0(pair, params.strike, params.spread, uint256(-params.amountDesired), false));
+            liquidity = -toInt256(getLiquidityForAmount0(pair, params.strike, 
+                                                            params.spread, uint256(-params.amountDesired), false));
             amount0 = params.amountDesired;
             amount1 = -toInt256(getAmount1ForLiquidity(pair, params.strike, params.spread, uint256(-liquidity), false));
         } else if (params.selector == TokenSelector.Token1) {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
 
-            liquidity = -toInt256(getLiquidityForAmount1(pair, params.strike, params.spread, uint256(-params.amountDesired), false));
+            liquidity = -toInt256(getLiquidityForAmount1(pair, params.strike, 
+                                                            params.spread, uint256(-params.amountDesired), false));
             amount0 = -toInt256(getAmount0ForLiquidity(pair, params.strike, params.spread, uint256(-liquidity), false));
             amount1 = params.amountDesired;
         } else {
