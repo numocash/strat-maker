@@ -299,6 +299,7 @@ library Pairs {
                             state.strikeCurrent[i - 1] = activeStrike;
 
                             uint256 liquidity = pair.strikes[activeStrike].liquidityBiDirectional[i - 1];
+
                             state.liquidityTotal += liquidity;
                             state.liquiditySwap += liquidity;
                             state.liquidityTotalSpread[i - 1] = liquidity;
@@ -339,6 +340,7 @@ library Pairs {
                             state.strikeCurrent[i - 1] = activeStrike;
 
                             uint256 liquidity = pair.strikes[activeStrike].liquidityBiDirectional[i - 1];
+
                             state.liquidityTotal += liquidity;
                             state.liquiditySwap += liquidity;
                             state.liquidityTotalSpread[i - 1] = liquidity;
