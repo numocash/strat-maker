@@ -191,7 +191,6 @@ contract Engine is Positions {
                                  LOGIC
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    /// @dev Set to address to 0 if creating a pair
     function execute(
         address to,
         Commands[] calldata commands,
@@ -199,73 +198,62 @@ contract Engine is Positions {
         uint256 numTokens,
         uint256 numLPs,
         bytes calldata data
-    )
+        )
         external
-        nonReentrant
+        nonReentrant 
     {
-        if (commands.length != inputs.length) revert CommandLengthMismatch();
+        if (commands.length != inputs.length) {
+            revert CommandLengthMismatch();
+        }
 
-        Accounts.Account memory account = Accounts.newAccount(numTokens, numLPs);
+    Accounts.Account memory account = Accounts.newAccount(numTokens, numLPs);
 
-        uint256 root = 0;
-        uint256 end = commands.length - 1;
-        uint256 mid;
+    uint256 mid;
 
-        // Binary search
-        while (root <= end) {
-            mid = (root + end) / 2;
+    // Binary search
+    mid = commands.length / 2;
 
-            // Check if the current command is the target command.
+        //checks if first command is swap
+        if (commands[mid] < Commands.RemoveLiquidity) {
             if (commands[mid] == Commands.Swap) {
-            _swap(abi.decode(inputs[mid], (SwapParams)), account);
-            break;
-            } else if (commands[mid] == Commands.AddLiquidity) {
-            _addLiquidity(to, abi.decode(inputs[mid], (AddLiquidityParams)), account);
-            break;
-            } else if (commands[mid] == Commands.BorrowLiquidity) {
-            _borrowLiquidity(to, abi.decode(inputs[mid], (BorrowLiquidityParams)), account);
-            break;
-            } else if (commands[mid] == Commands.RepayLiquidity) {
-            _repayLiquidity(abi.decode(inputs[mid], (RepayLiquidityParams)), account);
-            break;
-            } else if (commands[mid] == Commands.RemoveLiquidity) {
+                _swap(abi.decode(inputs[mid], (SwapParams)), account);
+                break;
+            } else {
+                revert InvalidCommand();
+            }
+        } else if (commands[mid] == Commands.RemoveLiquidity) {
+            // The command has been found.
             _removeLiquidity(abi.decode(inputs[mid], (RemoveLiquidityParams)), account);
             break;
-            } else if (commands[mid] == Commands.AccruePosition) {
-            _accruePosition(abi.decode(inputs[mid], (AccruePositionParams)));
-            break;
-            } else if (commands[mid] == Commands.Accrue) {
-            _accrue(abi.decode(inputs[mid], (AccrueParams)));
-            break;
-            } else if (commands[mid] == Commands.CreatePair) {
-            _createPair(abi.decode(inputs[mid], (CreatePairParams)));
-            break;
+        } else {
+            if (commands[mid] == Commands.CreatePair) {
+                _createPair(abi.decode(inputs[mid], (CreatePairParams)));
+                break;
             } else {
-            // revert if not found
-            revert InvalidCommand();
-            }
-
-            // Update the bst variables.
-            if (commands[mid] < Commands.Swap) {
-                root = mid + 1;
-            } else {
-                end = mid - 1;
+                //revert if not found
+                revert InvalidCommand();
             }
         }
+    }
 
         // transfer tokens out
         for (uint256 i = 0; i < numTokens;) {
             int256 delta = account.tokenDeltas[i];
             address token = account.tokens[i];
 
-            if (token == address(0)) break;
-
-            if (delta < 0) {
-                SafeTransferLib.safeTransfer(token, to, uint256(-delta));
-            }
-
-            unchecked {
+            // token is zero, so skip it.
+            if (token == address(0)) {
                 i++;
+            } else {
+                // if delta is negative, transfer token to recipient address
+                if (delta < 0) {
+                    SafeTransferLib.safeTransfer(token, to, uint256(-delta));
+                }
+
+                // increment the loop counter.
+                unchecked {
+                    i++;
+                }
             }
         }
 
