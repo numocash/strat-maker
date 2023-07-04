@@ -54,7 +54,15 @@ Reserving the rights to swap or borrowing liquidty solves these problems. Actors
 
 Each liquidity position both convex and concave is analagous to a replicated options portfolio whose payoff can perfectly match that of any option. With no expiry, the pricing is both simpler and perpetual.
 
-For pricing these derivatives, we relate the cost to the implied volatility of the underlying assets and the block frequency. We first take a look at arbitrageur profit. Without fees arbitrageur profit is
+For pricing these derivatives, we relate the cost to the implied volatility of the underlying assets and the block frequency. We make some assumptions about arbitageur behavior: there is only one trade per block, that takes the AMM from a stale price to the current price.
+
+We first take a look at arbitrageur profit. Without fees arbitrageur profit is $ArbitrageurProfit = a * (p - q)$, with 
+- a: Amount traded
+- p: Market price
+- q: AMM price
+
+We define $\Delta\P= p - q$ and can simplify the above equation to $ArbitrageurProfit = a * \Delta\P$
+
 
 ### Strikes (Aggregate Liquidity)
 
