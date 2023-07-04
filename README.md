@@ -61,7 +61,9 @@ We first take a look at arbitrageur profit. Without fees arbitrageur profit is $
 - p: Market price
 - q: AMM price
 
-We define $\Delta\P= p - q$ and can simplify the above equation to $ArbitrageurProfit = a * \Delta\P$
+We define $\Delta\ P= p - q$ and can simplify the above equation to $ArbitrageurProfit = a * \Delta\ P$. We can further simplify a to be the amount of liquidity $l$, giving $ArbitrageurProfit = l * \Delta\ P$.
+
+The swap fee shifts the AMM price by $f$, therefore shrinking arbitrageur profit. Now $ArbitrageurProfit =  a * (p - (1+f)q)$. If we set this to zero and solve for $f$, we get $f = \frac{\Delta\ P}{q}$.
 
 
 ### Strikes (Aggregate Liquidity)
