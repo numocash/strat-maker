@@ -8,10 +8,10 @@ An ERC20 exchange protocol built for the Ethereum Virtual Machine.
 Features:
 
 - Aggregate of constant-sum liquidity pools with spaced strike prices
-- Reserve the right to swap on liquidity with built in, overcollateralized lending
+- Reserve the right to swap on liquidity with built in, overcollateralized, liquidation-free lending
 - Custom fee settings within each pair with inherent, optimal, on-chain routing between them
 - Liquidity can be constricted to one trading direction (partial fill limit order)
-- Compounding fees
+- Auto-compounding fees
 - Single contract architecture
 
 ## Benchmarking
@@ -35,7 +35,20 @@ Dry Powder is uses the invariant `Liquidity = Price * amount0 + amount1`, also r
 
 Simply put, automated market makers create a market between two classes of users. Traders want to swap token0 to token1 or vice versa, presumably because they believe it will benefit them in someway. Liquidity providers lend out a combination of token0 and token1, that is used to facilitate traders. They are rewarded for this with a portion of all traders trades. This market aims to connect traders and liquidity providers in a way that leaves them both satisfied with the opportunity.
 
-### Reserving Rights to Swap
+### Reserving Rights to Swap (Creating Convex Derivatives)
+
+First implemented in Numoen's Power Market Maker Protocol is the ability to reserve the rights to swap by borrowing liquidity. To do this, users post collateral that they know will always be more valuable than the value of the liquidity they want to borrow. With this collateral, a user would borrow liquidity and immeadiately withdraw it in hopes that they can repay the liquidiity for a cheaper price in the future.
+
+For example, let's assume the price of ether is currently $1000. Alice borrows 1 unit of liquidity at a strike price of $1500 that contains 1 ether or 1500 usdc, but because the market price is below the strike price, it is redeemable for 1 ether currently. As collateral, alice uses the 1 ether that was redeemed plus .1 ether of her own. The market price then moves to $2000 per ether. Alice sells the 1.1 ether for 2200 usdc, uses 1500 of the usdc to mint a liquidity token and payback her debt, profiting 700 usdc from a 100% price move with $100 of principal.
+
+Obviously, users must pay for the ability to acheive asymmetric exposure. In this protocol, positions that are borrowing liquidity active liquidity are slowly liquidated by having their collateral seized and being forgiven of their debt. Interest is accrued per block and , explained in more detail in the next section, borrow rates are proportional to swap fees which are related to volatility and block times.
+
+This has drastic impacts on the low level economics of AMMs. The profitablity of popular exchange protocols is debated because liquidity providers suffer from a phenomenom known as Loss versus rebalancing. This is essentially a cost to liquidity providers that comes from external arbitrageurs having more informed market information than the protocol. These protocols are able to remain profitable by uninformed retail traders using them as a means of exchange, but this approach isn't sustainable. Two undesireable outcomes are the fact that:
+
+1. Arbitrageurs never lose money, they simply won't take any action if the trade is unprofitable.
+2. When arbitrageurs are bidding against eachother, their payment goes to validators instead of liquidity providers.
+
+Reserving the rights to swap or borrowing liquidty solves these problems. Actors who were previously profiting on the volatility of assets are now able to borrow liquidity and arbitrage when the market price moves. Arbitrageurs now are unprofitable when the cost of borrowing is more than the arbitrage profit. This protocol takes the more conservative assumption that all traders are more informed than the current market.
 
 ### Options Pricing
 
@@ -53,7 +66,7 @@ It is important to note that with a larger spread, pricing is less exact. For ex
 
 ### Limit orders
 
-Dry Powder allows liquidity providers to only allow for their liquidity to be used in one direction, equivalent to a limit order. This is done without any keepers or third parties, instead natively available on any pair. The limit orders implemented in Dry Powder are of the "partial fill" type, meaning they can be less than fully used to facilitate a trade and then later be available.
+Dry Powder allows liquidity providers to only allow for their liquidity to be used in one direction, equivalent to a limit order. This is done without any keepers or third parties, instead natively available on any pair. The limit orders implemented in Dry Powder are of the "partial fill" type, meaning they may not be fully swapped at once.
 
 ## Architecture
 
