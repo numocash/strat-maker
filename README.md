@@ -52,9 +52,9 @@ Reserving the rights to swap or borrowing liquidty solves these problems. Actors
 
 ### Options Pricing
 
-Each liquidity position both convex and concave is analagous to a replicated options portfolio whose payoff can perfectly match that of any option. With no expiry, the pricing is both simpler and perpetual. 
+Each liquidity position both convex and concave is analagous to a replicated options portfolio whose payoff can perfectly match that of any option. With no expiry, the pricing is both simpler and perpetual.
 
-For pricing option, or convex deriative, we relate the cost to the implied volatility of the portfolio.
+For pricing these derivatives, we relate the cost to the implied volatility of the underlying assets and the block frequency. We first take a look at arbitrageur profit. Without fees arbitrageur profit is
 
 ### Strikes (Aggregate Liquidity)
 
