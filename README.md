@@ -41,16 +41,18 @@ First implemented in Numoen's Power Market Maker Protocol is the ability to rese
 
 For example, let's assume the price of ether is currently $1000. Alice borrows 1 unit of liquidity at a strike price of $1500 that contains 1 ether or 1500 usdc, but because the market price is below the strike price, it is redeemable for 1 ether currently. As collateral, alice uses the 1 ether that was redeemed plus .1 ether of her own. The market price then moves to $2000 per ether. Alice sells the 1.1 ether for 2200 usdc, uses 1500 of the usdc to mint a liquidity token and payback her debt, profiting 700 usdc from a 100% price move with $100 of principal.
 
-Obviously, users must pay for the ability to acheive asymmetric exposure. In this protocol, positions that are borrowing liquidity active liquidity are slowly liquidated by having their collateral seized and being forgiven of their debt. Interest is accrued per block and , explained in more detail in the next section, borrow rates are proportional to swap fees which are related to volatility and block times.
+Obviously, users must pay for the ability to acheive asymmetric exposure. In this protocol, positions that are borrowing liquidity active liquidity are slowly liquidated by having their collateral seized and being forgiven of their debt. Interest is accrued per block and, explained in more detail in the next section, borrow rates are proportional to swap fees which are related to volatility and block times.
 
-This has drastic impacts on the low level economics of AMMs. The profitablity of popular exchange protocols is debated because liquidity providers suffer from a phenomenom known as Loss versus rebalancing. This is essentially a cost to liquidity providers that comes from external arbitrageurs having more informed market information than the protocol. These protocols are able to remain profitable by uninformed retail traders using them as a means of exchange, but this approach isn't sustainable. Two undesireable outcomes are the fact that:
+This has drastic impacts on the low level economics of AMMs. The profitablity of popular exchange protocols is debated because liquidity providers suffer from a phenomenom known as Loss Versus Rebalancing (LVR pronounced lever). This is essentially a cost to liquidity providers that comes from external arbitrageurs having more informed market information than the protocol. These protocols are able to remain profitable by uninformed retail traders using them as a means of exchange, but this approach isn't sustainable. Two undesireable outcomes are the fact that:
 
 1. Arbitrageurs never lose money, they simply won't take any action if the trade is unprofitable.
 2. When arbitrageurs are bidding against eachother, their payment goes to validators instead of liquidity providers.
 
-Reserving the rights to swap or borrowing liquidty solves these problems. Actors who were previously profiting on the volatility of assets are now able to borrow liquidity and arbitrage when the market price moves. Arbitrageurs now are unprofitable when the cost of borrowing is more than the arbitrage profit. This protocol takes the more conservative assumption that all traders are more informed than the current market.
+Reserving the rights to swap or borrowing liquidty solves these problems. Actors who were previously profiting on the volatility of assets are now able to borrow liquidity and arbitrage when the market price moves. Arbitrageurs now are unprofitable when the cost of borrowing is more than the arbitrage profit. We do not attempt to "solve" LVR, but instead make sure it is appropriately priced by allowing the other side of the trade or "gain versus rebalancing". This protocol takes the more conservative assumption that all traders are more informed than the current market.
 
 ### Options Pricing
+
+In this section we relate the cost of swapping and borrowing liquidity to market wide metrics such as implied volatility.
 
 ### Strikes (Aggregate Liquidity)
 
