@@ -35,13 +35,13 @@ Dry Powder is uses the invariant `Liquidity = Price * amount0 + amount1`, also r
 
 Simply put, automated market makers create a market between two classes of users. Traders want to swap token0 to token1 or vice versa, presumably because they believe it will benefit them in someway. Liquidity providers lend out a combination of token0 and token1, that is used to facilitate traders. They are rewarded for this with a portion of all traders trades. This market aims to connect traders and liquidity providers in a way that leaves them both satisfied with the opportunity.
 
-### Reserving Rights to Swap (Creating Convex Derivatives)
+### Reserving Rights to Swap (Creating Option)
 
-First implemented in Numoen's Power Market Maker Protocol is the ability to reserve the rights to swap by borrowing liquidity. To do this, users post collateral that they know will always be more valuable than the value of the liquidity they want to borrow. With this collateral, a user would borrow liquidity and immeadiately withdraw it in hopes that they can repay the liquidiity for a cheaper price in the future.
+First implemented in Numoen's Power Market Maker Protocol (pmmp) is the ability to reserve the rights to swap by borrowing liquidity. Thereby making swaps and borrowing empirically the same. To do this, users post collateral that they know will always be more valuable than the value of the liquidity they want to borrow. With this collateral, a user would borrow liquidity and immeadiately withdraw it in hopes that they can repay the liquidiity for a cheaper price in the future.
 
 For example, let's assume the price of ether is currently $1000. Alice borrows 1 unit of liquidity at a strike price of $1500 that contains 1 ether or 1500 usdc, but because the market price is below the strike price, it is redeemable for 1 ether currently. As collateral, alice uses the 1 ether that was redeemed plus .1 ether of her own. The market price then moves to $2000 per ether. Alice sells the 1.1 ether for 2200 usdc, uses 1500 of the usdc to mint a liquidity token and payback her debt, profiting 700 usdc from a 100% price move with $100 of principal.
 
-Obviously, users must pay for the ability to acheive asymmetric exposure. In this protocol, positions that are borrowing liquidity active liquidity are slowly liquidated by having their collateral seized and being forgiven of their debt. Interest is accrued per block and, explained in more detail in the next section, borrow rates are proportional to swap fees which are related to volatility and block times.
+Obviously, users must pay for the ability to acheive asymmetric exposure. In this protocol, positions that are borrowing liquidity active liquidity are slowly liquidated by having their collateral seized and being forgiven of their debt. We call this a continous liquidation and is keeperless. Interest is accrued per block and, explained in more detail in the next section, borrow rates are proportional to swap fees which are related to volatility and block times.
 
 This has drastic impacts on the low level economics of AMMs. The profitablity of popular exchange protocols is debated because liquidity providers suffer from a phenomenom known as Loss Versus Rebalancing (LVR pronounced lever). This is essentially a cost to liquidity providers that comes from external arbitrageurs having more informed market information than the protocol. These protocols are able to remain profitable by uninformed retail traders using them as a means of exchange, but this approach isn't sustainable. Two undesireable outcomes are the fact that:
 
@@ -52,7 +52,9 @@ Reserving the rights to swap or borrowing liquidty solves these problems. Actors
 
 ### Options Pricing
 
-In this section we relate the cost of swapping and borrowing liquidity to market wide metrics such as implied volatility.
+Each liquidity position both convex and concave is analagous to a replicated options portfolio whose payoff can perfectly match that of any option. With no expiry, the pricing is both simpler and perpetual. 
+
+For pricing option, or convex deriative, we relate the cost to the implied volatility of the portfolio.
 
 ### Strikes (Aggregate Liquidity)
 
