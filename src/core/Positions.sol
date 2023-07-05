@@ -172,7 +172,9 @@ abstract contract Positions is ILRTA {
             return true;
         } else {
             // TODO: accrue interest to sender and receiver
-            _dataOf[from][transferDetails.id].balance -= transferDetails.amount;
+            uint256 senderBalance = _dataOf[from][transferDetails.id].balance;
+            if (senderBalance == transferDetails.amount) delete _dataOf[from][transferDetails.id];
+            else _dataOf[from][transferDetails.id].balance = senderBalance - transferDetails.amount;
             unchecked {
                 _dataOf[to][transferDetails.id].balance += transferDetails.amount;
             }
@@ -374,8 +376,10 @@ abstract contract Positions is ILRTA {
     {
         bytes32 id = _debtID(token0, token1, strike, selector);
 
-        _dataOf[from][id].balance -= amount;
-        // TODO: clear out data for refund if balance is zero
+        uint256 balance = _dataOf[from][id].balance;
+
+        if (balance == amount) delete _dataOf[from][id];
+        else _dataOf[from][id].balance = balance - amount;
 
         emit Transfer(
             from,
