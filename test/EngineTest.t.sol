@@ -170,7 +170,7 @@ contract EngineTest is Test, EngineHelper {
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
 
-        (,,, uint256 leverageRatioX128) =
+        (, uint256 leverageRatioX128) =
             engine.getPositionDebt(address(this), address(token0), address(token1), 1, Engine.TokenSelector.Token0);
 
         (commands[0], inputs[0]) = repayCommand(
@@ -306,7 +306,7 @@ contract EngineTest is Test, EngineHelper {
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
 
-        (,,, uint256 leverageRatioX128) =
+        (, uint256 leverageRatioX128) =
             engine.getPositionDebt(address(this), address(token0), address(token1), 1, Engine.TokenSelector.Token0);
 
         (commands[0], inputs[0]) = repayCommand(

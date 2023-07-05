@@ -20,8 +20,6 @@ import {Q128} from "src/core/math/StrikeMath.sol";
 
 import {IExecuteCallback} from "src/core/interfaces/IExecuteCallback.sol";
 
-import {console2} from "forge-std/console2.sol";
-
 contract MockPair is Positions {
     using Pairs for Pairs.Pair;
 
@@ -78,17 +76,7 @@ contract MockPair is Positions {
         uint256 leverageRatioX128 = mulDiv(liquidityCollateral, Q128, liquidityDebt);
 
         // mint position to user
-        _mintDebt(
-            msg.sender,
-            token0,
-            token1,
-            strike,
-            selectorCollateral,
-            balance,
-            liquidityDebt,
-            _liquidityGrowthX128,
-            leverageRatioX128
-        );
+        _mintDebt(msg.sender, token0, token1, strike, selectorCollateral, balance, leverageRatioX128);
 
         uint256 balance0Before = BalanceLib.getBalance(token0);
         uint256 balance1Before = BalanceLib.getBalance(token1);
@@ -181,17 +169,7 @@ contract MockPair is Positions {
             if (amount1 > 0 && BalanceLib.getBalance(token1) < balance1Before + uint256(amount1)) revert();
         }
 
-        _burnDebt(
-            msg.sender,
-            token0,
-            token1,
-            strike,
-            selectorCollateral,
-            balance,
-            liquidity,
-            _liquidityGrowthX128,
-            leverageRatioX128
-        );
+        _burnDebt(msg.sender, token0, token1, strike, selectorCollateral, balance, leverageRatioX128);
     }
 
     function addLiquidity(
@@ -348,11 +326,11 @@ contract MockPair is Positions {
     )
         external
         view
-        returns (uint256 balance, uint256 liquidity, uint256 liquidityGrowthX128Last, uint256 leverageRatioX128)
+        returns (uint256 balance, uint256 leverageRatioX128)
     {
         balance = _dataOf[owner][_debtID(token0, token1, strike, selector)].balance;
         Positions.DebtData memory debtData = _dataOfDebt(owner, token0, token1, strike, selector);
 
-        return (balance, debtData.liquidity, debtData.liquidityGrowthX128Last, debtData.leverageRatioX128);
+        return (balance, debtData.leverageRatioX128);
     }
 }

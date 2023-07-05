@@ -2,11 +2,15 @@
 pragma solidity ^0.8.19;
 
 import {Engine} from "./Engine.sol";
+import {Pairs} from "./Pairs.sol";
 import {mulDivRoundingUp} from "./math/FullMath.sol";
 import {Q128} from "./math/StrikeMath.sol";
 import {ILRTA} from "ilrta/ILRTA.sol";
 
 abstract contract Positions is ILRTA {
+    using Pairs for Pairs.Pair;
+    using Pairs for mapping(bytes32 => Pairs.Pair);
+
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                DATA TYPES
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
@@ -34,8 +38,6 @@ abstract contract Positions is ILRTA {
     }
 
     struct DebtData {
-        uint256 liquidity;
-        uint256 liquidityGrowthX128Last;
         uint256 leverageRatioX128;
     }
 
@@ -43,6 +45,7 @@ abstract contract Positions is ILRTA {
         address token0;
         address token1;
         int24 strike;
+        Engine.TokenSelector selector;
     }
 
     struct ILRTADataID {
@@ -66,6 +69,8 @@ abstract contract Positions is ILRTA {
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                 STORAGE
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
+
+    mapping(bytes32 => Pairs.Pair) internal pairs;
 
     mapping(address => mapping(bytes32 => ILRTAData)) internal _dataOf;
 
@@ -135,27 +140,6 @@ abstract contract Positions is ILRTA {
         verifySuperSignature(from, transferDetails, dataHash);
 
         return _transfer(from, requestedTransfer.to, requestedTransferDetails);
-    }
-
-    function accruePositionDebt(
-        address owner,
-        address token0,
-        address token1,
-        int24 strike,
-        Engine.TokenSelector selector,
-        uint256 liquidityGrowthX128
-    )
-        internal
-    {
-        DebtData memory debtData = _dataOfDebt(owner, token0, token1, strike, selector);
-
-        uint256 liquidityGrowthDelta = liquidityGrowthX128 - debtData.liquidityGrowthX128Last;
-        uint256 liquidityAccrued = mulDivRoundingUp(liquidityGrowthDelta, debtData.liquidity, Q128);
-
-        debtData.liquidity = liquidityAccrued > debtData.liquidity ? 0 : debtData.liquidity - liquidityAccrued;
-        debtData.liquidityGrowthX128Last = liquidityGrowthX128;
-
-        _dataOf[owner][_debtID(token0, token1, strike, selector)].data = abi.encode(debtData);
     }
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
@@ -312,15 +296,14 @@ abstract contract Positions is ILRTA {
         int24 strike,
         Engine.TokenSelector selector,
         uint256 amount,
-        uint256 liquidityAmount,
-        uint256 liquidityGrowthX128Last,
         uint256 leverageRatioX128
     )
         internal
     {
+        // TODO: accrue interest to recipient
         bytes32 id = _debtID(token0, token1, strike, selector);
 
-        _dataOf[to][id].data = abi.encode(DebtData(liquidityAmount, liquidityGrowthX128Last, leverageRatioX128));
+        _dataOf[to][id].data = abi.encode(DebtData(leverageRatioX128));
 
         unchecked {
             _dataOf[to][id].balance += amount;
@@ -330,12 +313,7 @@ abstract contract Positions is ILRTA {
             address(0),
             to,
             abi.encode(
-                ILRTATransferDetails(
-                    id,
-                    amount,
-                    Engine.OrderType.Limit,
-                    abi.encode(DebtData(liquidityAmount, liquidityGrowthX128Last, leverageRatioX128))
-                )
+                ILRTATransferDetails(id, amount, Engine.OrderType.Limit, abi.encode(DebtData(leverageRatioX128)))
             )
         );
     }
@@ -390,8 +368,6 @@ abstract contract Positions is ILRTA {
         int24 strike,
         Engine.TokenSelector selector,
         uint256 amount,
-        uint256 liquidityAmount,
-        uint256 liquidityGrowthX128Last,
         uint256 leverageRatioX128
     )
         internal
@@ -399,17 +375,13 @@ abstract contract Positions is ILRTA {
         bytes32 id = _debtID(token0, token1, strike, selector);
 
         _dataOf[from][id].balance -= amount;
+        // TODO: clear out data for refund if balance is zero
 
         emit Transfer(
             from,
             address(0),
             abi.encode(
-                ILRTATransferDetails(
-                    id,
-                    amount,
-                    Engine.OrderType.Limit,
-                    abi.encode(DebtData(liquidityAmount, liquidityGrowthX128Last, leverageRatioX128))
-                )
+                ILRTATransferDetails(id, amount, Engine.OrderType.Limit, abi.encode(DebtData(leverageRatioX128)))
             )
         );
     }

@@ -76,7 +76,6 @@ contract Engine is Positions {
         BorrowLiquidity,
         RepayLiquidity,
         RemoveLiquidity,
-        AccruePosition,
         Accrue,
         CreatePair
     }
@@ -161,8 +160,6 @@ contract Engine is Positions {
                                 STORAGE
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    mapping(bytes32 => Pairs.Pair) private pairs;
-
     /// @dev this should be checked when reading any `get` function from another contract to prevent read-only
     /// reentrancy
     uint256 public locked = 1;
@@ -218,8 +215,6 @@ contract Engine is Positions {
                 _repayLiquidity(abi.decode(inputs[i], (RepayLiquidityParams)), account);
             } else if (commands[i] == Commands.RemoveLiquidity) {
                 _removeLiquidity(abi.decode(inputs[i], (RemoveLiquidityParams)), account);
-            } else if (commands[i] == Commands.AccruePosition) {
-                _accruePosition(abi.decode(inputs[i], (AccruePositionParams)));
             } else if (commands[i] == Commands.Accrue) {
                 _accrue(abi.decode(inputs[i], (AccrueParams)));
             } else if (commands[i] == Commands.CreatePair) {
@@ -420,8 +415,6 @@ contract Engine is Positions {
             params.strike,
             params.selectorCollateral,
             debtLiquidityToBalance(liquidityDebt, pair.strikes[params.strike].liquidityGrowthX128, false),
-            liquidityDebt,
-            pair.strikes[params.strike].liquidityGrowthX128,
             mulDiv(liquidityCollateral, Q128, liquidityDebt)
         );
 
@@ -471,12 +464,7 @@ contract Engine is Positions {
         // add burned position to account
         {
             bytes32 id = _debtID(params.token0, params.token1, params.strike, params.selectorCollateral);
-            account.updateILRTA(
-                id,
-                amount,
-                OrderType.Debt,
-                abi.encode(DebtData(liquidityDebt, _liquidityGrowthX128, params.leverageRatioX128))
-            );
+            account.updateILRTA(id, amount, OrderType.Debt, abi.encode(DebtData(params.leverageRatioX128)));
         }
 
         emit RepayLiquidity(pairID);
@@ -533,25 +521,6 @@ contract Engine is Positions {
         );
 
         emit RemoveLiquidity(pairID, params.strike, params.spread, uint256(-balance));
-    }
-
-    function _accruePosition(AccruePositionParams memory params) private {
-        (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
-
-        // if need to accrue pair
-        if (pair.cachedStrikeCurrent == params.strike) pair.accrue();
-
-        // accrue position
-        accruePositionDebt(
-            params.owner,
-            params.token0,
-            params.token1,
-            params.strike,
-            params.selectorCollateral,
-            pair.strikes[params.strike].liquidityGrowthX128
-        );
-
-        emit AccruePosition(pairID);
     }
 
     function _accrue(AccrueParams memory params) private {
@@ -637,11 +606,11 @@ contract Engine is Positions {
     )
         external
         view
-        returns (uint256 balance, uint256 liquidity, uint256 liquidityGrowthX128Last, uint256 leverageRatioX128)
+        returns (uint256 balance, uint256 leverageRatioX128)
     {
         balance = _dataOf[owner][_debtID(token0, token1, strike, selector)].balance;
         Positions.DebtData memory debtData = _dataOfDebt(owner, token0, token1, strike, selector);
 
-        return (balance, debtData.liquidity, debtData.liquidityGrowthX128Last, debtData.leverageRatioX128);
+        return (balance, debtData.leverageRatioX128);
     }
 }
