@@ -3,8 +3,7 @@ pragma solidity ^0.8.19;
 
 import {Engine} from "./Engine.sol";
 import {Pairs} from "./Pairs.sol";
-import {mulDivRoundingUp} from "./math/FullMath.sol";
-import {Q128} from "./math/StrikeMath.sol";
+import {addPositions} from "./math/PositionMath.sol";
 import {ILRTA} from "ilrta/ILRTA.sol";
 
 abstract contract Positions is ILRTA {
@@ -171,13 +170,31 @@ abstract contract Positions is ILRTA {
             emit Transfer(from, to, abi.encode(transferDetails));
             return true;
         } else {
-            // TODO: accrue interest to sender and receiver
+            DebtTransferDetails memory debtTransferDetails = abi.decode(transferDetails.data, (DebtTransferDetails));
+
             uint256 senderBalance = _dataOf[from][transferDetails.id].balance;
+            uint256 recipientBalance = _dataOf[to][transferDetails.id].balance;
+
             if (senderBalance == transferDetails.amount) delete _dataOf[from][transferDetails.id];
             else _dataOf[from][transferDetails.id].balance = senderBalance - transferDetails.amount;
+
             unchecked {
-                _dataOf[to][transferDetails.id].balance += transferDetails.amount;
+                _dataOf[to][transferDetails.id].balance = recipientBalance + transferDetails.amount;
             }
+
+            (, Pairs.Pair storage pair) = pairs.getPairAndID(debtTransferDetails.token0, debtTransferDetails.token1);
+
+            uint256 leverageRatioX128 = recipientBalance == 0
+                ? abi.decode(_dataOf[from][transferDetails.id].data, (DebtData)).leverageRatioX128
+                : addPositions(
+                    pair.strikes[debtTransferDetails.strike].liquidityGrowthX128,
+                    transferDetails.amount,
+                    recipientBalance,
+                    abi.decode(_dataOf[from][transferDetails.id].data, (DebtData)),
+                    abi.decode(_dataOf[to][transferDetails.id].data, (DebtData))
+                );
+
+            _dataOf[to][transferDetails.id].data = abi.encode(DebtData(leverageRatioX128));
 
             emit Transfer(from, to, abi.encode(transferDetails));
             return true;
@@ -302,13 +319,28 @@ abstract contract Positions is ILRTA {
     )
         internal
     {
-        // TODO: accrue interest to recipient
         bytes32 id = _debtID(token0, token1, strike, selector);
+        uint256 balance = _dataOf[to][id].balance;
 
-        _dataOf[to][id].data = abi.encode(DebtData(leverageRatioX128));
+        (, Pairs.Pair storage pair) = pairs.getPairAndID(token0, token1);
 
-        unchecked {
-            _dataOf[to][id].balance += amount;
+        if (balance == 0) {
+            _dataOf[to][id].balance = amount;
+            _dataOf[to][id].data = abi.encode(DebtData(leverageRatioX128));
+        } else {
+            DebtData memory debtData = abi.decode(_dataOf[to][id].data, (DebtData));
+
+            _dataOf[to][id].data = abi.encode(
+                DebtData(
+                    addPositions(
+                        pair.strikes[strike].liquidityGrowthX128, amount, balance, DebtData(leverageRatioX128), debtData
+                    )
+                )
+            );
+
+            unchecked {
+                _dataOf[to][id].balance = balance + amount;
+            }
         }
 
         emit Transfer(
