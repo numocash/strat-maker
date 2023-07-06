@@ -218,7 +218,6 @@ contract Engine is Positions {
                         _addLiquidity(to, abi.decode(inputs[i], (AddLiquidityParams)), account);
                     }
                 } else {
-                    // command could be borrow liquidity or repay liquidity
                     if (commands[i] == Commands.BorrowLiquidity) {
                         _borrowLiquidity(to, abi.decode(inputs[i], (BorrowLiquidityParams)), account);
                     } else {
@@ -228,7 +227,6 @@ contract Engine is Positions {
                 }
             } else {
                 if (commands[i] < Commands.Accrue) {
-                    //command could be remove liquidity or accrue position
                     if (commands[i] == Commands.RemoveLiquidity) {
                         // remove liquidity
                         _removeLiquidity(abi.decode(inputs[i], (RemoveLiquidityParams)), account);
@@ -522,7 +520,7 @@ contract Engine is Positions {
             balance = params.amountDesired;
             liquidity = -toInt256(balanceToLiquidity(pair, params.strike, params.spread, uint256(-balance), false));
             (uint256 _amount0, uint256 _amount1) =
-                getAmountsForLiquidity(pair, params.strike, params.spread, uint256(liquidity), false);
+                getAmountsForLiquidity(pair, params.strike, params.spread, uint256(-liquidity), false);
             amount0 = -int256(_amount0);
             amount1 = -int256(_amount1);
         } else if (params.selector == TokenSelector.Token0) {

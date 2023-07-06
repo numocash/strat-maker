@@ -122,10 +122,10 @@ contract EngineTest is Test, EngineHelper {
 
         basicRemoveLiquidity();
 
-        // assertEq(token0.balanceOf(address(this)), 1e18 - 1);
+        assertEq(token0.balanceOf(address(this)), 1e18 - 1);
         assertEq(token1.balanceOf(address(this)), 0);
 
-        // assertEq(token0.balanceOf(address(engine)), 1);
+        assertEq(token0.balanceOf(address(engine)), 1);
         assertEq(token1.balanceOf(address(engine)), 0);
     }
 
