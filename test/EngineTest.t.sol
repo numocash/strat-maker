@@ -17,6 +17,8 @@ import {
 
 import {Engine} from "src/core/Engine.sol";
 import {Pairs} from "src/core/Pairs.sol";
+import {mulDiv, mulDivRoundingUp} from "src/core/math/FullMath.sol";
+import {Q128, getRatioAtStrike} from "src/core/math/StrikeMath.sol";
 
 contract EngineTest is Test, EngineHelper {
     event PairCreated(address indexed token0, address indexed token1, int24 strikeInitial);
@@ -105,6 +107,12 @@ contract EngineTest is Test, EngineHelper {
         basicCreate();
 
         basicAddLiquidity();
+
+        assertEq(token0.balanceOf(address(this)), 0);
+        assertEq(token1.balanceOf(address(this)), 0);
+
+        assertEq(token0.balanceOf(address(engine)), 1e18);
+        assertEq(token1.balanceOf(address(engine)), 0);
     }
 
     function testRemoveLiquidity() external {
@@ -113,6 +121,12 @@ contract EngineTest is Test, EngineHelper {
         basicAddLiquidity();
 
         basicRemoveLiquidity();
+
+        assertEq(token0.balanceOf(address(this)), 1e18 - 1);
+        assertEq(token1.balanceOf(address(this)), 0);
+
+        assertEq(token0.balanceOf(address(engine)), 1);
+        assertEq(token1.balanceOf(address(engine)), 0);
     }
 
     function testBorrowLiquidity() external {
@@ -141,6 +155,15 @@ contract EngineTest is Test, EngineHelper {
         );
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
+
+        assertEq(token0.balanceOf(address(this)), 0);
+        assertEq(token1.balanceOf(address(this)), 0);
+
+        assertEq(
+            token0.balanceOf(address(engine)),
+            mulDivRoundingUp(1e18, Q128, getRatioAtStrike(1)) + 1.5e18 - mulDiv(0.5e18, Q128, getRatioAtStrike(1))
+        );
+        assertEq(token1.balanceOf(address(engine)), 0);
     }
 
     function testRepayLiquidity() external {
@@ -184,6 +207,12 @@ contract EngineTest is Test, EngineHelper {
         );
 
         engine.execute(address(this), commands, inputs, 1, 1, bytes(""));
+
+        uint256 tokens0Owed = mulDivRoundingUp(0.5e18, Q128, getRatioAtStrike(1));
+        uint256 tokens0Collateral = mulDiv((mulDiv(0.5e18, leverageRatioX128, Q128)), Q128, getRatioAtStrike(1));
+
+        assertEq(token0.balanceOf(address(this)), tokens0Collateral - tokens0Owed);
+        assertEq(token1.balanceOf(address(this)), 0);
     }
 
     function testSwap() external {
@@ -199,6 +228,14 @@ contract EngineTest is Test, EngineHelper {
             abi.encode(Engine.SwapParams(address(token0), address(token1), Engine.TokenSelector.Token1, 1e18 - 1));
 
         engine.execute(address(this), commands, inputs, 2, 0, bytes(""));
+
+        uint256 amountOut = mulDiv(1e18 - 1, Q128, getRatioAtStrike(1));
+
+        assertEq(token0.balanceOf(address(this)), amountOut);
+        assertEq(token1.balanceOf(address(this)), 0);
+
+        assertEq(token0.balanceOf(address(engine)), 1e18 - amountOut);
+        assertEq(token1.balanceOf(address(engine)), 1e18 - 1);
     }
 
     function testGasAddLiquidity() external {
@@ -371,7 +408,7 @@ contract EngineTest is Test, EngineHelper {
         vm.resumeGasMetering();
     }
 
-    function testRemoveAndSwap() external {
+    function testGasRemoveAndSwap() external {
         vm.pauseGasMetering();
         basicCreate();
         basicAddLiquidity();
