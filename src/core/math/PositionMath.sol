@@ -96,7 +96,7 @@ function addPositions(
     Positions.DebtData memory debtData0,
     Positions.DebtData memory debtData1
 )
-    view
+    pure
     returns (uint256 leverageRatioX128)
 {
     uint256 liquidity0 = debtBalanceToLiquidity(balance0, liquidityGrowthX128, false);

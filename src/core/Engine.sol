@@ -30,7 +30,7 @@ import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
 
 import {IExecuteCallback} from "./interfaces/IExecuteCallback.sol";
 
-/// @author Robert Leifke and Kyle Scott
+/// @author Kyle Scott and Robert Leifke
 /// @custom:team return data and events
 /// @custom:team tree for function selector
 /// @custom:team pass minted position information back to callback
@@ -188,7 +188,6 @@ contract Engine is Positions {
                                  LOGIC
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    /// @dev Set to address to 0 if creating a pair
     function execute(
         address to,
         Commands[] calldata commands,
@@ -200,27 +199,46 @@ contract Engine is Positions {
         external
         nonReentrant
     {
-        if (commands.length != inputs.length) revert CommandLengthMismatch();
+        if (commands.length != inputs.length) {
+            revert CommandLengthMismatch();
+        }
 
         Accounts.Account memory account = Accounts.newAccount(numTokens, numLPs);
 
         for (uint256 i = 0; i < commands.length;) {
-            if (commands[i] == Commands.Swap) {
-                _swap(abi.decode(inputs[i], (SwapParams)), account);
-            } else if (commands[i] == Commands.AddLiquidity) {
-                _addLiquidity(to, abi.decode(inputs[i], (AddLiquidityParams)), account);
-            } else if (commands[i] == Commands.BorrowLiquidity) {
-                _borrowLiquidity(to, abi.decode(inputs[i], (BorrowLiquidityParams)), account);
-            } else if (commands[i] == Commands.RepayLiquidity) {
-                _repayLiquidity(abi.decode(inputs[i], (RepayLiquidityParams)), account);
-            } else if (commands[i] == Commands.RemoveLiquidity) {
-                _removeLiquidity(abi.decode(inputs[i], (RemoveLiquidityParams)), account);
-            } else if (commands[i] == Commands.Accrue) {
-                _accrue(abi.decode(inputs[i], (AccrueParams)));
-            } else if (commands[i] == Commands.CreatePair) {
-                _createPair(abi.decode(inputs[i], (CreatePairParams)));
+            if (commands[i] < Commands.RemoveLiquidity) {
+                if (commands[i] < Commands.BorrowLiquidity) {
+                    if (commands[i] == Commands.Swap) {
+                        _swap(abi.decode(inputs[i], (SwapParams)), account);
+                    } else {
+                        // command must be 1, which is add liquidity
+                        _addLiquidity(to, abi.decode(inputs[i], (AddLiquidityParams)), account);
+                    }
+                } else {
+                    if (commands[i] == Commands.BorrowLiquidity) {
+                        _borrowLiquidity(to, abi.decode(inputs[i], (BorrowLiquidityParams)), account);
+                    } else {
+                        // must be _repayLiquidity
+                        _repayLiquidity(abi.decode(inputs[i], (RepayLiquidityParams)), account);
+                    }
+                }
             } else {
-                revert InvalidCommand();
+                if (commands[i] < Commands.CreatePair) {
+                    if (commands[i] == Commands.RemoveLiquidity) {
+                        // remove liquidity
+                        _removeLiquidity(abi.decode(inputs[i], (RemoveLiquidityParams)), account);
+                    } else {
+                        // accrue
+                        _accrue(abi.decode(inputs[i], (AccrueParams)));
+                    }
+                } else {
+                    if (commands[i] == Commands.CreatePair) {
+                        // create pair
+                        _createPair(abi.decode(inputs[i], (CreatePairParams)));
+                    } else {
+                        revert InvalidCommand();
+                    }
+                }
             }
 
             unchecked {
@@ -233,14 +251,19 @@ contract Engine is Positions {
             int256 delta = account.tokenDeltas[i];
             address token = account.tokens[i];
 
-            if (token == address(0)) break;
-
-            if (delta < 0) {
-                SafeTransferLib.safeTransfer(token, to, uint256(-delta));
-            }
-
-            unchecked {
+            // token is zero, so skip it.
+            if (token == address(0)) {
                 i++;
+            } else {
+                // if delta is negative, transfer token to recipient address
+                if (delta < 0) {
+                    SafeTransferLib.safeTransfer(token, to, uint256(-delta));
+                }
+
+                // increment the loop counter.
+                unchecked {
+                    i++;
+                }
             }
         }
 
@@ -484,7 +507,7 @@ contract Engine is Positions {
             balance = params.amountDesired;
             liquidity = -toInt256(balanceToLiquidity(pair, params.strike, params.spread, uint256(-balance), false));
             (uint256 _amount0, uint256 _amount1) =
-                getAmountsForLiquidity(pair, params.strike, params.spread, uint256(liquidity), false);
+                getAmountsForLiquidity(pair, params.strike, params.spread, uint256(-liquidity), false);
             amount0 = -int256(_amount0);
             amount1 = -int256(_amount1);
         } else if (params.selector == TokenSelector.Token0) {
