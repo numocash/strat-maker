@@ -47,7 +47,6 @@ jobs:
 
   test:
     name: Test
-    if: false
     runs-on: ubuntu-latest
     steps:
       - name: Clone repository
