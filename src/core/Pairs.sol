@@ -11,6 +11,8 @@ uint8 constant NUM_SPREADS = 5;
 int8 constant MAX_CONSECUTIVE = int8(NUM_SPREADS);
 
 /// @author Robert Leifke and Kyle Scott
+/// @custom:team should we allow for borrowing the current strike
+/// @custom:tema should we charge a fee on borrow origination
 library Pairs {
     using BitMaps for BitMaps.BitMap;
 
@@ -417,7 +419,6 @@ library Pairs {
         uint8 _activeSpread = strikeObj.activeSpread;
 
         while (true) {
-            // TODO: should we do this
             // don't allow for borrowing the current strike
             if (pair.strikeCurrent[_activeSpread] == strike) revert();
             uint256 availableLiquidity = strikeObj.liquidityBiDirectional[_activeSpread];
@@ -436,7 +437,6 @@ library Pairs {
                 _activeSpread++;
             }
         }
-        // TODO: charge fee for borrowing
 
         strikeObj.activeSpread = _activeSpread;
     }
@@ -495,8 +495,31 @@ library Pairs {
 
         pair.strikes[strike].liquidityGrowthX128 +=
             mulDivRoundingUp(liquidityGrowthNumerator, Q128, liquidityBorrowedTotal);
-        // TODO: same math as repay liquidity
 
+        uint256 liquidityRepaid = liquidityGrowthNumerator / 10_000;
+
+        Strike storage strikeObj = pair.strikes[strike];
+        uint8 _activeSpread = strikeObj.activeSpread;
+
+        while (true) {
+            uint256 borrowedLiquidity = strikeObj.liquidityBorrowed[_activeSpread];
+
+            if (borrowedLiquidity >= liquidityRepaid) {
+                strikeObj.liquidityBiDirectional[_activeSpread] += liquidityRepaid;
+                strikeObj.liquidityBorrowed[_activeSpread] = borrowedLiquidity - liquidityRepaid;
+                break;
+            } else {
+                strikeObj.liquidityBiDirectional[_activeSpread] += borrowedLiquidity;
+                strikeObj.liquidityBorrowed[_activeSpread] = 0;
+                liquidityRepaid -= borrowedLiquidity;
+                _activeSpread--;
+
+                _addStrike0To1(pair, strike - int8(_activeSpread));
+                _addStrike1To0(pair, strike + int8(_activeSpread));
+            }
+        }
+
+        strikeObj.activeSpread = _activeSpread;
         pair.cachedBlock = block.number;
     }
 
