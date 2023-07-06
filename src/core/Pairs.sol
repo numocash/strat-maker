@@ -7,6 +7,8 @@ import {addDelta, toInt256} from "./math/LiquidityMath.sol";
 import {getRatioAtStrike, MAX_STRIKE, MIN_STRIKE, Q128} from "./math/StrikeMath.sol";
 import {computeSwapStep} from "./math/SwapMath.sol";
 
+import {console2} from "forge-std/console2.sol";
+
 uint8 constant NUM_SPREADS = 5;
 int8 constant MAX_CONSECUTIVE = int8(NUM_SPREADS);
 
@@ -284,6 +286,7 @@ library Pairs {
             if (isSwap0To1) {
                 int24 strikePrev = state.cachedStrikeCurrent;
                 if (strikePrev == MIN_STRIKE) revert OutOfBounds();
+                _accrue(pair, strikePrev);
 
                 // Remove strike from linked list and bit map if it has no liquidity
                 // Only happens when initialized or all liquidity is removed from current strike
@@ -323,6 +326,7 @@ library Pairs {
             } else {
                 int24 strikePrev = state.cachedStrikeCurrent;
                 if (strikePrev == MAX_STRIKE) revert OutOfBounds();
+                _accrue(pair, strikePrev);
 
                 // Remove strike from linked list and bit map if it has no liquidity
                 // Only happens when initialized or all liquidity is removed from current strike
@@ -493,6 +497,7 @@ library Pairs {
             liquidityBorrowedTotal += liquidityBorrowed;
         }
 
+        if (liquidityGrowthNumerator == 0) return;
         pair.strikes[strike].liquidityGrowthX128 +=
             mulDivRoundingUp(liquidityGrowthNumerator, Q128, liquidityBorrowedTotal);
 
@@ -520,6 +525,7 @@ library Pairs {
         }
 
         strikeObj.activeSpread = _activeSpread;
+
         pair.cachedBlock = block.number;
     }
 
