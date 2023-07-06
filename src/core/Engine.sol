@@ -214,22 +214,34 @@ contract Engine is Positions {
                     if (commands[i] == Commands.Swap) {
                         _swap(abi.decode(inputs[i], (SwapParams)), account);
                     } else {
+                        // (commands[i] == Commands.AddLiquidity)
                         // command must be 1, which is add liquidity
                         _addLiquidity(to, abi.decode(inputs[i], (AddLiquidityParams)), account);
                     }
                 } else {
                     // command could be borrow liquidity or repay liquidity
-                    // branch like lines 214-219
+                    if (commands[i] == Commands.BorrowLiquidity) {
+                        _borrowLiquidity(to, abi.decode(inputs[i], (BorrowLiquidityParams)), account);
+                    } else {
+                        // must be _repayLiquidity
+                        _repayLiquidity(abi.decode(inputs[i], (RepayLiquidityParams)), account);
+                    }
                 }
             } else {
+                //command could be remove liquidity or accrue position
                 if (commands[i] < Commands.Accrue) {
-                    // command could be remove liquidity or accrue position
-                    // branch like lines 214-219
+                    if(commands[i] < Commands.RemoveLiquidity) {
+                        if(commands[i] == Commands.Swap) {
+                            _swap(abi.decode(inputs[i], (SwapParams)), account);
+                        }
+                    }
                 } else {
-                    if (commands[i] == Commands.Accrue) {
+                    if (commands[i] == Commands.AccruePosition) {
                         // accrue
+                        _accruePosition(abi.decode(inputs[i], (AccruePositionParams)));
                     } else if (commands[i] == Commands.CreatePair) {
                         // create pair
+                        _createPair(abi.decode(inputs[i], (CreatePairParams)));
                     } else {
                         revert InvalidCommand();
                     }
@@ -537,14 +549,18 @@ contract Engine is Positions {
         } else if (params.selector == TokenSelector.Token0) {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
 
-            liquidity = -toInt256(getLiquidityForAmount0(pair, params.strike, params.spread, uint256(-params.amountDesired), false));
+            liquidity = -toInt256(getLiquidityForAmount0(pair, params.strike, 
+                                                            params.spread, uint256(-params.amountDesired), false));
             amount0 = params.amountDesired;
-            amount1 = -toInt256(getAmount1ForLiquidity(pair, params.strike, params.spread, uint256(-liquidity), false));
+            amount1 = -toInt256(getAmount1ForLiquidity(pair, params.strike, 
+                                                        params.spread, uint256(-liquidity), false));
         } else if (params.selector == TokenSelector.Token1) {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
 
-            liquidity = -toInt256(getLiquidityForAmount1(pair, params.strike, params.spread, uint256(-params.amountDesired), false));
-            amount0 = -toInt256(getAmount0ForLiquidity(pair, params.strike, params.spread, uint256(-liquidity), false));
+            liquidity = -toInt256(getLiquidityForAmount1(pair, params.strike, 
+                                                            params.spread, uint256(-params.amountDesired), false));
+            amount0 = -toInt256(getAmount0ForLiquidity(pair, params.strike, 
+                                                            params.spread, uint256(-liquidity), false));
             amount1 = params.amountDesired;
         } else {
             revert InvalidSelector();
