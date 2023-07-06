@@ -205,6 +205,7 @@ contract Engine is Positions {
 
         Accounts.Account memory account = Accounts.newAccount(numTokens, numLPs);
 
+        // find command helper with binary search
         for (uint256 i = 0; i < commands.length;) {
             if (commands[i] < Commands.RemoveLiquidity) {
                 if (commands[i] < Commands.BorrowLiquidity) {
@@ -225,7 +226,6 @@ contract Engine is Positions {
             } else {
                 if (commands[i] < Commands.CreatePair) {
                     if (commands[i] == Commands.RemoveLiquidity) {
-                        // remove liquidity
                         _removeLiquidity(abi.decode(inputs[i], (RemoveLiquidityParams)), account);
                     } else {
                         // accrue
@@ -446,6 +446,7 @@ contract Engine is Positions {
 
     function _repayLiquidity(RepayLiquidityParams memory params, Accounts.Account memory account) private {
         (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
+        if (pair.cachedStrikeCurrent == params.strike) pair._accrue(params.strike);
 
         uint256 _liquidityGrowthX128 = pair.strikes[params.strike].liquidityGrowthX128;
 

@@ -18,6 +18,8 @@ import {
 import {balanceToLiquidity, debtBalanceToLiquidity, debtLiquidityToBalance} from "src/core/math/PositionMath.sol";
 import {Q128} from "src/core/math/StrikeMath.sol";
 
+import {console2} from "forge-std/console2.sol";
+
 import {IExecuteCallback} from "src/core/interfaces/IExecuteCallback.sol";
 
 contract MockPair is Positions {
@@ -118,8 +120,12 @@ contract MockPair is Positions {
         public
         returns (int256 amount0, int256 amount1)
     {
+        if (pair.cachedStrikeCurrent == strike) pair._accrue(strike);
+        console2.log("here");
         uint256 _liquidityGrowthX128 = pair.strikes[strike].liquidityGrowthX128;
+        console2.log(_liquidityGrowthX128 / Q128);
         uint256 liquidity = debtBalanceToLiquidity(balance, _liquidityGrowthX128, true);
+        console2.log("liquidity %d", liquidity);
         pair.repayLiquidity(strike, liquidity);
 
         {
@@ -212,6 +218,10 @@ contract MockPair is Positions {
 
         if (BalanceLib.getBalance(token0) < balance0Before + amount0) revert();
         if (BalanceLib.getBalance(token1) < balance1Before + amount1) revert();
+    }
+
+    function accrue() external {
+        pair.accrue();
     }
 
     function removeLiquidity(

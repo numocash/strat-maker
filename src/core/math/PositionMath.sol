@@ -69,8 +69,11 @@ function debtLiquidityToBalance(
     pure
     returns (uint256 balance)
 {
-    return liquidity
-        + (roundUp ? mulDivRoundingUp(liquidity, liquidityGrowthX128, Q128) : mulDiv(liquidity, liquidityGrowthX128, Q128));
+    return (
+        roundUp
+            ? mulDivRoundingUp(liquidity, liquidityGrowthX128 + Q128, Q128)
+            : mulDiv(liquidity, liquidityGrowthX128 + Q128, Q128)
+    );
 }
 
 function getLiquidityBorrowed(

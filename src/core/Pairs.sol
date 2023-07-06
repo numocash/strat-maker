@@ -14,7 +14,8 @@ int8 constant MAX_CONSECUTIVE = int8(NUM_SPREADS);
 
 /// @author Robert Leifke and Kyle Scott
 /// @custom:team should we allow for borrowing the current strike
-/// @custom:tema should we charge a fee on borrow origination
+/// @custom:team should we charge a fee on borrow origination
+/// @custom:team should we use exp instead of supply
 library Pairs {
     using BitMaps for BitMaps.BitMap;
 
@@ -449,8 +450,6 @@ library Pairs {
         Strike storage strikeObj = pair.strikes[strike];
         uint8 _activeSpread = strikeObj.activeSpread;
 
-        if (pair.cachedStrikeCurrent == strike) _accrue(pair, strike);
-
         while (true) {
             uint256 borrowedLiquidity = strikeObj.liquidityBorrowed[_activeSpread];
 
@@ -481,51 +480,33 @@ library Pairs {
                              INTERNAL LOGIC
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    function _accrue(Pair storage pair, int24 strike) private {
+    function _accrue(Pair storage pair, int24 strike) internal {
         uint256 _cachedBlock = pair.cachedBlock;
         uint256 blocks = block.number - _cachedBlock;
         if (blocks == 0) return;
 
-        uint256 liquidityGrowthNumerator;
+        uint256 liquidityRepaid;
         uint256 liquidityBorrowedTotal;
 
-        for (uint256 i = 0; i < pair.strikes[strike].activeSpread; i++) {
+        for (uint256 i = 0; i <= pair.strikes[strike].activeSpread; i++) {
             uint256 liquidityBorrowed = pair.strikes[strike].liquidityBorrowed[i];
 
-            pair.strikes[strike].liquidityBiDirectional[i] += ((i + 1) * blocks * liquidityBorrowed) / 10_000;
-            liquidityGrowthNumerator += (i + 1) * blocks * liquidityBorrowed;
+            uint256 spreadGrowth = ((i + 1) * blocks * liquidityBorrowed) / 10_000;
+
+            pair.strikes[strike].liquidityBiDirectional[i] += spreadGrowth;
+            liquidityRepaid += spreadGrowth;
             liquidityBorrowedTotal += liquidityBorrowed;
         }
 
-        if (liquidityGrowthNumerator == 0) return;
-        pair.strikes[strike].liquidityGrowthX128 +=
-            mulDivRoundingUp(liquidityGrowthNumerator, Q128, liquidityBorrowedTotal);
+        if (liquidityRepaid == 0) return;
 
-        uint256 liquidityRepaid = liquidityGrowthNumerator / 10_000;
+        pair.strikes[strike].liquidityGrowthX128 = mulDivRoundingUp(
+            pair.strikes[strike].liquidityGrowthX128 + Q128,
+            liquidityBorrowedTotal,
+            liquidityBorrowedTotal - liquidityRepaid
+        ) - Q128;
 
-        Strike storage strikeObj = pair.strikes[strike];
-        uint8 _activeSpread = strikeObj.activeSpread;
-
-        while (true) {
-            uint256 borrowedLiquidity = strikeObj.liquidityBorrowed[_activeSpread];
-
-            if (borrowedLiquidity >= liquidityRepaid) {
-                strikeObj.liquidityBiDirectional[_activeSpread] += liquidityRepaid;
-                strikeObj.liquidityBorrowed[_activeSpread] = borrowedLiquidity - liquidityRepaid;
-                break;
-            } else {
-                strikeObj.liquidityBiDirectional[_activeSpread] += borrowedLiquidity;
-                strikeObj.liquidityBorrowed[_activeSpread] = 0;
-                liquidityRepaid -= borrowedLiquidity;
-                _activeSpread--;
-
-                _addStrike0To1(pair, strike - int8(_activeSpread));
-                _addStrike1To0(pair, strike + int8(_activeSpread));
-            }
-        }
-
-        strikeObj.activeSpread = _activeSpread;
-
+        repayLiquidity(pair, strike, liquidityRepaid);
         pair.cachedBlock = block.number;
     }
 
