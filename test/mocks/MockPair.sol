@@ -50,6 +50,7 @@ contract MockPair is Positions {
         public
         returns (int256 amount0, int256 amount1)
     {
+        if (pair.cachedStrikeCurrent == strike) pair._accrue(strike);
         pair.borrowLiquidity(strike, liquidityDebt);
 
         // calculate the the tokens that are borrowed
