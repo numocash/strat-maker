@@ -7,8 +7,6 @@ import {addDelta, toInt256} from "./math/LiquidityMath.sol";
 import {getRatioAtStrike, MAX_STRIKE, MIN_STRIKE, Q128} from "./math/StrikeMath.sol";
 import {computeSwapStep} from "./math/SwapMath.sol";
 
-import {console2} from "forge-std/console2.sol";
-
 uint8 constant NUM_SPREADS = 5;
 int8 constant MAX_CONSECUTIVE = int8(NUM_SPREADS);
 

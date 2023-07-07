@@ -21,8 +21,16 @@ function balanceToLiquidity(
         return balance;
     } else {
         return roundUp
-            ? mulDivRoundingUp(balance, pair.strikes[strike].liquidityBiDirectional[spread - 1], totalSupply)
-            : mulDiv(balance, pair.strikes[strike].liquidityBiDirectional[spread - 1], totalSupply);
+            ? mulDivRoundingUp(
+                balance,
+                pair.strikes[strike].liquidityBiDirectional[spread - 1] + pair.strikes[strike].liquidityBorrowed[spread - 1],
+                totalSupply
+            )
+            : mulDiv(
+                balance,
+                pair.strikes[strike].liquidityBiDirectional[spread - 1] + pair.strikes[strike].liquidityBorrowed[spread - 1],
+                totalSupply
+            );
     }
 }
 
@@ -36,7 +44,8 @@ function liquidityToBalance(
     view
     returns (uint256 balance)
 {
-    uint256 totalLiquidity = pair.strikes[strike].liquidityBiDirectional[spread - 1];
+    uint256 totalLiquidity =
+        pair.strikes[strike].liquidityBiDirectional[spread - 1] + pair.strikes[strike].liquidityBorrowed[spread - 1];
     if (totalLiquidity == 0) {
         return liquidity;
     } else {

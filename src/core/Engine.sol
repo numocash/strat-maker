@@ -336,6 +336,7 @@ contract Engine is Positions {
 
     function _addLiquidity(address to, AddLiquidityParams memory params, Accounts.Account memory account) private {
         (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
+        if (pair.cachedStrikeCurrent == params.strike) pair._accrue(params.strike);
 
         // calculate how much to add
         int256 balance;
@@ -430,6 +431,8 @@ contract Engine is Positions {
             revert InvalidSelector();
         }
 
+        uint256 balance = debtLiquidityToBalance(liquidityDebt, pair.strikes[params.strike].liquidityGrowthX128, false);
+
         // mint position to user
         _mintDebt(
             to,
@@ -437,8 +440,8 @@ contract Engine is Positions {
             params.token1,
             params.strike,
             params.selectorCollateral,
-            debtLiquidityToBalance(liquidityDebt, pair.strikes[params.strike].liquidityGrowthX128, false),
-            mulDiv(liquidityCollateral, Q128, liquidityDebt)
+            balance,
+            mulDiv(liquidityCollateral, Q128, balance) // TODO: liquidity or balance
         );
 
         emit BorrowLiquidity(pairID);
@@ -475,7 +478,7 @@ contract Engine is Positions {
 
         // add unlocked collateral to account
         {
-            uint256 liquidityCollateral = mulDiv(liquidityDebt, params.leverageRatioX128, Q128);
+            uint256 liquidityCollateral = mulDiv(amount, params.leverageRatioX128, Q128) + liquidityDebt - amount;
             if (params.selectorCollateral == TokenSelector.Token0) {
                 account.updateToken(
                     params.token0, -toInt256(getAmount0Delta(liquidityCollateral, params.strike, false))
@@ -496,6 +499,7 @@ contract Engine is Positions {
 
     function _removeLiquidity(RemoveLiquidityParams memory params, Accounts.Account memory account) private {
         (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
+        if (pair.cachedStrikeCurrent == params.strike) pair._accrue(params.strike);
 
         // calculate how much to remove
         int256 balance;

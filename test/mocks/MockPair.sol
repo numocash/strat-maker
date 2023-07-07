@@ -18,8 +18,6 @@ import {
 import {balanceToLiquidity, debtBalanceToLiquidity, debtLiquidityToBalance} from "src/core/math/PositionMath.sol";
 import {Q128} from "src/core/math/StrikeMath.sol";
 
-import {console2} from "forge-std/console2.sol";
-
 import {IExecuteCallback} from "src/core/interfaces/IExecuteCallback.sol";
 
 contract MockPair is Positions {
@@ -75,7 +73,7 @@ contract MockPair is Positions {
 
         uint256 _liquidityGrowthX128 = pair.strikes[strike].liquidityGrowthX128;
         uint256 balance = debtLiquidityToBalance(liquidityDebt, _liquidityGrowthX128, false);
-        uint256 leverageRatioX128 = mulDiv(liquidityCollateral, Q128, liquidityDebt);
+        uint256 leverageRatioX128 = mulDiv(liquidityCollateral, Q128, balance); // TODO: liquidity or balance
 
         // mint position to user
         _mintDebt(msg.sender, token0, token1, strike, selectorCollateral, balance, leverageRatioX128);
@@ -121,11 +119,8 @@ contract MockPair is Positions {
         returns (int256 amount0, int256 amount1)
     {
         if (pair.cachedStrikeCurrent == strike) pair._accrue(strike);
-        console2.log("here");
         uint256 _liquidityGrowthX128 = pair.strikes[strike].liquidityGrowthX128;
-        console2.log(_liquidityGrowthX128 / Q128);
         uint256 liquidity = debtBalanceToLiquidity(balance, _liquidityGrowthX128, true);
-        console2.log("liquidity %d", liquidity);
         pair.repayLiquidity(strike, liquidity);
 
         {
@@ -136,7 +131,7 @@ contract MockPair is Positions {
         }
 
         {
-            uint256 liquidityCollateral = mulDiv(liquidity, leverageRatioX128, Q128);
+            uint256 liquidityCollateral = mulDiv(balance, leverageRatioX128, Q128) + liquidity - balance;
             if (selectorCollateral == Engine.TokenSelector.Token0) {
                 amount0 -= toInt256(getAmount0Delta(liquidityCollateral, strike, false));
             } else {
@@ -186,6 +181,7 @@ contract MockPair is Positions {
         public
         returns (uint256 amount0, uint256 amount1)
     {
+        if (pair.cachedStrikeCurrent == strike) pair._accrue(strike);
         uint256 liquidity = balanceToLiquidity(pair, strike, spread, uint256(balance), true);
         (amount0, amount1) = getAmountsForLiquidity(pair, strike, spread, uint256(liquidity), true);
 
@@ -232,6 +228,7 @@ contract MockPair is Positions {
         public
         returns (uint256 amount0, uint256 amount1)
     {
+        if (pair.cachedStrikeCurrent == strike) pair._accrue(strike);
         uint256 liquidity = balanceToLiquidity(pair, strike, spread, uint256(balance), false);
         (amount0, amount1) = getAmountsForLiquidity(pair, strike, spread, uint256(liquidity), false);
 
