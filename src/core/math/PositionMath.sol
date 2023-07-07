@@ -102,7 +102,6 @@ function getLiquidityCollateral(
 {}
 
 function addPositions(
-    uint256 liquidityGrowthX128,
     uint256 balance0,
     uint256 balance1,
     Positions.DebtData memory debtData0,
@@ -111,11 +110,8 @@ function addPositions(
     pure
     returns (uint256 leverageRatioX128)
 {
-    uint256 liquidity0 = debtBalanceToLiquidity(balance0, liquidityGrowthX128, false);
-    uint256 liquidity1 = debtBalanceToLiquidity(balance1, liquidityGrowthX128, false);
+    uint256 collateral0 = mulDiv(balance0, debtData0.leverageRatioX128, Q128);
+    uint256 collateral1 = mulDiv(balance1, debtData1.leverageRatioX128, Q128);
 
-    uint256 collateral0 = mulDiv(liquidity0, debtData0.leverageRatioX128, Q128);
-    uint256 collateral1 = mulDiv(liquidity1, debtData1.leverageRatioX128, Q128);
-
-    return mulDiv(collateral0 + collateral1, Q128, liquidity0 + liquidity1);
+    return mulDiv(collateral0 + collateral1, Q128, balance0 + balance1);
 }

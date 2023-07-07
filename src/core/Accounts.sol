@@ -14,7 +14,6 @@ library Accounts {
         bytes32[] lpIDs;
         uint256[] lpDeltas;
         Engine.OrderType[] orderTypes;
-        bytes[] datas;
     }
 
     function newAccount(uint256 numTokens, uint256 numLPs) internal pure returns (Account memory account) {
@@ -28,7 +27,6 @@ library Accounts {
             account.lpIDs = new bytes32[](numLPs);
             account.lpDeltas = new uint256[](numLPs);
             account.orderTypes = new Engine.OrderType[](numLPs);
-            account.datas = new bytes[](numLPs);
         }
     }
 
@@ -55,16 +53,7 @@ library Accounts {
     }
 
     /// @custom:team what if ids match but not data
-    function updateILRTA(
-        Account memory account,
-        bytes32 id,
-        uint256 delta,
-        Engine.OrderType orderType,
-        bytes memory data
-    )
-        internal
-        pure
-    {
+    function updateILRTA(Account memory account, bytes32 id, uint256 delta, Engine.OrderType orderType) internal pure {
         if (delta == 0) return;
 
         unchecked {
@@ -77,7 +66,6 @@ library Accounts {
                     account.lpIDs[i] = id;
                     account.lpDeltas[i] = delta;
                     account.orderTypes[i] = orderType;
-                    account.datas[i] = data;
                     return;
                 }
             }

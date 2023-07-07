@@ -11,7 +11,6 @@ interface IExecuteCallback {
         bytes32[] lpIDs;
         uint256[] lpDeltas;
         Engine.OrderType[] orderTypes;
-        bytes[] datas;
         bytes data;
     }
 

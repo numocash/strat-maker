@@ -74,7 +74,7 @@ contract MockPair is Positions {
 
         uint256 _liquidityGrowthX128 = pair.strikes[strike].liquidityGrowthX128;
         uint256 balance = debtLiquidityToBalance(liquidityDebt, _liquidityGrowthX128, false);
-        uint256 leverageRatioX128 = mulDiv(liquidityCollateral, Q128, balance); // TODO: liquidity or balance
+        uint256 leverageRatioX128 = mulDiv(liquidityCollateral, Q128, balance);
 
         // mint position to user
         _mintDebt(msg.sender, token0, token1, strike, selectorCollateral, balance, leverageRatioX128);
@@ -95,13 +95,7 @@ contract MockPair is Positions {
 
             IExecuteCallback(msg.sender).executeCallback(
                 IExecuteCallback.CallbackParams(
-                    tokens,
-                    tokenDeltas,
-                    new bytes32[](0),
-                    new uint256[](0),
-                    new Engine.OrderType[](0),
-                    new bytes[](0),
-                    bytes("")
+                    tokens, tokenDeltas, new bytes32[](0), new uint256[](0), new Engine.OrderType[](0), bytes("")
                 )
             );
         }
@@ -132,7 +126,7 @@ contract MockPair is Positions {
         }
 
         {
-            uint256 liquidityCollateral = mulDiv(balance, leverageRatioX128, Q128) + liquidity - balance;
+            uint256 liquidityCollateral = mulDiv(balance, leverageRatioX128, Q128) - 2 * (balance - liquidity);
             if (selectorCollateral == Engine.TokenSelector.Token0) {
                 amount0 -= toInt256(getAmount0Delta(liquidityCollateral, strike, false));
             } else {
@@ -157,13 +151,7 @@ contract MockPair is Positions {
 
             IExecuteCallback(msg.sender).executeCallback(
                 IExecuteCallback.CallbackParams(
-                    tokens,
-                    tokenDeltas,
-                    new bytes32[](0),
-                    new uint256[](0),
-                    new Engine.OrderType[](0),
-                    new bytes[](0),
-                    bytes("")
+                    tokens, tokenDeltas, new bytes32[](0), new uint256[](0), new Engine.OrderType[](0), bytes("")
                 )
             );
 
@@ -171,7 +159,7 @@ contract MockPair is Positions {
             if (amount1 > 0 && BalanceLib.getBalance(token1) < balance1Before + uint256(amount1)) revert();
         }
 
-        _burnDebt(msg.sender, token0, token1, strike, selectorCollateral, balance, leverageRatioX128);
+        _burnDebt(msg.sender, token0, token1, strike, selectorCollateral, balance);
     }
 
     function addLiquidity(
@@ -203,13 +191,7 @@ contract MockPair is Positions {
 
         IExecuteCallback(msg.sender).executeCallback(
             IExecuteCallback.CallbackParams(
-                tokens,
-                tokenDeltas,
-                new bytes32[](0),
-                new uint256[](0),
-                new Engine.OrderType[](0),
-                new bytes[](0),
-                bytes("")
+                tokens, tokenDeltas, new bytes32[](0), new uint256[](0), new Engine.OrderType[](0), bytes("")
             )
         );
 
@@ -256,13 +238,7 @@ contract MockPair is Positions {
             uint256 balance0Before = BalanceLib.getBalance(token0);
             IExecuteCallback(msg.sender).executeCallback(
                 IExecuteCallback.CallbackParams(
-                    tokens,
-                    tokenDeltas,
-                    new bytes32[](0),
-                    new uint256[](0),
-                    new Engine.OrderType[](0),
-                    new bytes[](0),
-                    bytes("")
+                    tokens, tokenDeltas, new bytes32[](0), new uint256[](0), new Engine.OrderType[](0), bytes("")
                 )
             );
             if (BalanceLib.getBalance(token0) < balance0Before + uint256(amount0)) revert();
@@ -271,13 +247,7 @@ contract MockPair is Positions {
             uint256 balance1Before = BalanceLib.getBalance(token1);
             IExecuteCallback(msg.sender).executeCallback(
                 IExecuteCallback.CallbackParams(
-                    tokens,
-                    tokenDeltas,
-                    new bytes32[](0),
-                    new uint256[](0),
-                    new Engine.OrderType[](0),
-                    new bytes[](0),
-                    bytes("")
+                    tokens, tokenDeltas, new bytes32[](0), new uint256[](0), new Engine.OrderType[](0), bytes("")
                 )
             );
             if (BalanceLib.getBalance(token1) < balance1Before + uint256(amount1)) revert();

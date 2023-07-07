@@ -498,6 +498,8 @@ contract BorrowTest is Test, PairHelper {
         pair.borrowLiquidity(1, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
         pair.swap(false, 0.1e18);
 
+        (, uint256 leverageRatioX128Init) = pair.getPositionDebt(address(this), 1, Engine.TokenSelector.Token0);
+
         vm.roll(10);
         pair.borrowLiquidity(1, Engine.TokenSelector.Token0, 1.5e18, 0.1e18);
 
@@ -506,8 +508,9 @@ contract BorrowTest is Test, PairHelper {
 
         assertEq(balance, 0.5e18 + mulDiv(0.1e18, mulDivRoundingUp(Q128, 0.5e18, 0.5e18 - 0.5e15), Q128));
 
-        // uint256 balanceCollateral = mulDiv(balance, leverageRatioX128, Q128) + liquidity - balance;
-        // assertEq(leverageRatioX128, mulDiv(balanceCollateral, Q128, balance));
+        uint256 balanceCollatInit = mulDiv(0.5e18, leverageRatioX128Init, Q128);
+
+        assertEq(leverageRatioX128, mulDiv(balanceCollatInit * 2, Q128, balance));
 
         Pairs.Strike memory strike = pair.getStrike(1);
 
@@ -561,7 +564,7 @@ contract RepayTest is Test, PairHelper {
         assertEq(
             amount0,
             int256(tokens0Owed)
-                - int256(mulDiv(mulDiv(0.5e18, leverageRatioX128, Q128) - 0.5e15, Q128, getRatioAtStrike(1)))
+                - int256(mulDiv(mulDiv(0.5e18, leverageRatioX128, Q128) - 1e15, Q128, getRatioAtStrike(1)))
         );
         assertEq(amount1, 0);
 

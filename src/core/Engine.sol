@@ -160,6 +160,8 @@ contract Engine is Positions {
                                 STORAGE
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
+    mapping(bytes32 => Pairs.Pair) internal pairs;
+
     /// @dev this should be checked when reading any `get` function from another contract to prevent read-only
     /// reentrancy
     uint256 public locked = 1;
@@ -271,13 +273,7 @@ contract Engine is Positions {
         if (numTokens > 0 || numLPs > 0) {
             IExecuteCallback(msg.sender).executeCallback(
                 IExecuteCallback.CallbackParams(
-                    account.tokens,
-                    account.tokenDeltas,
-                    account.lpIDs,
-                    account.lpDeltas,
-                    account.orderTypes,
-                    account.datas,
-                    data
+                    account.tokens, account.tokenDeltas, account.lpIDs, account.lpDeltas, account.orderTypes, data
                 )
             );
         }
@@ -307,7 +303,7 @@ contract Engine is Positions {
             if (id == bytes32(0)) break;
 
             if (delta < 0) {
-                _burn(address(this), id, delta, account.orderTypes[i], account.datas[i]);
+                _burn(address(this), id, delta, account.orderTypes[i]);
             }
 
             unchecked {
@@ -478,7 +474,7 @@ contract Engine is Positions {
 
         // add unlocked collateral to account
         {
-            uint256 liquidityCollateral = mulDiv(amount, params.leverageRatioX128, Q128) + liquidityDebt - amount;
+            uint256 liquidityCollateral = mulDiv(amount, params.leverageRatioX128, Q128) - 2 * (amount - liquidityDebt);
             if (params.selectorCollateral == TokenSelector.Token0) {
                 account.updateToken(
                     params.token0, -toInt256(getAmount0Delta(liquidityCollateral, params.strike, false))
@@ -491,7 +487,7 @@ contract Engine is Positions {
         // add burned position to account
         {
             bytes32 id = _debtID(params.token0, params.token1, params.strike, params.selectorCollateral);
-            account.updateILRTA(id, amount, OrderType.Debt, abi.encode(DebtData(params.leverageRatioX128)));
+            account.updateILRTA(id, amount, OrderType.Debt);
         }
 
         emit RepayLiquidity(pairID);
@@ -544,8 +540,7 @@ contract Engine is Positions {
         account.updateILRTA(
             _biDirectionalID(params.token0, params.token1, params.strike, params.spread),
             uint256(-balance),
-            OrderType.BiDirectional,
-            bytes("")
+            OrderType.BiDirectional
         );
 
         emit RemoveLiquidity(pairID, params.strike, params.spread, uint256(-balance));
