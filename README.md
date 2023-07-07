@@ -37,18 +37,18 @@ Simply put, automated market makers create a market between two classes of users
 
 ### Reserving Rights to Swap (Creating Option)
 
-First implemented in Numoen's Power Market Maker Protocol (pmmp) is the ability to reserve the rights to swap by borrowing liquidity. Thereby making swaps and borrowing empirically the same. To do this, users post collateral that they know will always be more valuable than the value of the liquidity they want to borrow. With this collateral, a user would borrow liquidity and immeadiately withdraw it in hopes that they can repay the liquidiity for a cheaper price in the future.
+First implemented in Numoen's Power Market Maker Protocol (pmmp) is the ability to reserve the rights to swap by borrowing liquidity. Thereby making swaps and borrowing empirically the same. To do this, users post collateral that they know will always be more valuable than the value of the liquidity they want to borrow. With this collateral, a user would borrow liquidity and immediately withdraw into the underlying tokens in hopes that they can repay the liquidiity for a cheaper price in the future.
 
 For example, let's assume the price of ether is currently $1000. Alice borrows 1 unit of liquidity at a strike price of $1500 that contains 1 ether or 1500 usdc, but because the market price is below the strike price, it is redeemable for 1 ether currently. As collateral, alice uses the 1 ether that was redeemed plus .1 ether of her own. The market price then moves to $2000 per ether. Alice sells the 1.1 ether for 2200 usdc, uses 1500 of the usdc to mint a liquidity token and payback her debt, profiting 700 usdc from a 100% price move with $100 of principal.
 
-Obviously, users must pay for the ability to acheive asymmetric exposure. In this protocol, positions that are borrowing liquidity active liquidity are slowly liquidated by having their collateral seized and being forgiven of their debt. We call this a continous liquidation and is keeperless. Interest is accrued per block and, explained in more detail in the next section, borrow rates are proportional to swap fees which are related to volatility and block times.
+Obviously, users must pay for the ability to acheive asymmetric exposure. In this protocol, positions that are borrowing active liquidity are slowly liquidated by having their collateral seized and being forgiven of their debt. We call this a continous liquidation and is keeperless. Interest is accrued per block and, explained in more detail in the next section, borrow rates are proportional to swap fees which are related to volatility and block times.
 
 This has drastic impacts on the low level economics of AMMs. The profitablity of popular exchange protocols is debated because liquidity providers suffer from a phenomenom known as Loss Versus Rebalancing (LVR pronounced lever). This is essentially a cost to liquidity providers that comes from external arbitrageurs having more informed market information than the protocol. These protocols are able to remain profitable by uninformed retail traders using them as a means of exchange, but this approach isn't sustainable. Two undesireable outcomes are the fact that:
 
 1. Arbitrageurs never lose money, they simply won't take any action if the trade is unprofitable.
 2. When arbitrageurs are bidding against eachother, their payment goes to validators instead of liquidity providers.
 
-Reserving the rights to swap or borrowing liquidty solves these problems. Actors who were previously profiting on the volatility of assets are now able to borrow liquidity and arbitrage when the market price moves. Arbitrageurs now are unprofitable when the cost of borrowing is more than the arbitrage profit. We do not attempt to "solve" LVR, but instead make sure it is appropriately priced by allowing the other side of the trade or "gain versus rebalancing". This protocol takes the more conservative assumption that all traders are more informed than the current market.
+Reserving the rights to swap or borrowing liquidty solves these problems. Actors who were previously profiting on the volatility of assets by arbitraging are now able to borrow liquidity and repay it when the market price moves. These actors now are unprofitable when the cost of borrowing is more than the arbitrage profit. We do not attempt to "solve" LVR, but instead make sure it is appropriately priced by allowing the other side of the trade or "gain versus rebalancing". In short, this protocol provides an avenue for users to borrow liquidity when it has been over provided.
 
 ### Options Pricing
 
@@ -56,7 +56,8 @@ Each liquidity position both convex and concave is analagous to a replicated opt
 
 For pricing these derivatives, we relate the cost to the implied volatility of the underlying assets and the block frequency. We make some assumptions about arbitageur behavior: there is only one trade per block, that takes the AMM from a stale price to the current price.
 
-We first take a look at arbitrageur profit. Without fees arbitrageur profit is $ArbitrageurProfit = a * (p - q)$, with 
+We first take a look at arbitrageur profit. Without fees arbitrageur profit is $ArbitrageurProfit = a * (p - q)$, with
+
 - a: Amount traded
 - p: Market price
 - q: AMM price
@@ -102,12 +103,16 @@ Pairs have several state variables including:
 
 - `composition`, and `strikeCurrent`: Information for each spread. Composition represents the portion of the liquidity that is held in `token1`. The current strike is the last strike that was used for a swap for that specific spread.
 - `cachedStrikeCurrent`: The last strike that was traded through for the entire pair. This save computation and can lead to less storage writes elsewhere.
-- `strikes`: Information for each strike. BiDirectional liquidity is the type of liquidity that is conventially stored in an AMM. Dry Powder also implements limit orders, or directional orders that are automatically closed out after being used to facilitate a trade. Limit orders need to store liquidity information as well as variables that can be used to determine if a specific limit order is closed. Strikes also contains two, singley-linked lists. These lists relate adjacent strikes together. This is needed because looping to find the next active adjacent strike is infeasible with 2**24 possible strikes.
+- `cachedBlock`: The last block that interest was accumulated at the current strike.
+- `strikes`: Information for each strike. BiDirectional liquidity is the type of liquidity that is conventially stored in an AMM. Each index of the array represents a spread tier. Borrowed liquidity is the amount of liquidity borrowed per spread. Total supply is a unit that represents a share of liquidity per spread, and is useful when calculating how much fees have been generated. Dry Powder also implements limit orders, or directional orders that are automatically closed out after being used to facilitate a trade. Limit orders need to store liquidity information as well as variables that can be used to determine if a specific limit order is closed. Strikes also contains two, singley-linked lists. These lists relate adjacent strikes together. This is needed because looping to find the next active adjacent strike is infeasible with 2**24 possible strikes.
 
 Pairs also contain two functions to manage the state variables:
 
 - `swap()`: Swap from one token to another, routing through the best priced liquidity.
-- `updateLiquidity()`: Either add or remove liquidity from the pair.
+- `updateStrike()`: Either add or remove liquidity from a strike.
+- `borrowLiquidity()`: Borrow liquidity from a certain strike.
+- `repayLiquidity()`: Repay liquidity to a certain strike.
+- `accrue()`: Accrue interest to the current strike, forgiving borrowers of a certain amount and reposessing their collateral.
 
 ### BitMaps (`core/BitMaps.sol`)
 
@@ -115,7 +120,7 @@ BitMaps is a library used in `Pairs.sol`. Its purpose is to manage and store inf
 
 ### Positions (`core/Positions.sol`)
 
-Positions stores users liquidity positions in Dry Powder. Positions implements a standard called `ILRTA`, which supports transferability with and without signatures.
+Positions stores users liquidity positions in Dry Powder. Positions implements a standard called `ILRTA`, which supports transferability with and without signatures. There are three types of positions, BiDirectional, Limit, Debt. BiDirectional is the standard AMM liquidity, with the amount representing the share of the underlying liquidity, similar to Uniswap V2. A limit order has units of strictly liquidity (limit orders can't have fees) and contains extra information (`liquidityGrowthLast`) that is vital for telling if a limit order has been fully closed or not. Debt positions represent borrowed liquidity + collateral. Debt positions are denominated in liquidity without any interest accrued and contain extra data point `leverageRatioX128` that is equal to a multiple of how much collateral to debt in units of liquidity without any interest accrued.
 
 ### Router (`periphery/Router.sol`)
 
