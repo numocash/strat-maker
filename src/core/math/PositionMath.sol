@@ -21,8 +21,16 @@ function balanceToLiquidity(
         return balance;
     } else {
         return roundUp
-            ? mulDivRoundingUp(balance, pair.strikes[strike].liquidityBiDirectional[spread - 1], totalSupply)
-            : mulDiv(balance, pair.strikes[strike].liquidityBiDirectional[spread - 1], totalSupply);
+            ? mulDivRoundingUp(
+                balance,
+                pair.strikes[strike].liquidityBiDirectional[spread - 1] + pair.strikes[strike].liquidityBorrowed[spread - 1],
+                totalSupply
+            )
+            : mulDiv(
+                balance,
+                pair.strikes[strike].liquidityBiDirectional[spread - 1] + pair.strikes[strike].liquidityBorrowed[spread - 1],
+                totalSupply
+            );
     }
 }
 
@@ -36,7 +44,8 @@ function liquidityToBalance(
     view
     returns (uint256 balance)
 {
-    uint256 totalLiquidity = pair.strikes[strike].liquidityBiDirectional[spread - 1];
+    uint256 totalLiquidity =
+        pair.strikes[strike].liquidityBiDirectional[spread - 1] + pair.strikes[strike].liquidityBorrowed[spread - 1];
     if (totalLiquidity == 0) {
         return liquidity;
     } else {
@@ -69,8 +78,11 @@ function debtLiquidityToBalance(
     pure
     returns (uint256 balance)
 {
-    return liquidity
-        + (roundUp ? mulDivRoundingUp(liquidity, liquidityGrowthX128, Q128) : mulDiv(liquidity, liquidityGrowthX128, Q128));
+    return (
+        roundUp
+            ? mulDivRoundingUp(liquidity, liquidityGrowthX128 + Q128, Q128)
+            : mulDiv(liquidity, liquidityGrowthX128 + Q128, Q128)
+    );
 }
 
 function getLiquidityBorrowed(
@@ -88,3 +100,22 @@ function getLiquidityCollateral(
 )
     returns (uint256 liquidity)
 {}
+
+function addPositions(
+    uint256 liquidityGrowthX128,
+    uint256 balance0,
+    uint256 balance1,
+    Positions.DebtData memory debtData0,
+    Positions.DebtData memory debtData1
+)
+    pure
+    returns (uint256 leverageRatioX128)
+{
+    uint256 liquidity0 = debtBalanceToLiquidity(balance0, liquidityGrowthX128, false);
+    uint256 liquidity1 = debtBalanceToLiquidity(balance1, liquidityGrowthX128, false);
+
+    uint256 collateral0 = mulDiv(liquidity0, debtData0.leverageRatioX128, Q128);
+    uint256 collateral1 = mulDiv(liquidity1, debtData1.leverageRatioX128, Q128);
+
+    return mulDiv(collateral0 + collateral1, Q128, liquidity0 + liquidity1);
+}

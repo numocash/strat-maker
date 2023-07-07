@@ -20,8 +20,6 @@ import {Q128} from "src/core/math/StrikeMath.sol";
 
 import {IExecuteCallback} from "src/core/interfaces/IExecuteCallback.sol";
 
-import {console2} from "forge-std/console2.sol";
-
 contract MockPair is Positions {
     using Pairs for Pairs.Pair;
 
@@ -52,6 +50,7 @@ contract MockPair is Positions {
         public
         returns (int256 amount0, int256 amount1)
     {
+        if (pair.cachedStrikeCurrent == strike) pair._accrue(strike);
         pair.borrowLiquidity(strike, liquidityDebt);
 
         // calculate the the tokens that are borrowed
@@ -75,20 +74,10 @@ contract MockPair is Positions {
 
         uint256 _liquidityGrowthX128 = pair.strikes[strike].liquidityGrowthX128;
         uint256 balance = debtLiquidityToBalance(liquidityDebt, _liquidityGrowthX128, false);
-        uint256 leverageRatioX128 = mulDiv(liquidityCollateral, Q128, liquidityDebt);
+        uint256 leverageRatioX128 = mulDiv(liquidityCollateral, Q128, balance); // TODO: liquidity or balance
 
         // mint position to user
-        _mintDebt(
-            msg.sender,
-            token0,
-            token1,
-            strike,
-            selectorCollateral,
-            balance,
-            liquidityDebt,
-            _liquidityGrowthX128,
-            leverageRatioX128
-        );
+        _mintDebt(msg.sender, token0, token1, strike, selectorCollateral, balance, leverageRatioX128);
 
         uint256 balance0Before = BalanceLib.getBalance(token0);
         uint256 balance1Before = BalanceLib.getBalance(token1);
@@ -130,6 +119,7 @@ contract MockPair is Positions {
         public
         returns (int256 amount0, int256 amount1)
     {
+        if (pair.cachedStrikeCurrent == strike) pair._accrue(strike);
         uint256 _liquidityGrowthX128 = pair.strikes[strike].liquidityGrowthX128;
         uint256 liquidity = debtBalanceToLiquidity(balance, _liquidityGrowthX128, true);
         pair.repayLiquidity(strike, liquidity);
@@ -142,7 +132,7 @@ contract MockPair is Positions {
         }
 
         {
-            uint256 liquidityCollateral = mulDiv(liquidity, leverageRatioX128, Q128);
+            uint256 liquidityCollateral = mulDiv(balance, leverageRatioX128, Q128) + liquidity - balance;
             if (selectorCollateral == Engine.TokenSelector.Token0) {
                 amount0 -= toInt256(getAmount0Delta(liquidityCollateral, strike, false));
             } else {
@@ -181,17 +171,7 @@ contract MockPair is Positions {
             if (amount1 > 0 && BalanceLib.getBalance(token1) < balance1Before + uint256(amount1)) revert();
         }
 
-        _burnDebt(
-            msg.sender,
-            token0,
-            token1,
-            strike,
-            selectorCollateral,
-            balance,
-            liquidity,
-            _liquidityGrowthX128,
-            leverageRatioX128
-        );
+        _burnDebt(msg.sender, token0, token1, strike, selectorCollateral, balance, leverageRatioX128);
     }
 
     function addLiquidity(
@@ -202,6 +182,7 @@ contract MockPair is Positions {
         public
         returns (uint256 amount0, uint256 amount1)
     {
+        if (pair.cachedStrikeCurrent == strike) pair._accrue(strike);
         uint256 liquidity = balanceToLiquidity(pair, strike, spread, uint256(balance), true);
         (amount0, amount1) = getAmountsForLiquidity(pair, strike, spread, uint256(liquidity), true);
 
@@ -236,6 +217,10 @@ contract MockPair is Positions {
         if (BalanceLib.getBalance(token1) < balance1Before + amount1) revert();
     }
 
+    function accrue() external {
+        pair.accrue();
+    }
+
     function removeLiquidity(
         int24 strike,
         uint8 spread,
@@ -244,6 +229,7 @@ contract MockPair is Positions {
         public
         returns (uint256 amount0, uint256 amount1)
     {
+        if (pair.cachedStrikeCurrent == strike) pair._accrue(strike);
         uint256 liquidity = balanceToLiquidity(pair, strike, spread, uint256(balance), false);
         (amount0, amount1) = getAmountsForLiquidity(pair, strike, spread, uint256(liquidity), false);
 
@@ -348,11 +334,11 @@ contract MockPair is Positions {
     )
         external
         view
-        returns (uint256 balance, uint256 liquidity, uint256 liquidityGrowthX128Last, uint256 leverageRatioX128)
+        returns (uint256 balance, uint256 leverageRatioX128)
     {
         balance = _dataOf[owner][_debtID(token0, token1, strike, selector)].balance;
         Positions.DebtData memory debtData = _dataOfDebt(owner, token0, token1, strike, selector);
 
-        return (balance, debtData.liquidity, debtData.liquidityGrowthX128Last, debtData.leverageRatioX128);
+        return (balance, debtData.leverageRatioX128);
     }
 }

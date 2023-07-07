@@ -38,10 +38,6 @@ contract AddLiquidityTest is Test, PairHelper {
 
         assertEq(amount0, 1e18);
         assertEq(amount1, 0);
-    }
-
-    function testLiquidityTokenBalances() external {
-        basicAddLiquidity();
 
         assertEq(token0.balanceOf(address(this)), 0);
         assertEq(token1.balanceOf(address(this)), 0);
@@ -104,6 +100,19 @@ contract AddLiquidityTest is Test, PairHelper {
         vm.expectRevert();
         pair.addLiquidity(0, 10, 1e18);
     }
+
+    function testAddLiquidityAfterAccrue() external {
+        pair.addLiquidity(0, 1, 1e18);
+        pair.addLiquidity(1, 1, 1e18);
+        pair.borrowLiquidity(1, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
+        pair.swap(false, 0.1e18);
+
+        vm.roll(10);
+        (uint256 amount0, uint256 amount1) = pair.addLiquidity(1, 1, 1e18);
+
+        assertEq(amount0, mulDivRoundingUp(Q128, (1e18 + 0.5e15), getRatioAtStrike(1)));
+        assertEq(amount1, 0);
+    }
 }
 
 contract RemoveLiquidityTest is Test, PairHelper {
@@ -117,11 +126,7 @@ contract RemoveLiquidityTest is Test, PairHelper {
 
         assertEq(amount0, 1e18 - 1, "amount0");
         assertEq(amount1, 0, "amount1");
-    }
 
-    function testRemoveLiquidityTokenAmounts() external {
-        basicAddLiquidity();
-        basicRemoveLiquidity();
         assertEq(token0.balanceOf(address(this)), 1e18 - 1);
         assertEq(token1.balanceOf(address(this)), 0);
 
@@ -209,6 +214,32 @@ contract RemoveLiquidityTest is Test, PairHelper {
 
         vm.expectRevert();
         pair.removeLiquidity(0, 10, 1e18);
+    }
+
+    function testRemoveLiquidityPartialAfterAccrue() external {
+        pair.addLiquidity(0, 1, 1e18);
+        pair.addLiquidity(1, 1, 1e18);
+        pair.borrowLiquidity(1, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
+        pair.swap(false, 0.1e18);
+
+        vm.roll(10);
+        (uint256 amount0, uint256 amount1) = pair.removeLiquidity(1, 1, 0.25e18);
+
+        assertEq(amount0, mulDiv(Q128, (0.25e18 + 0.125e15), getRatioAtStrike(1)));
+        assertEq(amount1, 0);
+    }
+
+    function testRemoveLiquidityFullAfterAccrue() external {
+        pair.addLiquidity(0, 1, 1e18);
+        pair.addLiquidity(1, 1, 1e18);
+        pair.borrowLiquidity(1, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
+        pair.swap(false, 0.1e18);
+
+        vm.roll(10);
+        (uint256 amount0, uint256 amount1) = pair.removeLiquidity(1, 1, 0.5e18);
+
+        assertEq(amount0, mulDiv(Q128, (0.5e18 + 0.25e15), getRatioAtStrike(1)));
+        assertEq(amount1, 0);
     }
 }
 
@@ -425,13 +456,66 @@ contract BorrowTest is Test, PairHelper {
         assertEq(token0.balanceOf(address(pair)), mulDivRoundingUp(1e18, Q128, getRatioAtStrike(1)) + uint256(amount0));
         assertEq(token1.balanceOf(address(pair)), 0);
 
-        (uint256 balance, uint256 liquidity, uint256 liquidityGrowthX128Last, uint256 leverageRatioX128) =
+        (uint256 balance, uint256 leverageRatioX128) =
             pair.getPositionDebt(address(this), 1, Engine.TokenSelector.Token0);
 
         assertEq(balance, 0.5e18);
-        assertEq(liquidity, 0.5e18);
-        assertEq(liquidityGrowthX128Last, 0);
         assertEq(leverageRatioX128, mulDiv(mulDiv(1.5e18, getRatioAtStrike(1), Q128), Q128, 0.5e18));
+
+        Pairs.Strike memory strike = pair.getStrike(1);
+
+        assertEq(strike.activeSpread, 0);
+        assertEq(strike.liquidityGrowthX128, 0);
+        assertEq(strike.liquidityBiDirectional[0], 0.5e18);
+        assertEq(strike.liquidityBorrowed[0], 0.5e18);
+        assertEq(strike.totalSupply[0], 1e18);
+    }
+
+    function testAccrual() external {
+        pair.addLiquidity(0, 1, 1e18);
+        pair.addLiquidity(1, 1, 1e18);
+        pair.borrowLiquidity(1, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
+        pair.swap(false, 0.1e18);
+
+        (,, int24 cachedStrikeCurrent,) = pair.getPair();
+        assertEq(cachedStrikeCurrent, 1);
+
+        vm.roll(10);
+        pair.accrue();
+
+        Pairs.Strike memory strike = pair.getStrike(1);
+
+        assertEq(strike.activeSpread, 0);
+        assertEq(strike.liquidityGrowthX128, mulDivRoundingUp(Q128, 0.5e18, 0.5e18 - 0.5e15) - Q128);
+        assertEq(strike.liquidityBiDirectional[0], 0.5e18 + 1e15);
+        assertEq(strike.liquidityBorrowed[0], 0.5e18 - 0.5e15);
+        assertEq(strike.totalSupply[0], 1e18);
+    }
+
+    function testBorrowAfterAccrue() external {
+        pair.addLiquidity(0, 1, 1e18);
+        pair.addLiquidity(1, 1, 1e18);
+        pair.borrowLiquidity(1, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
+        pair.swap(false, 0.1e18);
+
+        vm.roll(10);
+        pair.borrowLiquidity(1, Engine.TokenSelector.Token0, 1.5e18, 0.1e18);
+
+        (uint256 balance, uint256 leverageRatioX128) =
+            pair.getPositionDebt(address(this), 1, Engine.TokenSelector.Token0);
+
+        assertEq(balance, 0.5e18 + mulDiv(0.1e18, mulDivRoundingUp(Q128, 0.5e18, 0.5e18 - 0.5e15), Q128));
+
+        // uint256 balanceCollateral = mulDiv(balance, leverageRatioX128, Q128) + liquidity - balance;
+        // assertEq(leverageRatioX128, mulDiv(balanceCollateral, Q128, balance));
+
+        Pairs.Strike memory strike = pair.getStrike(1);
+
+        assertEq(strike.activeSpread, 0);
+        assertEq(strike.liquidityGrowthX128, mulDivRoundingUp(Q128, 0.5e18, 0.5e18 - 0.5e15) - Q128);
+        assertEq(strike.liquidityBiDirectional[0], 0.4e18 + 1e15);
+        assertEq(strike.liquidityBorrowed[0], 0.6e18 - 0.5e15);
+        assertEq(strike.totalSupply[0], 1e18);
     }
 }
 
@@ -443,7 +527,7 @@ contract RepayTest is Test, PairHelper {
     function testRepayAmounts() external {
         pair.addLiquidity(1, 1, 1e18);
         pair.borrowLiquidity(1, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
-        (,,, uint256 leverageRatioX128) = pair.getPositionDebt(address(this), 1, Engine.TokenSelector.Token0);
+        (, uint256 leverageRatioX128) = pair.getPositionDebt(address(this), 1, Engine.TokenSelector.Token0);
         (int256 amount0, int256 amount1) =
             pair.repayLiquidity(1, Engine.TokenSelector.Token0, leverageRatioX128, 0.5e18);
 
@@ -458,5 +542,35 @@ contract RepayTest is Test, PairHelper {
 
         // assertEq(token0.balanceOf(address(pair)), mulDivRoundingUp(1e18, Q128, getRatioAtStrike(1)));
         assertEq(token1.balanceOf(address(pair)), 0);
+    }
+
+    function testRepayAfterAccrue() external {
+        pair.addLiquidity(0, 1, 1e18);
+        pair.addLiquidity(1, 1, 1e18);
+        pair.borrowLiquidity(1, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
+        pair.swap(false, 0.1e18);
+
+        (, uint256 leverageRatioX128) = pair.getPositionDebt(address(this), 1, Engine.TokenSelector.Token0);
+
+        vm.roll(10);
+        (int256 amount0, int256 amount1) =
+            pair.repayLiquidity(1, Engine.TokenSelector.Token0, leverageRatioX128, 0.5e18);
+
+        uint256 tokens0Owed = mulDivRoundingUp(0.5e18 - 0.5e15, Q128, getRatioAtStrike(1));
+
+        assertEq(
+            amount0,
+            int256(tokens0Owed)
+                - int256(mulDiv(mulDiv(0.5e18, leverageRatioX128, Q128) - 0.5e15, Q128, getRatioAtStrike(1)))
+        );
+        assertEq(amount1, 0);
+
+        Pairs.Strike memory strike = pair.getStrike(1);
+
+        assertEq(strike.activeSpread, 0);
+        assertEq(strike.liquidityGrowthX128, mulDivRoundingUp(Q128, 0.5e18, 0.5e18 - 0.5e15) - Q128);
+        assertEq(strike.liquidityBiDirectional[0], 1e18 + 0.5e15);
+        assertEq(strike.liquidityBorrowed[0], 0);
+        assertEq(strike.totalSupply[0], 1e18);
     }
 }

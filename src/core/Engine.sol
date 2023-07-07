@@ -76,7 +76,6 @@ contract Engine is Positions {
         BorrowLiquidity,
         RepayLiquidity,
         RemoveLiquidity,
-        AccruePosition,
         Accrue,
         CreatePair
     }
@@ -161,8 +160,6 @@ contract Engine is Positions {
                                 STORAGE
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    mapping(bytes32 => Pairs.Pair) private pairs;
-
     /// @dev this should be checked when reading any `get` function from another contract to prevent read-only
     /// reentrancy
     uint256 public locked = 1;
@@ -208,6 +205,7 @@ contract Engine is Positions {
 
         Accounts.Account memory account = Accounts.newAccount(numTokens, numLPs);
 
+        // find command helper with binary search
         for (uint256 i = 0; i < commands.length;) {
             if (commands[i] < Commands.RemoveLiquidity) {
                 if (commands[i] < Commands.BorrowLiquidity) {
@@ -226,19 +224,15 @@ contract Engine is Positions {
                     }
                 }
             } else {
-                if (commands[i] < Commands.Accrue) {
+                if (commands[i] < Commands.CreatePair) {
                     if (commands[i] == Commands.RemoveLiquidity) {
-                        // remove liquidity
                         _removeLiquidity(abi.decode(inputs[i], (RemoveLiquidityParams)), account);
                     } else {
-                        // accrue position
-                        _accruePosition(abi.decode(inputs[i], (AccruePositionParams)));
-                    }
-                } else {
-                    if (commands[i] == Commands.Accrue) {
                         // accrue
                         _accrue(abi.decode(inputs[i], (AccrueParams)));
-                    } else if (commands[i] == Commands.CreatePair) {
+                    }
+                } else {
+                    if (commands[i] == Commands.CreatePair) {
                         // create pair
                         _createPair(abi.decode(inputs[i], (CreatePairParams)));
                     } else {
@@ -342,6 +336,7 @@ contract Engine is Positions {
 
     function _addLiquidity(address to, AddLiquidityParams memory params, Accounts.Account memory account) private {
         (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
+        if (pair.cachedStrikeCurrent == params.strike) pair._accrue(params.strike);
 
         // calculate how much to add
         int256 balance;
@@ -436,6 +431,8 @@ contract Engine is Positions {
             revert InvalidSelector();
         }
 
+        uint256 balance = debtLiquidityToBalance(liquidityDebt, pair.strikes[params.strike].liquidityGrowthX128, false);
+
         // mint position to user
         _mintDebt(
             to,
@@ -443,10 +440,8 @@ contract Engine is Positions {
             params.token1,
             params.strike,
             params.selectorCollateral,
-            debtLiquidityToBalance(liquidityDebt, pair.strikes[params.strike].liquidityGrowthX128, false),
-            liquidityDebt,
-            pair.strikes[params.strike].liquidityGrowthX128,
-            mulDiv(liquidityCollateral, Q128, liquidityDebt)
+            balance,
+            mulDiv(liquidityCollateral, Q128, balance) // TODO: liquidity or balance
         );
 
         emit BorrowLiquidity(pairID);
@@ -454,6 +449,7 @@ contract Engine is Positions {
 
     function _repayLiquidity(RepayLiquidityParams memory params, Accounts.Account memory account) private {
         (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
+        if (pair.cachedStrikeCurrent == params.strike) pair._accrue(params.strike);
 
         uint256 _liquidityGrowthX128 = pair.strikes[params.strike].liquidityGrowthX128;
 
@@ -482,7 +478,7 @@ contract Engine is Positions {
 
         // add unlocked collateral to account
         {
-            uint256 liquidityCollateral = mulDiv(liquidityDebt, params.leverageRatioX128, Q128);
+            uint256 liquidityCollateral = mulDiv(amount, params.leverageRatioX128, Q128) + liquidityDebt - amount;
             if (params.selectorCollateral == TokenSelector.Token0) {
                 account.updateToken(
                     params.token0, -toInt256(getAmount0Delta(liquidityCollateral, params.strike, false))
@@ -495,12 +491,7 @@ contract Engine is Positions {
         // add burned position to account
         {
             bytes32 id = _debtID(params.token0, params.token1, params.strike, params.selectorCollateral);
-            account.updateILRTA(
-                id,
-                amount,
-                OrderType.Debt,
-                abi.encode(DebtData(liquidityDebt, _liquidityGrowthX128, params.leverageRatioX128))
-            );
+            account.updateILRTA(id, amount, OrderType.Debt, abi.encode(DebtData(params.leverageRatioX128)));
         }
 
         emit RepayLiquidity(pairID);
@@ -508,6 +499,7 @@ contract Engine is Positions {
 
     function _removeLiquidity(RemoveLiquidityParams memory params, Accounts.Account memory account) private {
         (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
+        if (pair.cachedStrikeCurrent == params.strike) pair._accrue(params.strike);
 
         // calculate how much to remove
         int256 balance;
@@ -557,25 +549,6 @@ contract Engine is Positions {
         );
 
         emit RemoveLiquidity(pairID, params.strike, params.spread, uint256(-balance));
-    }
-
-    function _accruePosition(AccruePositionParams memory params) private {
-        (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
-
-        // if need to accrue pair
-        if (pair.cachedStrikeCurrent == params.strike) pair.accrue();
-
-        // accrue position
-        accruePositionDebt(
-            params.owner,
-            params.token0,
-            params.token1,
-            params.strike,
-            params.selectorCollateral,
-            pair.strikes[params.strike].liquidityGrowthX128
-        );
-
-        emit AccruePosition(pairID);
     }
 
     function _accrue(AccrueParams memory params) private {
@@ -661,11 +634,11 @@ contract Engine is Positions {
     )
         external
         view
-        returns (uint256 balance, uint256 liquidity, uint256 liquidityGrowthX128Last, uint256 leverageRatioX128)
+        returns (uint256 balance, uint256 leverageRatioX128)
     {
         balance = _dataOf[owner][_debtID(token0, token1, strike, selector)].balance;
         Positions.DebtData memory debtData = _dataOfDebt(owner, token0, token1, strike, selector);
 
-        return (balance, debtData.liquidity, debtData.liquidityGrowthX128Last, debtData.leverageRatioX128);
+        return (balance, debtData.leverageRatioX128);
     }
 }

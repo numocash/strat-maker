@@ -11,6 +11,9 @@ uint8 constant NUM_SPREADS = 5;
 int8 constant MAX_CONSECUTIVE = int8(NUM_SPREADS);
 
 /// @author Robert Leifke and Kyle Scott
+/// @custom:team should we allow for borrowing the current strike
+/// @custom:team should we charge a fee on borrow origination
+/// @custom:team should we use exp instead of supply
 library Pairs {
     using BitMaps for BitMaps.BitMap;
 
@@ -282,6 +285,7 @@ library Pairs {
             if (isSwap0To1) {
                 int24 strikePrev = state.cachedStrikeCurrent;
                 if (strikePrev == MIN_STRIKE) revert OutOfBounds();
+                _accrue(pair, strikePrev);
 
                 // Remove strike from linked list and bit map if it has no liquidity
                 // Only happens when initialized or all liquidity is removed from current strike
@@ -321,6 +325,7 @@ library Pairs {
             } else {
                 int24 strikePrev = state.cachedStrikeCurrent;
                 if (strikePrev == MAX_STRIKE) revert OutOfBounds();
+                _accrue(pair, strikePrev);
 
                 // Remove strike from linked list and bit map if it has no liquidity
                 // Only happens when initialized or all liquidity is removed from current strike
@@ -417,7 +422,6 @@ library Pairs {
         uint8 _activeSpread = strikeObj.activeSpread;
 
         while (true) {
-            // TODO: should we do this
             // don't allow for borrowing the current strike
             if (pair.strikeCurrent[_activeSpread] == strike) revert();
             uint256 availableLiquidity = strikeObj.liquidityBiDirectional[_activeSpread];
@@ -436,7 +440,6 @@ library Pairs {
                 _activeSpread++;
             }
         }
-        // TODO: charge fee for borrowing
 
         strikeObj.activeSpread = _activeSpread;
     }
@@ -444,8 +447,6 @@ library Pairs {
     function repayLiquidity(Pair storage pair, int24 strike, uint256 liquidity) internal {
         Strike storage strikeObj = pair.strikes[strike];
         uint8 _activeSpread = strikeObj.activeSpread;
-
-        if (pair.cachedStrikeCurrent == strike) _accrue(pair, strike);
 
         while (true) {
             uint256 borrowedLiquidity = strikeObj.liquidityBorrowed[_activeSpread];
@@ -477,26 +478,33 @@ library Pairs {
                              INTERNAL LOGIC
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    function _accrue(Pair storage pair, int24 strike) private {
+    function _accrue(Pair storage pair, int24 strike) internal {
         uint256 _cachedBlock = pair.cachedBlock;
         uint256 blocks = block.number - _cachedBlock;
         if (blocks == 0) return;
 
-        uint256 liquidityGrowthNumerator;
+        uint256 liquidityRepaid;
         uint256 liquidityBorrowedTotal;
 
-        for (uint256 i = 0; i < pair.strikes[strike].activeSpread; i++) {
+        for (uint256 i = 0; i <= pair.strikes[strike].activeSpread; i++) {
             uint256 liquidityBorrowed = pair.strikes[strike].liquidityBorrowed[i];
 
-            pair.strikes[strike].liquidityBiDirectional[i] += ((i + 1) * blocks * liquidityBorrowed) / 10_000;
-            liquidityGrowthNumerator += (i + 1) * blocks * liquidityBorrowed;
+            uint256 spreadGrowth = ((i + 1) * blocks * liquidityBorrowed) / 10_000;
+
+            pair.strikes[strike].liquidityBiDirectional[i] += spreadGrowth;
+            liquidityRepaid += spreadGrowth;
             liquidityBorrowedTotal += liquidityBorrowed;
         }
 
-        pair.strikes[strike].liquidityGrowthX128 +=
-            mulDivRoundingUp(liquidityGrowthNumerator, Q128, liquidityBorrowedTotal);
-        // TODO: same math as repay liquidity
+        if (liquidityRepaid == 0) return;
 
+        pair.strikes[strike].liquidityGrowthX128 = mulDivRoundingUp(
+            pair.strikes[strike].liquidityGrowthX128 + Q128,
+            liquidityBorrowedTotal,
+            liquidityBorrowedTotal - liquidityRepaid
+        ) - Q128;
+
+        repayLiquidity(pair, strike, liquidityRepaid);
         pair.cachedBlock = block.number;
     }
 
