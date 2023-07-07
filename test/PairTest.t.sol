@@ -436,6 +436,39 @@ contract SwapTest is Test, PairHelper {
     //         assertEq(strikeCurrent, -2);
     //         assertEq(offset, 2);
     //     }
+
+    function testSwapFeeOneSpread() external {
+        pair.addLiquidity(0, 1, 1e18);
+        pair.swap(false, 0.5e18);
+
+        (uint128[NUM_SPREADS] memory composition,,,) = pair.getPair();
+
+        assertApproxEqRel(composition[0], type(uint128).max - mulDiv(0.5e18, Q128, 1e18 + 0.5e14), 1e5);
+
+        Pairs.Strike memory strike = pair.getStrike(0);
+        assertEq(strike.liquidityBiDirectional[0], 1e18 + 0.5e14);
+        assertEq(strike.totalSupply[0], 1e18);
+    }
+
+    function testSwapFeeTwoSpread() external {
+        pair.addLiquidity(0, 2, 1e18);
+        pair.addLiquidity(1, 1, 1e18);
+
+        pair.swap(false, 0.5e18);
+
+        (uint128[NUM_SPREADS] memory composition,,,) = pair.getPair();
+
+        assertApproxEqRel(composition[0], type(uint128).max - mulDiv(1.5e18, Q128, 2e18 + 0.75e14), 1e5);
+        assertApproxEqRel(composition[1], type(uint128).max - mulDiv(1.5e18, Q128, 2e18 + 0.75e14), 1e5);
+
+        Pairs.Strike memory strike = pair.getStrike(0);
+        assertEq(strike.liquidityBiDirectional[1], 1e18 + 0.5e14 - 1);
+        assertEq(strike.totalSupply[1], 1e18, "total supply");
+
+        strike = pair.getStrike(1);
+        assertEq(strike.liquidityBiDirectional[0], 1e18 + 0.25e14);
+        assertEq(strike.totalSupply[0], 1e18, "total supply");
+    }
 }
 
 contract BorrowTest is Test, PairHelper {

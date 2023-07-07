@@ -33,6 +33,12 @@ function getLiquidityDeltaAmount0(uint256 amount0, int24 strike, bool roundUp) p
         : mulDiv(amount0, getRatioAtStrike(strike), Q128);
 }
 
+/// @notice Calculate liquidity for amount0
+/// i.e. L = x * Pi
+function getLiquidityDeltaAmount0(uint256 amount0, uint256 ratioX128, bool roundUp) pure returns (uint256 liquidity) {
+    return roundUp ? mulDivRoundingUp(amount0, ratioX128, Q128) : mulDiv(amount0, ratioX128, Q128);
+}
+
 /// @notice Calculate liquidity for amount1
 /// i.e. L = y
 function getLiquidityDeltaAmount1(uint256 amount1) pure returns (uint256 liquidity) {

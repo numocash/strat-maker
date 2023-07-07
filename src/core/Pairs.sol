@@ -7,6 +7,8 @@ import {getLiquidityDeltaAmount0, getLiquidityDeltaAmount1, addDelta, toInt256} 
 import {getRatioAtStrike, MAX_STRIKE, MIN_STRIKE, Q128} from "./math/StrikeMath.sol";
 import {computeSwapStep} from "./math/SwapMath.sol";
 
+import {console2} from "forge-std/console2.sol";
+
 uint8 constant NUM_SPREADS = 5;
 int8 constant MAX_CONSECUTIVE = int8(NUM_SPREADS);
 
@@ -182,11 +184,11 @@ library Pairs {
 
         while (true) {
             uint256 ratioX128 = getRatioAtStrike(state.cachedStrikeCurrent);
-            uint256 amountRemaining;
+            uint256 liquidityRemaining;
             {
                 uint256 amountIn;
                 uint256 amountOut;
-                (amountIn, amountOut, amountRemaining) =
+                (amountIn, amountOut, liquidityRemaining) =
                     computeSwapStep(ratioX128, state.liquiditySwap, isToken0, amountDesired);
 
                 if (amountDesired > 0) {
@@ -209,7 +211,9 @@ library Pairs {
 
                                 if (activeStrike == spreadStrikeCurrent) {
                                     uint256 liquidityNew = getLiquidityDeltaAmount0(
-                                        mulDiv(state.liquiditySwapSpread[i - 1], amountIn * i, state.liquiditySwap),
+                                        mulDiv(
+                                            state.liquiditySwapSpread[i - 1], amountIn * i, state.liquiditySwap * 10_000
+                                        ),
                                         state.cachedStrikeCurrent,
                                         false
                                     );
@@ -228,7 +232,9 @@ library Pairs {
 
                                 if (activeStrike == spreadStrikeCurrent) {
                                     uint256 liquidityNew = getLiquidityDeltaAmount1(
-                                        mulDiv(state.liquiditySwapSpread[i - 1], amountIn * i, state.liquiditySwap)
+                                        mulDiv(
+                                            state.liquiditySwapSpread[i - 1], amountIn * i, state.liquiditySwap * 10_000
+                                        )
                                     );
                                     pair.strikes[activeStrike].liquidityBiDirectional[i - 1] += liquidityNew;
                                     state.liquidityTotal += liquidityNew;
@@ -243,7 +249,7 @@ library Pairs {
 
             if (amountDesired == 0) {
                 if (isSwap0To1) {
-                    uint128 composition = uint128(mulDiv(amountRemaining, Q128, state.liquidityTotal));
+                    uint128 composition = uint128(mulDiv(liquidityRemaining, Q128, state.liquidityTotal));
 
                     unchecked {
                         for (uint256 i = 1; i <= NUM_SPREADS; i++) {
@@ -259,7 +265,7 @@ library Pairs {
                     }
                 } else {
                     uint128 composition =
-                        type(uint128).max - uint128(mulDiv(amountRemaining, ratioX128, state.liquidityTotal));
+                        type(uint128).max - uint128(mulDiv(liquidityRemaining, Q128, state.liquidityTotal));
 
                     unchecked {
                         for (uint256 i = 1; i <= NUM_SPREADS; i++) {
