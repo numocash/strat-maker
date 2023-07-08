@@ -20,6 +20,8 @@ import {
     swapCommand
 } from "./helpers/Utils.sol";
 
+import {console2} from "forge-std/console2.sol";
+
 contract RouterTest is Test {
     Engine private engine;
     Permit3 private permit3;
@@ -38,11 +40,10 @@ contract RouterTest is Test {
 
     bytes32 private constant SUPER_SIGNATURE_ILRTA_TRANSFER_TYPEHASH = keccak256(
         // solhint-disable-next-line max-line-length
-        "Transfer(TransferDetails transferDetails,address spender)TransferDetails(address token0,address token1,int24 strike,uint8 spread,uint256 amount)"
+        "Transfer(TransferDetails transferDetails,address spender)TransferDetails(bytes32 id,uint256 amount)"
     );
 
-    bytes32 private constant ILRTA_TRANSFER_DETAILS_TYPEHASH =
-        keccak256("TransferDetails(address token0,address token1,int24 strike,uint8 spread,uint256 amount)");
+    bytes32 private constant ILRTA_TRANSFER_DETAILS_TYPEHASH = keccak256("TransferDetails(bytes32 id,uint256 amount)");
 
     function permitDataHash(Permit3.TransferDetails[] memory permitTransfers) private view returns (bytes32) {
         uint256 length = permitTransfers.length;
@@ -72,7 +73,7 @@ contract RouterTest is Test {
             abi.encode(
                 SUPER_SIGNATURE_ILRTA_TRANSFER_TYPEHASH,
                 keccak256(abi.encode(ILRTA_TRANSFER_DETAILS_TYPEHASH, abi.encode(positionTransfer))),
-                msg.sender
+                address(router)
             )
         );
 
@@ -171,80 +172,89 @@ contract RouterTest is Test {
         );
     }
 
-    // function testGasRemoveLiquidity() external {
-    //     vm.pauseGasMetering();
-    //     uint256 privateKey = 0xC0FFEE;
-    //     address owner = vm.addr(privateKey);
+    function testGasRemoveLiquidity() external {
+        vm.pauseGasMetering();
+        uint256 privateKey = 0xC0FFEE;
+        address owner = vm.addr(privateKey);
 
-    //     token0.mint(address(owner), 1e18);
+        token0.mint(address(owner), 1e18);
 
-    //     vm.prank(owner);
-    //     token0.approve(address(permit3), 1e18);
+        vm.prank(owner);
+        token0.approve(address(permit3), 1e18);
 
-    //     Engine.Commands[] memory commands = createCommands();
-    //     bytes[] memory inputs = createInputs();
+        Engine.Commands[] memory commands = createCommands();
+        bytes[] memory inputs = createInputs();
 
-    //     (Engine.Commands addCommand, bytes memory addInput) =
-    //         addLiquidityCommand(address(token0), address(token1), 0, 1, Engine.TokenSelector.LiquidityPosition,
-    // 1e18);
+        (Engine.Commands addCommand, bytes memory addInput) =
+            addLiquidityCommand(address(token0), address(token1), 0, 1, Engine.TokenSelector.LiquidityPosition, 1e18);
 
-    //     commands = pushCommands(commands, addCommand);
-    //     inputs = pushInputs(inputs, addInput);
+        commands = pushCommands(commands, addCommand);
+        inputs = pushInputs(inputs, addInput);
 
-    //     Permit3.TransferDetails[] memory permitTransferDetails = new Permit3.TransferDetails[](1);
-    //     permitTransferDetails[0] = Permit3.TransferDetails({token: address(token0), amount: 1e18});
+        Permit3.TransferDetails[] memory permitTransferDetails = new Permit3.TransferDetails[](1);
+        permitTransferDetails[0] = Permit3.TransferDetails({token: address(token0), amount: 1e18});
 
-    //     bytes32[] memory dataHash = new bytes32[](1);
-    //     dataHash[0] = permitDataHash(permitTransferDetails);
+        bytes32[] memory dataHash = new bytes32[](1);
+        dataHash[0] = permitDataHash(permitTransferDetails);
 
-    //     SuperSignature.Verify memory verify = SuperSignature.Verify(dataHash, 0, block.timestamp);
+        SuperSignature.Verify memory verify = SuperSignature.Verify(dataHash, 0, block.timestamp);
 
-    //     bytes memory signature = signSuperSignature(verify, privateKey);
+        bytes memory signature = signSuperSignature(verify, privateKey);
 
-    //     vm.prank(owner);
-    //     router.route(
-    //         Router.RouteParams(
-    //             owner,
-    //             commands,
-    //             inputs,
-    //             1,
-    //             1,
-    //             permitTransferDetails,
-    //             new Positions.ILRTATransferDetails[](0),
-    //             verify,
-    //             signature
-    //         )
-    //     );
+        vm.prank(owner);
+        router.route(
+            Router.RouteParams(
+                owner,
+                commands,
+                inputs,
+                1,
+                1,
+                permitTransferDetails,
+                new Positions.ILRTATransferDetails[](0),
+                verify,
+                signature
+            )
+        );
 
-    //     // REMOVE LIQUIDITY
+        // REMOVE LIQUIDITY
 
-    //     (Engine.Commands removeCommand, bytes memory removeInput) = removeLiquidityCommand(
-    //         address(token0), address(token1), 0, 1, Engine.TokenSelector.LiquidityPosition, -1e18
-    //     );
+        (Engine.Commands removeCommand, bytes memory removeInput) = removeLiquidityCommand(
+            address(token0), address(token1), 0, 1, Engine.TokenSelector.LiquidityPosition, -1e18
+        );
 
-    //     commands[0] = removeCommand;
-    //     inputs[0] = removeInput;
+        commands[0] = removeCommand;
+        inputs[0] = removeInput;
 
-    //     Positions.ILRTATransferDetails[] memory positionTransfer = new Positions.ILRTATransferDetails[](1);
-    //     positionTransfer[0] = Positions.ILRTATransferDetails(
-    //         engine.dataID(abi.encode(Positions.ILRTADataID(address(token0), address(token1), 0, 1))), 1e18
-    //     );
+        Positions.ILRTATransferDetails[] memory positionTransfer = new Positions.ILRTATransferDetails[](1);
+        positionTransfer[0] = Positions.ILRTATransferDetails(
+            engine.dataID(
+                abi.encode(
+                    Positions.ILRTADataID(
+                        Engine.OrderType.BiDirectional,
+                        abi.encode(Positions.BiDirectionalID(address(token0), address(token1), 0, 1))
+                    )
+                )
+            ),
+            1e18,
+            Engine.OrderType.BiDirectional
+        );
 
-    //     dataHash[0] = positionsDataHash(positionTransfer[0]);
+        console2.log("%x", uint256(positionTransfer[0].id));
+        dataHash[0] = positionsDataHash(positionTransfer[0]);
 
-    //     verify = SuperSignature.Verify(dataHash, 1, block.timestamp);
+        verify = SuperSignature.Verify(dataHash, 1, block.timestamp);
 
-    //     signature = signSuperSignature(verify, privateKey);
+        signature = signSuperSignature(verify, privateKey);
 
-    //     vm.resumeGasMetering();
+        vm.resumeGasMetering();
 
-    //     vm.prank(owner);
-    //     router.route(
-    //         Router.RouteParams(
-    //             owner, commands, inputs, 1, 1, new Permit3.TransferDetails[](0), positionTransfer, verify, signature
-    //         )
-    //     );
-    // }
+        vm.prank(owner);
+        router.route(
+            Router.RouteParams(
+                owner, commands, inputs, 1, 1, new Permit3.TransferDetails[](0), positionTransfer, verify, signature
+            )
+        );
+    }
 
     function testGasSwap() external {
         vm.pauseGasMetering();

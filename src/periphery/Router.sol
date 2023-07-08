@@ -8,6 +8,8 @@ import {ILRTA} from "ilrta/ILRTA.sol";
 import {Permit3} from "ilrta/Permit3.sol";
 import {SuperSignature} from "ilrta/SuperSignature.sol";
 
+import {console2} from "forge-std/console2.sol";
+
 /// @author Robert Leifke and Kyle Scott
 /// @custom:team route by signature
 contract Router is IExecuteCallback {
@@ -84,32 +86,32 @@ contract Router is IExecuteCallback {
             );
         }
 
-        // // send all liquidity positions individually
-        // j = 0;
-        // for (uint256 i = 0; i < lpIDs.length;) {
-        //     uint256 delta = lpDeltas[i];
-        //     bytes32 id = lpIDs[i];
+        // send all liquidity positions individually
+        j = 0;
+        for (uint256 i = 0; i < params.lpIDs.length;) {
+            uint256 delta = params.lpDeltas[i];
+            bytes32 id = params.lpIDs[i];
 
-        //     if (delta < 0 && id != bytes32(0)) {
-        //         engine.transferBySuperSignature(
-        //             callbackData.payer,
-        //             abi.encode(callbackData.positionTransfers[j]),
-        //             // solhint-disable-next-line max-line-length
-        //             ILRTA.RequestedTransfer(
-        //                 msg.sender, abi.encode(Positions.ILRTATransferDetails(id, delta, orderTypes[i], datas[i]))
-        //             ),
-        //             // TODO: this reverts
-        //             abi.decode(data[1 + j:], (bytes32[]))
-        //         );
+            console2.log(delta);
+            console2.log("%x", uint256(id));
+            if (delta > 0 && id != bytes32(0)) {
+                engine.transferBySuperSignature(
+                    callbackData.payer,
+                    abi.encode(callbackData.positionTransfers[j]),
+                    ILRTA.RequestedTransfer(
+                        msg.sender, abi.encode(Positions.ILRTATransferDetails(id, delta, params.orderTypes[i]))
+                    ),
+                    callbackData.dataHash
+                );
 
-        //         unchecked {
-        //             j++;
-        //         }
-        //     }
+                unchecked {
+                    j++;
+                }
+            }
 
-        //     unchecked {
-        //         i++;
-        //     }
-        // }
+            unchecked {
+                i++;
+            }
+        }
     }
 }
