@@ -69,7 +69,7 @@ The swap fee shifts the AMM price by $f$, therefore shrinking arbitrageur profit
 
 ### Strikes (Aggregate Liquidity)
 
-In order to allow for maximum simplicity and expressiveness, Dry Powder is an aggregate of up to 2^24 constant sum automated market makers. Each individual market is designated by its **strike** which is directly mapped to a price according to the formula `Price = (1.0001)^strike`, such that each strike is 1 bip away from adjacent strikes. This design is very similar to Uniswap's concentrated liquidity except that liquidity is assigned directly to a fixed price, because of the constant sum invariant. Dry Powder manages swap routing so that all trades swap through the best available price.
+In order to allow for maximum simplicity and expressiveness, Dry Powder is an aggregate of up to 2^24 or 16,777,216 constant sum automated market makers. Each individual market is designated by its **strike** which is directly mapped to a price according to the formula `Price = (1.0001)^strike`, such that each strike is 1 bip away from adjacent strikes. This design is very similar to Uniswap's concentrated liquidity except that liquidity is assigned directly to a fixed price, because of the constant sum invariant. Dry Powder manages swap routing so that all trades swap through the best available price.
 
 ### Spreads
 
@@ -116,11 +116,28 @@ Pairs also contain two functions to manage the state variables:
 
 ### BitMaps (`core/BitMaps.sol`)
 
-BitMaps is a library used in `Pairs.sol`. Its purpose is to manage and store information about initialized strikes. This is used when inserting a new node into the previously mentioned singley-linked lists in sub-linear time.
+BitMaps is a library used in `Pairs.sol`. Its purpose is to manage and store information about initialized strikes. Implemented in the library is a three level **sparse bit vector** which is a data structure used for storing bits in a compact way. The first level is the `blockMap`, which is a 256-bit integer that stores a bit for each of the 256 blocks of strikes. The second level is the blocks mapping, which maps from block indices to 256-bit integers. Each of these integers stores a bit for each of the 256 words in the corresponding block. The third level is the words mapping, which maps from word indices to 256-bit integers. Each of these integers stores a bit for each of the 256 strikes in the corresponding word. As aforementioned, a strike price is an integer between 0 and 2^24 - 1, inclusive. There are three functions provided in the contract; `set()` which used to intialize the strike, `unset` to unintialize a strike, and `nextBelow()` to find the next strike below the current strike. The library is used when inserting a new node into the previously mentioned singley-linked lists in sub-linear time. The `BitMaps.sol` contract was taken from github.com/muffinfi/muffin under the permission of core developers. 
 
 ### Positions (`core/Positions.sol`)
 
 Positions stores users liquidity positions in Dry Powder. Positions implements a standard called `ILRTA`, which supports transferability with and without signatures. There are three types of positions, BiDirectional, Limit, Debt. BiDirectional is the standard AMM liquidity, with the amount representing the share of the underlying liquidity, similar to Uniswap V2. A limit order has units of strictly liquidity (limit orders can't have fees) and contains extra information (`liquidityGrowthLast`) that is vital for telling if a limit order has been fully closed or not. Debt positions represent borrowed liquidity + collateral. Debt positions are denominated in liquidity without any interest accrued and contain extra data point `leverageRatioX128` that is equal to a multiple of how much collateral to debt in units of liquidity without any interest accrued.
+
+### Option Tokens 
+
+Each *Option Token* is a defined `IRLTA` liquidity position that is overcollaterlized and marks a debt issued by a specific user to the pool. An option token can be minted by calling the function `_mintDebt` from the contract `Positions`. 
+
+Once called, it first checks if the user already has a debt position for the specified strike. If they do not, the function creates a new position with the specified amount and leverage ratio. If the user already has a debt position for the specified strike, the function adds the new amount to the existing position. The function then emits a transfer event to notify listeners of the new position.
+
+The function takes the following parameters:
+`to`: The address of the user to mint the debt position for.
+`token0`: The address of the first token in the debt position.
+`token1`: The address of the second token in the debt position.
+`strike`: The strike price of the debt position.
+`selector`: The token selector for the debt position.
+`amount`: The amount of debt to mint.
+`leverageRatioX128`: The leverage ratio of the debt position.
+
+The function first gets the ID of the debt position from the mapping `_dataOf`. This mapping stores the data for all of the debt positions for the specified user. The function then checks if the balance of the debt position is `0`. If it is, the function simply sets the balance to the specified amount and sets the data of the debt position to the encoded DebtData object with the specified leverage ratio. If the balance of the debt position is not 0, the function creates a new `DebtData` object with the sum of the specified amount and the existing balance. The function then sets the data of the debt position to the encoded `DebtData` object and increments the balance of the debt position by the specified amount. Finally, the function emits a transfer event to notify listeners of the new debt position.
 
 ### Router (`periphery/Router.sol`)
 
