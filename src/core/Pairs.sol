@@ -3,9 +3,11 @@ pragma solidity ^0.8.19;
 
 import {BitMaps} from "./BitMaps.sol";
 import {mulDiv, mulDivRoundingUp} from "./math/FullMath.sol";
-import {addDelta, toInt256} from "./math/LiquidityMath.sol";
+import {getLiquidityDeltaAmount0, getLiquidityDeltaAmount1, addDelta, toInt256} from "./math/LiquidityMath.sol";
 import {getRatioAtStrike, MAX_STRIKE, MIN_STRIKE, Q128} from "./math/StrikeMath.sol";
 import {computeSwapStep} from "./math/SwapMath.sol";
+
+import {console2} from "forge-std/console2.sol";
 
 uint8 constant NUM_SPREADS = 5;
 int8 constant MAX_CONSECUTIVE = int8(NUM_SPREADS);
@@ -182,11 +184,11 @@ library Pairs {
 
         while (true) {
             uint256 ratioX128 = getRatioAtStrike(state.cachedStrikeCurrent);
-            uint256 amountRemaining;
+            uint256 liquidityRemaining;
             {
                 uint256 amountIn;
                 uint256 amountOut;
-                (amountIn, amountOut, amountRemaining) =
+                (amountIn, amountOut, liquidityRemaining) =
                     computeSwapStep(ratioX128, state.liquiditySwap, isToken0, amountDesired);
 
                 if (amountDesired > 0) {
@@ -200,54 +202,54 @@ library Pairs {
                 }
 
                 // calculate and store liquidity gained from fees
-                // if (isSwap0To1) {
-                //     unchecked {
-                //         uint256 swapLiquidityAvailable = mulDiv(
-                //             type(uint256).max - state.cachedComposition,
-                //             state.cachedLiquidity,
-                //             type(uint256).max / ratioX128
-                //         );
+                unchecked {
+                    if (isSwap0To1) {
+                        if (state.liquiditySwap > 0) {
+                            for (uint256 i = 1; i <= NUM_SPREADS; i++) {
+                                int24 activeStrike = state.cachedStrikeCurrent + int24(int256(i));
+                                int24 spreadStrikeCurrent = state.strikeCurrent[i - 1];
 
-                //         if (swapLiquidityAvailable > 0) {
-                //             for (uint256 i = 1; i <= NUM_SPREADS; i++) {
-                //                 int24 activeStrike = state.cachedStrikeCurrent + int24(int256(i));
-                //                 int24 spreadStrikeCurrent = state.strikeCurrent[i - 1];
+                                if (activeStrike == spreadStrikeCurrent) {
+                                    uint256 liquidityNew = getLiquidityDeltaAmount0(
+                                        mulDiv(
+                                            state.liquiditySwapSpread[i - 1], amountIn * i, state.liquiditySwap * 10_000
+                                        ),
+                                        state.cachedStrikeCurrent,
+                                        false
+                                    );
+                                    pair.strikes[activeStrike].liquidityBiDirectional[i - 1] += liquidityNew;
+                                    state.liquidityTotal += liquidityNew;
+                                } else {
+                                    break;
+                                }
+                            }
+                        }
+                    } else {
+                        if (state.liquiditySwap > 0) {
+                            for (uint256 i = 1; i <= NUM_SPREADS; i++) {
+                                int24 activeStrike = state.cachedStrikeCurrent - int24(int256(i));
+                                int24 spreadStrikeCurrent = state.strikeCurrent[i - 1];
 
-                //                 if (activeStrike == spreadStrikeCurrent) {
-                //                     pair.strikes[activeStrike].liquidity0InPerLiquidity[i - 1] += mulDiv(
-                //                         amountIn, type(uint256).max - state.composition[i - 1],
-                // swapLiquidityAvailable
-                //                     );
-                //                 } else {
-                //                     break;
-                //                 }
-                //             }
-                //         }
-                //     }
-                // } else {
-                //     unchecked {
-                //         uint256 swapLiquidityAvailable = mulDiv(state.cachedComposition, state.cachedLiquidity,
-                // Q128);
-                //         if (swapLiquidityAvailable > 0) {
-                //             for (uint256 i = 1; i <= NUM_SPREADS; i++) {
-                //                 int24 activeStrike = state.cachedStrikeCurrent - int24(int256(i));
-                //                 int24 spreadStrikeCurrent = state.strikeCurrent[i - 1];
-
-                //                 if (activeStrike == spreadStrikeCurrent) {
-                //                     pair.strikes[activeStrike].liquidityBiDirectional[i - 1] +=
-                //                         mulDiv(amountIn, state.composition[i - 1], swapLiquidityAvailable);
-                //                 } else {
-                //                     break;
-                //                 }
-                //             }
-                //         }
-                //     }
-                // }
+                                if (activeStrike == spreadStrikeCurrent) {
+                                    uint256 liquidityNew = getLiquidityDeltaAmount1(
+                                        mulDiv(
+                                            state.liquiditySwapSpread[i - 1], amountIn * i, state.liquiditySwap * 10_000
+                                        )
+                                    );
+                                    pair.strikes[activeStrike].liquidityBiDirectional[i - 1] += liquidityNew;
+                                    state.liquidityTotal += liquidityNew;
+                                } else {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             if (amountDesired == 0) {
                 if (isSwap0To1) {
-                    uint128 composition = uint128(mulDiv(amountRemaining, Q128, state.liquidityTotal));
+                    uint128 composition = uint128(mulDiv(liquidityRemaining, Q128, state.liquidityTotal));
 
                     unchecked {
                         for (uint256 i = 1; i <= NUM_SPREADS; i++) {
@@ -263,7 +265,7 @@ library Pairs {
                     }
                 } else {
                     uint128 composition =
-                        type(uint128).max - uint128(mulDiv(amountRemaining, ratioX128, state.liquidityTotal));
+                        type(uint128).max - uint128(mulDiv(liquidityRemaining, Q128, state.liquidityTotal));
 
                     unchecked {
                         for (uint256 i = 1; i <= NUM_SPREADS; i++) {
