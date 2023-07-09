@@ -8,8 +8,6 @@ import {ILRTA} from "ilrta/ILRTA.sol";
 import {Permit3} from "ilrta/Permit3.sol";
 import {SuperSignature} from "ilrta/SuperSignature.sol";
 
-import {console2} from "forge-std/console2.sol";
-
 /// @author Robert Leifke and Kyle Scott
 /// @custom:team route by signature
 contract Router is IExecuteCallback {
@@ -59,41 +57,11 @@ contract Router is IExecuteCallback {
         if (msg.sender != address(engine)) revert InvalidCaller(msg.sender);
         CallbackData memory callbackData = abi.decode(params.data, (CallbackData));
 
-        // build array of transfer requests, then send as a batch
-        Permit3.RequestedTransferDetails[] memory requestedTransfer =
-            new Permit3.RequestedTransferDetails[](callbackData.permitTransfers.length);
-
-        uint256 j = 0;
-        for (uint256 i = 0; i < params.tokensDelta.length;) {
-            int256 delta = params.tokensDelta[i];
-
-            if (delta > 0 && params.tokens[i] != address(0)) {
-                requestedTransfer[j] = Permit3.RequestedTransferDetails(msg.sender, uint256(delta));
-
-                unchecked {
-                    j++;
-                }
-            }
-
-            unchecked {
-                i++;
-            }
-        }
-
-        if (callbackData.permitTransfers.length > 0) {
-            permit3.transferBySuperSignature(
-                callbackData.payer, callbackData.permitTransfers, requestedTransfer, callbackData.dataHash
-            );
-        }
-
         // send all liquidity positions individually
-        j = 0;
+        uint256 j = 0;
         for (uint256 i = 0; i < params.lpIDs.length;) {
             uint256 delta = params.lpDeltas[i];
             bytes32 id = params.lpIDs[i];
-
-            console2.log(delta);
-            console2.log("%x", uint256(id));
             if (delta > 0 && id != bytes32(0)) {
                 engine.transferBySuperSignature(
                     callbackData.payer,
@@ -112,6 +80,38 @@ contract Router is IExecuteCallback {
             unchecked {
                 i++;
             }
+        }
+
+        // build array of transfer requests, then send as a batch
+        bytes32[] memory permitDataHash = new bytes32[](1);
+        if (callbackData.dataHash.length > 0) {
+            permitDataHash[0] = callbackData.dataHash[callbackData.dataHash.length - 1];
+        }
+
+        Permit3.RequestedTransferDetails[] memory requestedTransfer =
+            new Permit3.RequestedTransferDetails[](callbackData.permitTransfers.length);
+
+        j = 0;
+        for (uint256 i = 0; i < params.tokensDelta.length;) {
+            int256 delta = params.tokensDelta[i];
+
+            if (delta > 0 && params.tokens[i] != address(0)) {
+                requestedTransfer[j] = Permit3.RequestedTransferDetails(msg.sender, uint256(delta));
+
+                unchecked {
+                    j++;
+                }
+            }
+
+            unchecked {
+                i++;
+            }
+        }
+
+        if (callbackData.permitTransfers.length > 0) {
+            permit3.transferBySuperSignature(
+                callbackData.payer, callbackData.permitTransfers, requestedTransfer, permitDataHash
+            );
         }
     }
 }

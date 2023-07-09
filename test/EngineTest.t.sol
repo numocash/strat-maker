@@ -8,8 +8,8 @@ import {
     createInputs,
     pushCommands,
     pushInputs,
-    borrowCommand,
-    repayCommand,
+    borrowLiquidityCommand,
+    repayLiquidityCommand,
     addLiquidityCommand,
     removeLiquidityCommand,
     swapCommand
@@ -144,7 +144,7 @@ contract EngineTest is Test, EngineHelper {
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
 
-        (commands[0], inputs[0]) = borrowCommand(
+        (commands[0], inputs[0]) = borrowLiquidityCommand(
             address(token0),
             address(token1),
             1,
@@ -181,7 +181,7 @@ contract EngineTest is Test, EngineHelper {
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
 
-        (commands[0], inputs[0]) = borrowCommand(
+        (commands[0], inputs[0]) = borrowLiquidityCommand(
             address(token0),
             address(token1),
             1,
@@ -196,7 +196,7 @@ contract EngineTest is Test, EngineHelper {
         (, uint256 leverageRatioX128) =
             engine.getPositionDebt(address(this), address(token0), address(token1), 1, Engine.TokenSelector.Token0);
 
-        (commands[0], inputs[0]) = repayCommand(
+        (commands[0], inputs[0]) = repayLiquidityCommand(
             address(token0),
             address(token1),
             1,
@@ -300,7 +300,7 @@ contract EngineTest is Test, EngineHelper {
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
 
-        (commands[0], inputs[0]) = borrowCommand(
+        (commands[0], inputs[0]) = borrowLiquidityCommand(
             address(token0),
             address(token1),
             1,
@@ -331,7 +331,7 @@ contract EngineTest is Test, EngineHelper {
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
 
-        (commands[0], inputs[0]) = borrowCommand(
+        (commands[0], inputs[0]) = borrowLiquidityCommand(
             address(token0),
             address(token1),
             1,
@@ -346,7 +346,7 @@ contract EngineTest is Test, EngineHelper {
         (, uint256 leverageRatioX128) =
             engine.getPositionDebt(address(this), address(token0), address(token1), 1, Engine.TokenSelector.Token0);
 
-        (commands[0], inputs[0]) = repayCommand(
+        (commands[0], inputs[0]) = repayLiquidityCommand(
             address(token0),
             address(token1),
             1,

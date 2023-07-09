@@ -32,7 +32,6 @@ import {IExecuteCallback} from "./interfaces/IExecuteCallback.sol";
 
 /// @author Kyle Scott and Robert Leifke
 /// @custom:team return data and events
-/// @custom:team tree for function selector
 /// @custom:team pass minted position information back to callback
 /// @custom:team don't allow for transferring if a position isn't accrued
 /// @custom:team amount desired is impossible

@@ -17,10 +17,10 @@ import {
     pushInputs,
     addLiquidityCommand,
     removeLiquidityCommand,
+    borrowLiquidityCommand,
+    repayLiquidityCommand,
     swapCommand
 } from "./helpers/Utils.sol";
-
-import {console2} from "forge-std/console2.sol";
 
 contract RouterTest is Test {
     Engine private engine;
@@ -29,6 +29,9 @@ contract RouterTest is Test {
     Router private router;
     MockERC20 private token0;
     MockERC20 private token1;
+
+    uint256 private privateKey = 0xC0FFEE;
+    address private owner = vm.addr(privateKey);
 
     bytes32 private constant VERIFY_TYPEHASH = keccak256("Verify(bytes32[] dataHash,uint256 nonce,uint256 deadline)");
 
@@ -127,8 +130,6 @@ contract RouterTest is Test {
 
     function testGasAddLiquidity() external {
         vm.pauseGasMetering();
-        uint256 privateKey = 0xC0FFEE;
-        address owner = vm.addr(privateKey);
 
         token0.mint(address(owner), 1e18);
 
@@ -174,8 +175,6 @@ contract RouterTest is Test {
 
     function testGasRemoveLiquidity() external {
         vm.pauseGasMetering();
-        uint256 privateKey = 0xC0FFEE;
-        address owner = vm.addr(privateKey);
 
         token0.mint(address(owner), 1e18);
 
@@ -239,7 +238,6 @@ contract RouterTest is Test {
             Engine.OrderType.BiDirectional
         );
 
-        console2.log("%x", uint256(positionTransfer[0].id));
         dataHash[0] = positionsDataHash(positionTransfer[0]);
 
         verify = SuperSignature.Verify(dataHash, 1, block.timestamp);
@@ -258,8 +256,6 @@ contract RouterTest is Test {
 
     function testGasSwap() external {
         vm.pauseGasMetering();
-        uint256 privateKey = 0xC0FFEE;
-        address owner = vm.addr(privateKey);
 
         token0.mint(address(owner), 1e18);
 
@@ -333,6 +329,219 @@ contract RouterTest is Test {
                 new Positions.ILRTATransferDetails[](0),
                 verify,
                 signature
+            )
+        );
+    }
+
+    function testGasBorrowLiquidity() external {
+        vm.pauseGasMetering();
+
+        token0.mint(address(owner), 2e18);
+
+        vm.prank(owner);
+        token0.approve(address(permit3), 2e18);
+
+        Engine.Commands[] memory commands = createCommands();
+        bytes[] memory inputs = createInputs();
+
+        (Engine.Commands addCommand, bytes memory addInput) =
+            addLiquidityCommand(address(token0), address(token1), 1, 1, Engine.TokenSelector.LiquidityPosition, 1e18);
+
+        commands = pushCommands(commands, addCommand);
+        inputs = pushInputs(inputs, addInput);
+
+        Permit3.TransferDetails[] memory permitTransferDetails = new Permit3.TransferDetails[](1);
+        permitTransferDetails[0] = Permit3.TransferDetails({token: address(token0), amount: 1e18});
+
+        bytes32[] memory dataHash = new bytes32[](1);
+        dataHash[0] = permitDataHash(permitTransferDetails);
+
+        SuperSignature.Verify memory verify = SuperSignature.Verify(dataHash, 0, block.timestamp);
+
+        bytes memory signature = signSuperSignature(verify, privateKey);
+
+        vm.prank(owner);
+        router.route(
+            Router.RouteParams(
+                owner,
+                commands,
+                inputs,
+                1,
+                1,
+                permitTransferDetails,
+                new Positions.ILRTATransferDetails[](0),
+                verify,
+                signature
+            )
+        );
+
+        // BORROW LIQUIDITY
+
+        (Engine.Commands borrowCommand, bytes memory borrowInput) = borrowLiquidityCommand(
+            address(token0),
+            address(token1),
+            1,
+            Engine.TokenSelector.Token0,
+            1e18,
+            Engine.TokenSelector.LiquidityPosition,
+            0.5e18
+        );
+
+        commands[0] = borrowCommand;
+        inputs[0] = borrowInput;
+
+        permitTransferDetails[0] = Permit3.TransferDetails({token: address(token0), amount: 1.5e18});
+
+        dataHash[0] = permitDataHash(permitTransferDetails);
+
+        verify = SuperSignature.Verify(dataHash, 1, block.timestamp);
+
+        signature = signSuperSignature(verify, privateKey);
+
+        vm.resumeGasMetering();
+
+        vm.prank(owner);
+        router.route(
+            Router.RouteParams(
+                owner,
+                commands,
+                inputs,
+                1,
+                1,
+                permitTransferDetails,
+                new Positions.ILRTATransferDetails[](0),
+                verify,
+                signature
+            )
+        );
+    }
+
+    function testGasRepayLiquidity() external {
+        vm.pauseGasMetering();
+
+        token0.mint(address(owner), 2e18);
+
+        vm.prank(owner);
+        token0.approve(address(permit3), 2e18);
+
+        Engine.Commands[] memory commands = createCommands();
+        bytes[] memory inputs = createInputs();
+
+        (Engine.Commands addCommand, bytes memory addInput) =
+            addLiquidityCommand(address(token0), address(token1), 1, 1, Engine.TokenSelector.LiquidityPosition, 1e18);
+
+        commands = pushCommands(commands, addCommand);
+        inputs = pushInputs(inputs, addInput);
+
+        Permit3.TransferDetails[] memory permitTransferDetails = new Permit3.TransferDetails[](1);
+        permitTransferDetails[0] = Permit3.TransferDetails({token: address(token0), amount: 1e18});
+
+        bytes32[] memory dataHash = new bytes32[](1);
+        dataHash[0] = permitDataHash(permitTransferDetails);
+
+        SuperSignature.Verify memory verify = SuperSignature.Verify(dataHash, 0, block.timestamp);
+
+        bytes memory signature = signSuperSignature(verify, privateKey);
+
+        vm.prank(owner);
+        router.route(
+            Router.RouteParams(
+                owner,
+                commands,
+                inputs,
+                1,
+                1,
+                permitTransferDetails,
+                new Positions.ILRTATransferDetails[](0),
+                verify,
+                signature
+            )
+        );
+
+        // BORROW LIQUIDITY
+
+        (Engine.Commands borrowCommand, bytes memory borrowInput) = borrowLiquidityCommand(
+            address(token0),
+            address(token1),
+            1,
+            Engine.TokenSelector.Token0,
+            1e18,
+            Engine.TokenSelector.LiquidityPosition,
+            0.5e18
+        );
+
+        commands[0] = borrowCommand;
+        inputs[0] = borrowInput;
+
+        permitTransferDetails[0] = Permit3.TransferDetails({token: address(token0), amount: 1.5e18});
+
+        dataHash[0] = permitDataHash(permitTransferDetails);
+
+        verify = SuperSignature.Verify(dataHash, 1, block.timestamp);
+
+        signature = signSuperSignature(verify, privateKey);
+
+        vm.prank(owner);
+        router.route(
+            Router.RouteParams(
+                owner,
+                commands,
+                inputs,
+                1,
+                1,
+                permitTransferDetails,
+                new Positions.ILRTATransferDetails[](0),
+                verify,
+                signature
+            )
+        );
+
+        // REPAY LIQUIDITY
+
+        {
+            (, uint256 leverageRatioX128) =
+                engine.getPositionDebt(owner, address(token0), address(token1), 1, Engine.TokenSelector.Token0);
+
+            (Engine.Commands repayCommand, bytes memory repayInput) = repayLiquidityCommand(
+                address(token0),
+                address(token1),
+                1,
+                Engine.TokenSelector.Token0,
+                leverageRatioX128,
+                Engine.TokenSelector.LiquidityPosition,
+                0.5e18
+            );
+
+            commands[0] = repayCommand;
+            inputs[0] = repayInput;
+        }
+
+        Positions.ILRTATransferDetails[] memory positionTransfer = new Positions.ILRTATransferDetails[](1);
+        positionTransfer[0] = Positions.ILRTATransferDetails(
+            engine.dataID(
+                abi.encode(
+                    Positions.ILRTADataID(
+                        Engine.OrderType.Debt,
+                        abi.encode(Positions.DebtID(address(token0), address(token1), 1, Engine.TokenSelector.Token0))
+                    )
+                )
+            ),
+            0.5e18,
+            Engine.OrderType.Debt
+        );
+
+        dataHash[0] = positionsDataHash(positionTransfer[0]);
+
+        verify = SuperSignature.Verify(dataHash, 2, block.timestamp);
+
+        signature = signSuperSignature(verify, privateKey);
+
+        vm.resumeGasMetering();
+
+        vm.prank(owner);
+        router.route(
+            Router.RouteParams(
+                owner, commands, inputs, 1, 1, new Permit3.TransferDetails[](0), positionTransfer, verify, signature
             )
         );
     }
