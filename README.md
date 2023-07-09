@@ -69,7 +69,7 @@ The swap fee shifts the AMM price by $f$, therefore shrinking arbitrageur profit
 
 ### Strikes (Aggregate Liquidity)
 
-In order to allow for maximum simplicity and expressiveness, Dry Powder is an aggregate of up to 2^24 constant sum automated market makers. Each individual market is designated by its **strike** which is directly mapped to a price according to the formula `Price = (1.0001)^strike`, such that each strike is 1 bip away from adjacent strikes. This design is very similar to Uniswap's concentrated liquidity except that liquidity is assigned directly to a fixed price, because of the constant sum invariant. Dry Powder manages swap routing so that all trades swap through the best available price.
+In order to allow for maximum simplicity and expressiveness, Dry Powder is an aggregate of up to 2^24 or 16,777,216 constant sum automated market makers. Each individual market is designated by its **strike** which is directly mapped to a price according to the formula `Price = (1.0001)^strike`, such that each strike is 1 bip away from adjacent strikes. This design is very similar to Uniswap's concentrated liquidity except that liquidity is assigned directly to a fixed price, because of the constant sum invariant. Dry Powder manages swap routing so that all trades swap through the best available price.
 
 ### Spreads
 
@@ -116,7 +116,7 @@ Pairs also contain two functions to manage the state variables:
 
 ### BitMaps (`core/BitMaps.sol`)
 
-BitMaps is a library used in `Pairs.sol`. Its purpose is to manage and store information about initialized strikes. This is used when inserting a new node into the previously mentioned singley-linked lists in sub-linear time.
+BitMaps is a library used in `Pairs.sol`. Its purpose is to manage and store information about initialized strikes. Implemented in the library is a three level bitmap which is a data structure used for storing binary data about an array in a compact way. Simply, a `1` bit represents an initialized strike, and storing the data this way allows for efficient computation of the next initialized strike below any arbitrary value.
 
 ### Positions (`core/Positions.sol`)
 
