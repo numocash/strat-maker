@@ -159,13 +159,6 @@ abstract contract Positions is ILRTA {
             uint256 senderBalance = _dataOf[from][transferDetails.id].balance;
             uint256 recipientBalance = _dataOf[to][transferDetails.id].balance;
 
-            if (senderBalance == transferDetails.amount) delete _dataOf[from][transferDetails.id];
-            else _dataOf[from][transferDetails.id].balance = senderBalance - transferDetails.amount;
-
-            unchecked {
-                _dataOf[to][transferDetails.id].balance = recipientBalance + transferDetails.amount;
-            }
-
             uint256 leverageRatioX128 = recipientBalance == 0
                 ? abi.decode(_dataOf[from][transferDetails.id].data, (DebtData)).leverageRatioX128
                 : addPositions(
@@ -174,6 +167,13 @@ abstract contract Positions is ILRTA {
                     abi.decode(_dataOf[from][transferDetails.id].data, (DebtData)),
                     abi.decode(_dataOf[to][transferDetails.id].data, (DebtData))
                 );
+
+            if (senderBalance == transferDetails.amount) delete _dataOf[from][transferDetails.id];
+            else _dataOf[from][transferDetails.id].balance = senderBalance - transferDetails.amount;
+
+            unchecked {
+                _dataOf[to][transferDetails.id].balance = recipientBalance + transferDetails.amount;
+            }
 
             _dataOf[to][transferDetails.id].data = abi.encode(DebtData(leverageRatioX128));
 

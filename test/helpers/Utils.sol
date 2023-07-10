@@ -14,7 +14,7 @@ function createCommand(
     return (Engine.Commands.CreatePair, abi.encode(Engine.CreatePairParams(token0, token1, tickInitial)));
 }
 
-function borrowCommand(
+function borrowLiquidityCommand(
     address token0,
     address token1,
     int24 strike,
@@ -36,7 +36,7 @@ function borrowCommand(
     );
 }
 
-function repayCommand(
+function repayLiquidityCommand(
     address token0,
     address token1,
     int24 strike,
