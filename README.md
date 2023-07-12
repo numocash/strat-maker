@@ -3,7 +3,9 @@
 [gha]: https://github.com/numoen/dry-powder/actions
 [gha-badge]: https://github.com/numoen/dry-powder/actions/workflows/main.yml/badge.svg
 
-An ERC20 exchange protocol built for the Ethereum Virtual Machine.
+An ERC20 exchange protocol optimized for portfolio replication and margining built for the Ethereum Virtual Machine.
+
+
 
 Features:
 
