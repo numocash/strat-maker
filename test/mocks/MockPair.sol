@@ -258,14 +258,15 @@ contract MockPair is Positions {
         external
         view
         returns (
+            uint256 cachedBlock,
             uint128[NUM_SPREADS] memory composition,
             int24[NUM_SPREADS] memory strikeCurrent,
             int24 cachedStrikeCurrent,
             uint8 initialized
         )
     {
-        (composition, strikeCurrent, cachedStrikeCurrent, initialized) =
-            (pair.composition, pair.strikeCurrent, pair.cachedStrikeCurrent, pair.initialized);
+        (cachedBlock, composition, strikeCurrent, cachedStrikeCurrent, initialized) =
+            (pair.cachedBlock, pair.composition, pair.strikeCurrent, pair.cachedStrikeCurrent, pair.initialized);
     }
 
     function getStrike(int24 strike) external view returns (Pairs.Strike memory) {

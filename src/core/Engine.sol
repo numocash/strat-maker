@@ -573,6 +573,7 @@ contract Engine is Positions {
         external
         view
         returns (
+            uint256 cachedBlock,
             uint128[NUM_SPREADS] memory composition,
             int24[NUM_SPREADS] memory strikeCurrent,
             int24 cachedStrikeCurrent,
@@ -580,8 +581,8 @@ contract Engine is Positions {
         )
     {
         (, Pairs.Pair storage pair) = pairs.getPairAndID(token0, token1);
-        (composition, strikeCurrent, cachedStrikeCurrent, initialized) =
-            (pair.composition, pair.strikeCurrent, pair.cachedStrikeCurrent, pair.initialized);
+        (cachedBlock, composition, strikeCurrent, cachedStrikeCurrent, initialized) =
+            (pair.cachedBlock, pair.composition, pair.strikeCurrent, pair.cachedStrikeCurrent, pair.initialized);
     }
 
     function getStrike(address token0, address token1, int24 strike) external view returns (Pairs.Strike memory) {

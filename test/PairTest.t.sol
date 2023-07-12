@@ -266,8 +266,8 @@ contract SwapTest is Test, PairHelper {
         assertEq(token0.balanceOf(address(pair)), 1e18 - amountOut);
         assertEq(token1.balanceOf(address(pair)), 1e18 - 1);
 
-        (uint128[NUM_SPREADS] memory composition, int24[NUM_SPREADS] memory strikeCurrent, int24 cachedStrikeCurrent,) =
-            pair.getPair();
+        (, uint128[NUM_SPREADS] memory composition, int24[NUM_SPREADS] memory strikeCurrent, int24 cachedStrikeCurrent,)
+        = pair.getPair();
 
         assertEq(composition[0], type(uint128).max);
         assertEq(strikeCurrent[0], 0);
@@ -290,8 +290,8 @@ contract SwapTest is Test, PairHelper {
         assertEq(token0.balanceOf(address(pair)), 1e18 - amountOut);
         assertEq(token1.balanceOf(address(pair)), 1e18 - 1);
 
-        (uint128[NUM_SPREADS] memory composition, int24[NUM_SPREADS] memory strikeCurrent, int24 cachedStrikeCurrent,) =
-            pair.getPair();
+        (, uint128[NUM_SPREADS] memory composition, int24[NUM_SPREADS] memory strikeCurrent, int24 cachedStrikeCurrent,)
+        = pair.getPair();
 
         assertEq(composition[0], type(uint128).max);
         assertEq(strikeCurrent[0], 0);
@@ -313,8 +313,8 @@ contract SwapTest is Test, PairHelper {
         assertEq(token0.balanceOf(address(pair)), amountIn);
         assertEq(token1.balanceOf(address(pair)), 0);
 
-        (uint128[NUM_SPREADS] memory composition, int24[NUM_SPREADS] memory strikeCurrent, int24 cachedStrikeCurrent,) =
-            pair.getPair();
+        (, uint128[NUM_SPREADS] memory composition, int24[NUM_SPREADS] memory strikeCurrent, int24 cachedStrikeCurrent,)
+        = pair.getPair();
 
         assertEq(composition[0], 0);
         assertEq(strikeCurrent[0], -1);
@@ -338,8 +338,8 @@ contract SwapTest is Test, PairHelper {
         assertEq(token0.balanceOf(address(pair)), amountIn, "balance0 pair");
         assertEq(token1.balanceOf(address(pair)), 0, "balance1 pair");
 
-        (uint128[NUM_SPREADS] memory composition, int24[NUM_SPREADS] memory strikeCurrent, int24 cachedStrikeCurrent,) =
-            pair.getPair();
+        (, uint128[NUM_SPREADS] memory composition, int24[NUM_SPREADS] memory strikeCurrent, int24 cachedStrikeCurrent,)
+        = pair.getPair();
 
         assertEq(composition[0], 0);
         assertEq(strikeCurrent[0], -1);
@@ -441,7 +441,7 @@ contract SwapTest is Test, PairHelper {
         pair.addLiquidity(0, 1, 1e18);
         pair.swap(false, 0.5e18);
 
-        (uint128[NUM_SPREADS] memory composition,,,) = pair.getPair();
+        (, uint128[NUM_SPREADS] memory composition,,,) = pair.getPair();
 
         assertApproxEqRel(composition[0], type(uint128).max - mulDiv(0.5e18, Q128, 1e18 + 0.5e14), 1e5);
 
@@ -456,7 +456,7 @@ contract SwapTest is Test, PairHelper {
 
         pair.swap(false, 0.5e18);
 
-        (uint128[NUM_SPREADS] memory composition,,,) = pair.getPair();
+        (, uint128[NUM_SPREADS] memory composition,,,) = pair.getPair();
 
         assertApproxEqRel(composition[0], type(uint128).max - mulDiv(1.5e18, Q128, 2e18 + 0.75e14), 1e5);
         assertApproxEqRel(composition[1], type(uint128).max - mulDiv(1.5e18, Q128, 2e18 + 0.75e14), 1e5);
@@ -510,7 +510,7 @@ contract BorrowTest is Test, PairHelper {
         pair.borrowLiquidity(1, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
         pair.swap(false, 0.1e18);
 
-        (,, int24 cachedStrikeCurrent,) = pair.getPair();
+        (,,, int24 cachedStrikeCurrent,) = pair.getPair();
         assertEq(cachedStrikeCurrent, 1);
 
         vm.roll(10);
