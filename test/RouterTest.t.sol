@@ -61,10 +61,16 @@ contract RouterTest is Test {
         }
 
         bytes32 signatureHash = keccak256(
-            abi.encode(
-                SUPER_SIGNATURE_TRANSFER_BATCH_TYPEHASH,
-                keccak256(abi.encodePacked(transfeDetailsHashes)),
-                address(router)
+            abi.encodePacked(
+                "\x19\x01",
+                permit3.DOMAIN_SEPARATOR(),
+                keccak256(
+                    abi.encode(
+                        SUPER_SIGNATURE_TRANSFER_BATCH_TYPEHASH,
+                        keccak256(abi.encodePacked(transfeDetailsHashes)),
+                        address(router)
+                    )
+                )
             )
         );
 
@@ -73,24 +79,23 @@ contract RouterTest is Test {
 
     function positionsDataHash(Positions.ILRTATransferDetails memory positionTransfer) private view returns (bytes32) {
         bytes32 signatureHash = keccak256(
-            abi.encode(
-                SUPER_SIGNATURE_ILRTA_TRANSFER_TYPEHASH,
-                keccak256(abi.encode(ILRTA_TRANSFER_DETAILS_TYPEHASH, abi.encode(positionTransfer))),
-                address(router)
+            abi.encodePacked(
+                "\x19\x01",
+                engine.DOMAIN_SEPARATOR(),
+                keccak256(
+                    abi.encode(
+                        SUPER_SIGNATURE_ILRTA_TRANSFER_TYPEHASH,
+                        keccak256(abi.encode(ILRTA_TRANSFER_DETAILS_TYPEHASH, abi.encode(positionTransfer))),
+                        address(router)
+                    )
+                )
             )
         );
 
         return signatureHash;
     }
 
-    function signSuperSignature(
-        SuperSignature.Verify memory verify,
-        uint256 privateKey
-    )
-        private
-        view
-        returns (bytes memory signature)
-    {
+    function signSuperSignature(SuperSignature.Verify memory verify) private view returns (bytes memory signature) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(
             privateKey,
             keccak256(
@@ -154,7 +159,7 @@ contract RouterTest is Test {
 
         SuperSignature.Verify memory verify = SuperSignature.Verify(dataHash, 0, block.timestamp);
 
-        bytes memory signature = signSuperSignature(verify, privateKey);
+        bytes memory signature = signSuperSignature(verify);
         vm.resumeGasMetering();
 
         vm.prank(owner);
@@ -198,7 +203,7 @@ contract RouterTest is Test {
 
         SuperSignature.Verify memory verify = SuperSignature.Verify(dataHash, 0, block.timestamp);
 
-        bytes memory signature = signSuperSignature(verify, privateKey);
+        bytes memory signature = signSuperSignature(verify);
 
         vm.prank(owner);
         router.route(
@@ -242,7 +247,7 @@ contract RouterTest is Test {
 
         verify = SuperSignature.Verify(dataHash, 1, block.timestamp);
 
-        signature = signSuperSignature(verify, privateKey);
+        signature = signSuperSignature(verify);
 
         vm.resumeGasMetering();
 
@@ -278,7 +283,7 @@ contract RouterTest is Test {
         dataHash[0] = permitDataHash(permitTransferDetails);
 
         SuperSignature.Verify memory verify = SuperSignature.Verify(dataHash, 0, block.timestamp);
-        bytes memory signature = signSuperSignature(verify, privateKey);
+        bytes memory signature = signSuperSignature(verify);
 
         vm.prank(owner);
         router.route(
@@ -313,7 +318,7 @@ contract RouterTest is Test {
         dataHash[0] = permitDataHash(permitTransferDetails);
 
         verify = SuperSignature.Verify(dataHash, 1, block.timestamp);
-        signature = signSuperSignature(verify, privateKey);
+        signature = signSuperSignature(verify);
 
         vm.resumeGasMetering();
 
@@ -358,7 +363,7 @@ contract RouterTest is Test {
 
         SuperSignature.Verify memory verify = SuperSignature.Verify(dataHash, 0, block.timestamp);
 
-        bytes memory signature = signSuperSignature(verify, privateKey);
+        bytes memory signature = signSuperSignature(verify);
 
         vm.prank(owner);
         router.route(
@@ -396,7 +401,7 @@ contract RouterTest is Test {
 
         verify = SuperSignature.Verify(dataHash, 1, block.timestamp);
 
-        signature = signSuperSignature(verify, privateKey);
+        signature = signSuperSignature(verify);
 
         vm.resumeGasMetering();
 
@@ -441,7 +446,7 @@ contract RouterTest is Test {
 
         SuperSignature.Verify memory verify = SuperSignature.Verify(dataHash, 0, block.timestamp);
 
-        bytes memory signature = signSuperSignature(verify, privateKey);
+        bytes memory signature = signSuperSignature(verify);
 
         vm.prank(owner);
         router.route(
@@ -479,7 +484,7 @@ contract RouterTest is Test {
 
         verify = SuperSignature.Verify(dataHash, 1, block.timestamp);
 
-        signature = signSuperSignature(verify, privateKey);
+        signature = signSuperSignature(verify);
 
         vm.prank(owner);
         router.route(
@@ -534,7 +539,7 @@ contract RouterTest is Test {
 
         verify = SuperSignature.Verify(dataHash, 2, block.timestamp);
 
-        signature = signSuperSignature(verify, privateKey);
+        signature = signSuperSignature(verify);
 
         vm.resumeGasMetering();
 
