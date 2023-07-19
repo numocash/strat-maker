@@ -114,7 +114,7 @@ contract Engine is Positions {
         int24 strike;
         TokenSelector selectorCollateral;
         uint256 amountDesiredCollateral;
-        TokenSelector selectorDebt;
+        // TokenSelector selectorDebt;
         uint256 amountDesiredDebt;
     }
 
@@ -124,7 +124,7 @@ contract Engine is Positions {
         int24 strike;
         TokenSelector selectorCollateral;
         uint256 leverageRatioX128;
-        TokenSelector selectorDebt;
+        // TokenSelector selectorDebt;
         uint256 amountDesiredDebt;
     }
 
@@ -152,7 +152,7 @@ contract Engine is Positions {
                                 STORAGE
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    mapping(bytes32 => Pairs.Pair) internal pairs;
+    mapping(bytes32 => Pairs.Pair) private pairs;
 
     /// @dev this should be checked when reading any `get` function from another contract to prevent read-only
     /// reentrancy
@@ -386,25 +386,15 @@ contract Engine is Positions {
     {
         (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
 
-        // calculate how much liquidity is borrowed
-        uint256 liquidityDebt;
-        if (params.selectorDebt == TokenSelector.LiquidityPosition) {
-            liquidityDebt = params.amountDesiredDebt;
-        } else if (params.selectorDebt == TokenSelector.Token0) {
-            revert InvalidSelector();
-        } else if (params.selectorDebt == TokenSelector.Token1) {
-            revert InvalidSelector();
-        } else {
-            revert InvalidSelector();
-        }
-
-        pair.borrowLiquidity(params.strike, liquidityDebt);
+        pair.borrowLiquidity(params.strike, params.amountDesiredDebt);
 
         // calculate the the tokens that are borrowed
         if (params.strike > pair.cachedStrikeCurrent) {
-            account.updateToken(params.token0, -toInt256(getAmount0Delta(liquidityDebt, params.strike, false)));
+            account.updateToken(
+                params.token0, -toInt256(getAmount0Delta(params.amountDesiredDebt, params.strike, false))
+            );
         } else {
-            account.updateToken(params.token1, -toInt256(getAmount1Delta(liquidityDebt)));
+            account.updateToken(params.token1, -toInt256(getAmount1Delta(params.amountDesiredDebt)));
         }
 
         // add collateral to account
@@ -422,7 +412,8 @@ contract Engine is Positions {
 
         // TODO: check for undercollateralization
 
-        uint256 balance = debtLiquidityToBalance(liquidityDebt, pair.strikes[params.strike].liquidityGrowthX128, false);
+        uint256 balance =
+            debtLiquidityToBalance(params.amountDesiredDebt, pair.strikes[params.strike].liquidityGrowthX128, false);
 
         // mint position to user
         _mintDebt(
@@ -444,19 +435,7 @@ contract Engine is Positions {
 
         uint256 _liquidityGrowthX128 = pair.strikes[params.strike].liquidityGrowthX128;
 
-        // calculate liquidity to repay
-        uint256 amount;
-        uint256 liquidityDebt;
-        if (params.selectorDebt == TokenSelector.LiquidityPosition) {
-            amount = params.amountDesiredDebt;
-            liquidityDebt = debtBalanceToLiquidity(amount, _liquidityGrowthX128, true);
-        } else if (params.selectorDebt == TokenSelector.Token0) {
-            revert InvalidSelector();
-        } else if (params.selectorDebt == TokenSelector.Token1) {
-            revert InvalidSelector();
-        } else {
-            revert InvalidSelector();
-        }
+        uint256 liquidityDebt = debtBalanceToLiquidity(params.amountDesiredDebt, _liquidityGrowthX128, true);
 
         pair.repayLiquidity(params.strike, liquidityDebt);
 
@@ -474,7 +453,8 @@ contract Engine is Positions {
 
         // add unlocked collateral to account
         {
-            uint256 liquidityCollateral = mulDiv(amount, params.leverageRatioX128, Q128) - 2 * (amount - liquidityDebt);
+            uint256 liquidityCollateral = mulDiv(params.amountDesiredDebt, params.leverageRatioX128, Q128)
+                - 2 * (params.amountDesiredDebt - liquidityDebt);
             if (params.selectorCollateral == TokenSelector.Token0) {
                 account.updateToken(
                     params.token0, -toInt256(getAmount0Delta(liquidityCollateral, params.strike, false))
@@ -487,7 +467,7 @@ contract Engine is Positions {
         // add burned position to account
         {
             bytes32 id = _debtID(params.token0, params.token1, params.strike, params.selectorCollateral);
-            account.updateILRTA(id, amount, OrderType.Debt);
+            account.updateILRTA(id, params.amountDesiredDebt, OrderType.Debt);
         }
 
         emit RepayLiquidity(pairID);

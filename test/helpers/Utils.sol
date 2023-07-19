@@ -20,7 +20,6 @@ function borrowLiquidityCommand(
     int24 strike,
     Engine.TokenSelector selectorCollateral,
     uint256 amountDesiredCollateral,
-    Engine.TokenSelector selectorDebt,
     uint256 amountDesiredDebt
 )
     pure
@@ -30,7 +29,7 @@ function borrowLiquidityCommand(
         Engine.Commands.BorrowLiquidity,
         abi.encode(
             Engine.BorrowLiquidityParams(
-                token0, token1, strike, selectorCollateral, amountDesiredCollateral, selectorDebt, amountDesiredDebt
+                token0, token1, strike, selectorCollateral, amountDesiredCollateral, amountDesiredDebt
             )
             )
     );
@@ -42,7 +41,6 @@ function repayLiquidityCommand(
     int24 strike,
     Engine.TokenSelector selectorCollateral,
     uint256 leverageRatioX128,
-    Engine.TokenSelector selectorDebt,
     uint256 amountDesiredDebt
 )
     pure
@@ -52,7 +50,7 @@ function repayLiquidityCommand(
         Engine.Commands.RepayLiquidity,
         abi.encode(
             Engine.RepayLiquidityParams(
-                token0, token1, strike, selectorCollateral, leverageRatioX128, selectorDebt, amountDesiredDebt
+                token0, token1, strike, selectorCollateral, leverageRatioX128, amountDesiredDebt
             )
             )
     );

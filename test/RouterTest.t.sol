@@ -382,15 +382,8 @@ contract RouterTest is Test {
 
         // BORROW LIQUIDITY
 
-        (Engine.Commands borrowCommand, bytes memory borrowInput) = borrowLiquidityCommand(
-            address(token0),
-            address(token1),
-            1,
-            Engine.TokenSelector.Token0,
-            1e18,
-            Engine.TokenSelector.LiquidityPosition,
-            0.5e18
-        );
+        (Engine.Commands borrowCommand, bytes memory borrowInput) =
+            borrowLiquidityCommand(address(token0), address(token1), 1, Engine.TokenSelector.Token0, 1e18, 0.5e18);
 
         commands[0] = borrowCommand;
         inputs[0] = borrowInput;
@@ -465,15 +458,8 @@ contract RouterTest is Test {
 
         // BORROW LIQUIDITY
 
-        (Engine.Commands borrowCommand, bytes memory borrowInput) = borrowLiquidityCommand(
-            address(token0),
-            address(token1),
-            1,
-            Engine.TokenSelector.Token0,
-            1e18,
-            Engine.TokenSelector.LiquidityPosition,
-            0.5e18
-        );
+        (Engine.Commands borrowCommand, bytes memory borrowInput) =
+            borrowLiquidityCommand(address(token0), address(token1), 1, Engine.TokenSelector.Token0, 1e18, 0.5e18);
 
         commands[0] = borrowCommand;
         inputs[0] = borrowInput;
@@ -508,13 +494,7 @@ contract RouterTest is Test {
                 engine.getPositionDebt(owner, address(token0), address(token1), 1, Engine.TokenSelector.Token0);
 
             (Engine.Commands repayCommand, bytes memory repayInput) = repayLiquidityCommand(
-                address(token0),
-                address(token1),
-                1,
-                Engine.TokenSelector.Token0,
-                leverageRatioX128,
-                Engine.TokenSelector.LiquidityPosition,
-                0.5e18
+                address(token0), address(token1), 1, Engine.TokenSelector.Token0, leverageRatioX128, 0.5e18
             );
 
             commands[0] = repayCommand;

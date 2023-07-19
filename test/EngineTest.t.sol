@@ -144,15 +144,8 @@ contract EngineTest is Test, EngineHelper {
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
 
-        (commands[0], inputs[0]) = borrowLiquidityCommand(
-            address(token0),
-            address(token1),
-            1,
-            Engine.TokenSelector.Token0,
-            1.5e18,
-            Engine.TokenSelector.LiquidityPosition,
-            0.5e18
-        );
+        (commands[0], inputs[0]) =
+            borrowLiquidityCommand(address(token0), address(token1), 1, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
 
@@ -181,15 +174,8 @@ contract EngineTest is Test, EngineHelper {
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
 
-        (commands[0], inputs[0]) = borrowLiquidityCommand(
-            address(token0),
-            address(token1),
-            1,
-            Engine.TokenSelector.Token0,
-            1.5e18,
-            Engine.TokenSelector.LiquidityPosition,
-            0.5e18
-        );
+        (commands[0], inputs[0]) =
+            borrowLiquidityCommand(address(token0), address(token1), 1, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
 
@@ -197,13 +183,7 @@ contract EngineTest is Test, EngineHelper {
             engine.getPositionDebt(address(this), address(token0), address(token1), 1, Engine.TokenSelector.Token0);
 
         (commands[0], inputs[0]) = repayLiquidityCommand(
-            address(token0),
-            address(token1),
-            1,
-            Engine.TokenSelector.Token0,
-            leverageRatioX128,
-            Engine.TokenSelector.LiquidityPosition,
-            0.5e18
+            address(token0), address(token1), 1, Engine.TokenSelector.Token0, leverageRatioX128, 0.5e18
         );
 
         engine.execute(address(this), commands, inputs, 1, 1, bytes(""));
@@ -300,15 +280,8 @@ contract EngineTest is Test, EngineHelper {
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
 
-        (commands[0], inputs[0]) = borrowLiquidityCommand(
-            address(token0),
-            address(token1),
-            1,
-            Engine.TokenSelector.Token0,
-            1.5e18,
-            Engine.TokenSelector.LiquidityPosition,
-            0.5e18
-        );
+        (commands[0], inputs[0]) =
+            borrowLiquidityCommand(address(token0), address(token1), 1, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
 
         vm.resumeGasMetering();
 
@@ -331,15 +304,8 @@ contract EngineTest is Test, EngineHelper {
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
 
-        (commands[0], inputs[0]) = borrowLiquidityCommand(
-            address(token0),
-            address(token1),
-            1,
-            Engine.TokenSelector.Token0,
-            1.5e18,
-            Engine.TokenSelector.LiquidityPosition,
-            0.5e18
-        );
+        (commands[0], inputs[0]) =
+            borrowLiquidityCommand(address(token0), address(token1), 1, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
 
@@ -347,13 +313,7 @@ contract EngineTest is Test, EngineHelper {
             engine.getPositionDebt(address(this), address(token0), address(token1), 1, Engine.TokenSelector.Token0);
 
         (commands[0], inputs[0]) = repayLiquidityCommand(
-            address(token0),
-            address(token1),
-            1,
-            Engine.TokenSelector.Token0,
-            leverageRatioX128,
-            Engine.TokenSelector.LiquidityPosition,
-            0.5e18
+            address(token0), address(token1), 1, Engine.TokenSelector.Token0, leverageRatioX128, 0.5e18
         );
 
         vm.resumeGasMetering();
