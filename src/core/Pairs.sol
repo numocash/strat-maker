@@ -308,6 +308,7 @@ library Pairs {
                             state.liquiditySwap += liquidity;
                             state.liquidityTotalSpread[i - 1] = liquidity;
                             state.liquiditySwapSpread[i - 1] = liquidity;
+                            // TODO: can liquiditySpread ever have dirty bits
                         } else if (state.strikeCurrent[i - 1] == activeStrike) {
                             uint256 liquidity = pair.strikes[activeStrike].liquidityBiDirectional[i - 1];
                             uint128 composition = pair.composition[i - 1];
@@ -391,9 +392,9 @@ library Pairs {
     /// @notice Update a strike
     /// @param liquidity The amount of liquidity being added or removed
     function updateStrike(Pair storage pair, int24 strike, uint8 spread, int256 balance, int256 liquidity) internal {
+        if (pair.initialized != 1) revert Initialized();
         _checkStrike(strike - int8(spread));
         _checkStrike(strike + int8(spread));
-
         _checkSpread(spread);
 
         uint256 existingLiquidity = pair.strikes[strike].liquidityBiDirectional[spread - 1];
@@ -418,6 +419,8 @@ library Pairs {
     }
 
     function borrowLiquidity(Pair storage pair, int24 strike, uint256 liquidity) internal {
+        if (pair.initialized != 1) revert Initialized();
+
         Strike storage strikeObj = pair.strikes[strike];
         uint8 _activeSpread = strikeObj.activeSpread;
 
@@ -445,6 +448,7 @@ library Pairs {
     }
 
     function repayLiquidity(Pair storage pair, int24 strike, uint256 liquidity) internal {
+        if (pair.initialized != 1) revert Initialized();
         Strike storage strikeObj = pair.strikes[strike];
         uint8 _activeSpread = strikeObj.activeSpread;
 
@@ -517,7 +521,7 @@ library Pairs {
 
     /// @notice Check the validity of the spread
     function _checkSpread(uint8 spread) private pure {
-        if (spread == 0 || spread > NUM_SPREADS + 1) revert InvalidSpread();
+        if (spread == 0 || spread > NUM_SPREADS) revert InvalidSpread();
     }
 
     function _addStrike0To1(Pair storage pair, int24 strike) private {

@@ -11,8 +11,7 @@ library BitMaps {
     }
 
     /// @dev Compress and convert strike into an unsigned integer, then compute the indices of the block and word that
-    /// the
-    /// compressed strike uses. Assume strike >= MIN_STRIKE
+    /// the compressed strike uses. Assume strike >= MIN_STRIKE
     function _indices(int24 strike) internal pure returns (uint256 blockIdx, uint256 wordIdx, uint256 compressed) {
         unchecked {
             compressed = uint256(int256((strike - MIN_STRIKE)));

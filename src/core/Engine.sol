@@ -35,6 +35,7 @@ import {IExecuteCallback} from "./interfaces/IExecuteCallback.sol";
 /// @custom:team pass minted position information back to callback
 /// @custom:team don't allow for transferring if a position isn't accrued
 /// @custom:team amount desired is impossible
+/// @custom:team helper function for amounts
 contract Engine is Positions {
     using Pairs for Pairs.Pair;
     using Accounts for Accounts.Account;
@@ -134,14 +135,6 @@ contract Engine is Positions {
         uint8 spread;
         TokenSelector selector;
         int256 amountDesired;
-    }
-
-    struct AccruePositionParams {
-        address token0;
-        address token1;
-        int24 strike;
-        TokenSelector selectorCollateral;
-        address owner;
     }
 
     struct AccrueParams {
@@ -415,6 +408,7 @@ contract Engine is Positions {
         }
 
         // add collateral to account
+        // TODO: check borrowing current strikes
         uint256 liquidityCollateral;
         if (params.selectorCollateral == TokenSelector.Token0) {
             account.updateToken(params.token0, toInt256(params.amountDesiredCollateral));
@@ -425,6 +419,8 @@ contract Engine is Positions {
         } else {
             revert InvalidSelector();
         }
+
+        // TODO: check for undercollateralization
 
         uint256 balance = debtLiquidityToBalance(liquidityDebt, pair.strikes[params.strike].liquidityGrowthX128, false);
 
@@ -466,7 +462,12 @@ contract Engine is Positions {
 
         // calculate tokens owed and add to account
         (uint256 amount0, uint256 amount1) = getAmountsForLiquidity(
-            pair, params.strike, pair.strikes[params.strike].activeSpread + 1, liquidityDebt, true
+            // TODO: should this be + 1
+            pair,
+            params.strike,
+            pair.strikes[params.strike].activeSpread + 1,
+            liquidityDebt,
+            true
         );
         account.updateToken(params.token0, toInt256(amount0));
         account.updateToken(params.token1, toInt256(amount1));

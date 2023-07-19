@@ -152,6 +152,7 @@ function getAmountsForLiquidity(
 }
 
 /// @notice Calculate max liquidity received if adding the given amount0
+/// @custom:team can make more efficient on average by rearranging if statements
 function getLiquidityForAmount0(
     Pairs.Pair storage pair,
     int24 strike,

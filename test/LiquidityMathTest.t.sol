@@ -30,6 +30,7 @@ contract LiquidityMathTest is Test {
             "positive strike round up"
         );
 
+        assertEq(getAmount0Delta(1e18, -1, false), mulDiv(1e18, Q128, getRatioAtStrike(-1)), "negative strike ");
         assertEq(
             getAmount0Delta(1e18, -1, true), mulDiv(1e18, Q128, getRatioAtStrike(-1)) + 1, "negative strike round up"
         );
