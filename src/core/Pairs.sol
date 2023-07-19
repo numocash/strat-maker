@@ -30,16 +30,16 @@ library Pairs {
                                DATA TYPES
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    struct Limit {
-        uint256 liquidity0To1;
-        uint256 liquidity1To0;
-        uint256 liquidity0InPerLiquidity;
-        uint256 liquidity1InPerLiquidity;
-    }
+    // struct Limit {
+    //     uint256 liquidity0To1;
+    //     uint256 liquidity1To0;
+    //     uint256 liquidity0InPerLiquidity;
+    //     uint256 liquidity1InPerLiquidity;
+    // }
 
     /// @custom:team could we make reference a bitmap
     struct Strike {
-        Limit limit;
+        // Limit limit;
         uint256[NUM_SPREADS] totalSupply;
         uint256[NUM_SPREADS] liquidityBiDirectional;
         uint256[NUM_SPREADS] liquidityBorrowed;

@@ -285,18 +285,18 @@ contract MockPair is Positions {
         return _dataOf[owner][_biDirectionalID(token0, token1, strike, spread)].balance;
     }
 
-    function getPositionLimit(
-        address owner,
-        int24 strike,
-        bool zeroToOne,
-        uint256 liquidityGrowthLast
-    )
-        external
-        view
-        returns (uint256 balance)
-    {
-        return _dataOf[owner][_limitID(token0, token1, strike, zeroToOne, liquidityGrowthLast)].balance;
-    }
+    // function getPositionLimit(
+    //     address owner,
+    //     int24 strike,
+    //     bool zeroToOne,
+    //     uint256 liquidityGrowthLast
+    // )
+    //     external
+    //     view
+    //     returns (uint256 balance)
+    // {
+    //     return _dataOf[owner][_limitID(token0, token1, strike, zeroToOne, liquidityGrowthLast)].balance;
+    // }
 
     function getPositionDebt(
         address owner,
