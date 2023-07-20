@@ -22,7 +22,7 @@ function borrowLiquidityCommand(
     int24 strike,
     Engine.TokenSelector selectorCollateral,
     uint256 amountDesiredCollateral,
-    uint256 amountDesiredDebt
+    uint128 amountDesiredDebt
 )
     pure
     returns (Engine.Commands command, bytes memory input)
@@ -44,7 +44,7 @@ function repayLiquidityCommand(
     int24 strike,
     Engine.TokenSelector selectorCollateral,
     uint256 leverageRatioX128,
-    uint256 amountDesiredDebt
+    uint128 amountDesiredDebt
 )
     pure
     returns (Engine.Commands command, bytes memory input)

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import {Accounts} from "./Accounts.sol";
-import {toInt256} from "./math/LiquidityMath.sol";
+import {toInt128, toInt256} from "./math/LiquidityMath.sol";
 import {Pairs, NUM_SPREADS} from "./Pairs.sol";
 import {Positions} from "./Positions.sol";
 import {mulDiv} from "./math/FullMath.sol";
@@ -15,7 +15,9 @@ import {
     getLiquidityDeltaAmount0,
     getLiquidityDeltaAmount1,
     getAmount0ForLiquidity,
-    getAmount1ForLiquidity
+    getAmount1ForLiquidity,
+    scaleLiquidityUp,
+    scaleLiquidityDown
 } from "./math/LiquidityMath.sol";
 import {
     balanceToLiquidity,
@@ -33,7 +35,6 @@ import {IExecuteCallback} from "./interfaces/IExecuteCallback.sol";
 /// @author Kyle Scott and Robert Leifke
 /// @custom:team return data and events
 /// @custom:team pass minted position information back to callback
-/// @custom:team don't allow for transferring if a position isn't accrued
 /// @custom:team amount desired is impossible
 /// @custom:team helper function for amounts
 contract Engine is Positions {
@@ -46,12 +47,12 @@ contract Engine is Positions {
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     event Swap(bytes32 indexed pairID);
-    event AddLiquidity(bytes32 indexed pairID, int24 indexed strike, uint8 indexed spread, uint256 liquidity);
+    event AddLiquidity(bytes32 indexed pairID, int24 indexed strike, uint8 indexed spread, uint128 liquidity);
     event BorrowLiquidity(bytes32 indexed pairID);
     event RepayLiquidity(bytes32 indexed pairID);
     event AccruePosition(bytes32 indexed pairID);
     event Accrue(bytes32 indexed pairID);
-    event RemoveLiquidity(bytes32 indexed pairID, int24 indexed strike, uint8 indexed spread, uint256 liquidity);
+    event RemoveLiquidity(bytes32 indexed pairID, int24 indexed strike, uint8 indexed spread, uint128 liquidity);
     event PairCreated(address indexed token0, address indexed token1, int24 strikeInitial);
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
@@ -118,7 +119,7 @@ contract Engine is Positions {
         TokenSelector selectorCollateral;
         uint256 amountDesiredCollateral;
         // TokenSelector selectorDebt;
-        uint256 amountDesiredDebt;
+        uint128 amountDesiredDebt;
     }
 
     struct RepayLiquidityParams {
@@ -129,7 +130,7 @@ contract Engine is Positions {
         TokenSelector selectorCollateral;
         uint256 leverageRatioX128;
         // TokenSelector selectorDebt;
-        uint256 amountDesiredDebt;
+        uint128 amountDesiredDebt;
     }
 
     struct RemoveLiquidityParams {
@@ -296,7 +297,7 @@ contract Engine is Positions {
 
         // check liquidity positions in
         for (uint256 i = 0; i < numLPs;) {
-            uint256 delta = account.lpDeltas[i];
+            uint128 delta = account.lpDeltas[i];
             bytes32 id = account.lpIDs[i];
 
             if (id == bytes32(0)) break;
@@ -323,7 +324,8 @@ contract Engine is Positions {
             revert InvalidSelector();
         }
 
-        (int256 amount0, int256 amount1) = pair.swap(params.selector == TokenSelector.Token0, params.amountDesired);
+        (int256 amount0, int256 amount1) =
+            pair.swap(params.scalingFactor, params.selector == TokenSelector.Token0, params.amountDesired);
         account.updateToken(params.token0, amount0);
         account.updateToken(params.token1, amount1);
 
@@ -336,41 +338,56 @@ contract Engine is Positions {
         if (pair.cachedStrikeCurrent == params.strike) pair._accrue(params.strike);
 
         // calculate how much to add
-        int256 balance;
-        int256 liquidity;
+        int128 balance;
+        int128 liquidity;
         int256 amount0;
         int256 amount1;
         if (params.selector == TokenSelector.LiquidityPosition) {
             if (params.amountDesired < 0) revert InvalidAmountDesired();
 
-            balance = params.amountDesired;
-            liquidity = toInt256(balanceToLiquidity(pair, params.strike, params.spread, uint256(balance), true));
-            (uint256 _amount0, uint256 _amount1) =
-                getAmountsForLiquidity(pair, params.strike, params.spread, uint256(liquidity), true);
+            balance = int128(params.amountDesired);
+            liquidity = toInt128(balanceToLiquidity(pair, params.strike, params.spread, uint128(balance), true));
+            (uint256 _amount0, uint256 _amount1) = getAmountsForLiquidity(
+                pair, params.strike, params.spread, scaleLiquidityUp(uint128(liquidity), params.scalingFactor), true
+            );
             amount0 = int256(_amount0);
             amount1 = int256(_amount1);
         } else if (params.selector == TokenSelector.Token0) {
             if (params.amountDesired < 0) revert InvalidAmountDesired();
 
-            liquidity = toInt256(
-                getLiquidityForAmount0(pair, params.strike, params.spread, uint256(params.amountDesired), true)
+            liquidity = toInt128(
+                scaleLiquidityDown(
+                    getLiquidityForAmount0(pair, params.strike, params.spread, uint256(params.amountDesired), true),
+                    params.scalingFactor
+                )
             );
             amount0 = params.amountDesired;
-            amount1 = toInt256(getAmount1ForLiquidity(pair, params.strike, params.spread, uint256(liquidity), true));
+            amount1 = toInt256(
+                getAmount1ForLiquidity(
+                    pair, params.strike, params.spread, scaleLiquidityUp(uint128(liquidity), params.scalingFactor), true
+                )
+            );
         } else if (params.selector == TokenSelector.Token1) {
             if (params.amountDesired < 0) revert InvalidAmountDesired();
 
-            liquidity = toInt256(
-                getLiquidityForAmount1(pair, params.strike, params.spread, uint256(params.amountDesired), true)
+            liquidity = toInt128(
+                scaleLiquidityDown(
+                    getLiquidityForAmount1(pair, params.strike, params.spread, uint256(params.amountDesired), true),
+                    params.scalingFactor
+                )
             );
-            amount0 = toInt256(getAmount0ForLiquidity(pair, params.strike, params.spread, uint256(liquidity), true));
+            amount0 = toInt256(
+                getAmount0ForLiquidity(
+                    pair, params.strike, params.spread, scaleLiquidityUp(uint128(liquidity), params.scalingFactor), true
+                )
+            );
             amount1 = params.amountDesired;
         } else {
             revert InvalidSelector();
         }
 
         if (params.selector == TokenSelector.Token0 || params.selector == TokenSelector.Token1) {
-            balance = toInt256(liquidityToBalance(pair, params.strike, params.spread, uint256(liquidity), false));
+            balance = toInt128(liquidityToBalance(pair, params.strike, params.spread, uint128(liquidity), false));
         }
 
         // add to pair
@@ -382,10 +399,10 @@ contract Engine is Positions {
 
         // mint position token
         _mintBiDirectional(
-            to, params.token0, params.token1, params.scalingFactor, params.strike, params.spread, uint256(balance)
+            to, params.token0, params.token1, params.scalingFactor, params.strike, params.spread, uint128(balance)
         );
 
-        emit AddLiquidity(pairID, params.strike, params.spread, uint256(balance));
+        emit AddLiquidity(pairID, params.strike, params.spread, uint128(balance));
     }
 
     function _borrowLiquidity(
@@ -403,10 +420,18 @@ contract Engine is Positions {
         // calculate the the tokens that are borrowed
         if (params.strike > pair.cachedStrikeCurrent) {
             account.updateToken(
-                params.token0, -toInt256(getAmount0Delta(params.amountDesiredDebt, params.strike, false))
+                params.token0,
+                -toInt256(
+                    getAmount0Delta(
+                        scaleLiquidityUp(params.amountDesiredDebt, params.scalingFactor), params.strike, false
+                    )
+                )
             );
         } else {
-            account.updateToken(params.token1, -toInt256(getAmount1Delta(params.amountDesiredDebt)));
+            account.updateToken(
+                params.token1,
+                -toInt256(getAmount1Delta(scaleLiquidityUp(params.amountDesiredDebt, params.scalingFactor)))
+            );
         }
 
         // add collateral to account
@@ -424,7 +449,7 @@ contract Engine is Positions {
 
         // TODO: check for undercollateralization
 
-        uint256 balance =
+        uint128 balance =
             debtLiquidityToBalance(params.amountDesiredDebt, pair.strikes[params.strike].liquidityGrowthX128, false);
 
         // mint position to user
@@ -449,7 +474,7 @@ contract Engine is Positions {
 
         uint256 _liquidityGrowthX128 = pair.strikes[params.strike].liquidityGrowthX128;
 
-        uint256 liquidityDebt = debtBalanceToLiquidity(params.amountDesiredDebt, _liquidityGrowthX128, true);
+        uint128 liquidityDebt = debtBalanceToLiquidity(params.amountDesiredDebt, _liquidityGrowthX128, true);
 
         pair.repayLiquidity(params.strike, liquidityDebt);
 
@@ -459,7 +484,7 @@ contract Engine is Positions {
             pair,
             params.strike,
             pair.strikes[params.strike].activeSpread + 1,
-            liquidityDebt,
+            scaleLiquidityUp(params.amountDesiredDebt, params.scalingFactor),
             true
         );
         account.updateToken(params.token0, toInt256(amount0));
@@ -494,37 +519,64 @@ contract Engine is Positions {
         if (pair.cachedStrikeCurrent == params.strike) pair._accrue(params.strike);
 
         // calculate how much to remove
-        int256 balance;
-        int256 liquidity;
+        int128 balance;
+        int128 liquidity;
         int256 amount0;
         int256 amount1;
         if (params.selector == TokenSelector.LiquidityPosition) {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
 
-            balance = params.amountDesired;
-            liquidity = -toInt256(balanceToLiquidity(pair, params.strike, params.spread, uint256(-balance), false));
-            (uint256 _amount0, uint256 _amount1) =
-                getAmountsForLiquidity(pair, params.strike, params.spread, uint256(-liquidity), false);
+            balance = int128(params.amountDesired);
+            liquidity = -toInt128(balanceToLiquidity(pair, params.strike, params.spread, uint128(-balance), false));
+            (uint256 _amount0, uint256 _amount1) = getAmountsForLiquidity(
+                pair, params.strike, params.spread, scaleLiquidityUp(uint128(-liquidity), params.scalingFactor), false
+            );
             amount0 = -int256(_amount0);
             amount1 = -int256(_amount1);
         } else if (params.selector == TokenSelector.Token0) {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
 
-            liquidity = -toInt256(getLiquidityForAmount0(pair, params.strike, params.spread, uint256(-params.amountDesired), false));
+            liquidity = -toInt128(
+                scaleLiquidityDown(
+                    getLiquidityForAmount0(pair, params.strike, params.spread, uint256(-params.amountDesired), false),
+                    params.scalingFactor
+                )
+            );
             amount0 = params.amountDesired;
-            amount1 = -toInt256(getAmount1ForLiquidity(pair, params.strike, params.spread, uint256(-liquidity), false));
+            amount1 = -toInt256(
+                getAmount1ForLiquidity(
+                    pair,
+                    params.strike,
+                    params.spread,
+                    scaleLiquidityUp(uint128(-liquidity), params.scalingFactor),
+                    false
+                )
+            );
         } else if (params.selector == TokenSelector.Token1) {
             if (params.amountDesired > 0) revert InvalidAmountDesired();
 
-            liquidity = -toInt256(getLiquidityForAmount1(pair, params.strike, params.spread, uint256(-params.amountDesired), false));
-            amount0 = -toInt256(getAmount0ForLiquidity(pair, params.strike, params.spread, uint256(-liquidity), false));
+            liquidity = -toInt128(
+                scaleLiquidityDown(
+                    getLiquidityForAmount1(pair, params.strike, params.spread, uint256(-params.amountDesired), false),
+                    params.scalingFactor
+                )
+            );
+            amount0 = -toInt256(
+                getAmount0ForLiquidity(
+                    pair,
+                    params.strike,
+                    params.spread,
+                    scaleLiquidityUp(uint128(-liquidity), params.scalingFactor),
+                    false
+                )
+            );
             amount1 = params.amountDesired;
         } else {
             revert InvalidSelector();
         }
 
         if (params.selector == TokenSelector.Token0 || params.selector == TokenSelector.Token1) {
-            balance = -toInt256(liquidityToBalance(pair, params.strike, params.spread, uint256(-liquidity), true));
+            balance = -toInt128(liquidityToBalance(pair, params.strike, params.spread, uint128(-liquidity), true));
         }
 
         // remove from pair
@@ -535,11 +587,11 @@ contract Engine is Positions {
         account.updateToken(params.token1, amount1);
         account.updateILRTA(
             _biDirectionalID(params.token0, params.token1, params.scalingFactor, params.strike, params.spread),
-            uint256(-balance),
+            uint128(-balance),
             OrderType.BiDirectional
         );
 
-        emit RemoveLiquidity(pairID, params.strike, params.spread, uint256(-balance));
+        emit RemoveLiquidity(pairID, params.strike, params.spread, uint128(-balance));
     }
 
     function _accrue(AccrueParams memory params) private {

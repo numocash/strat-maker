@@ -9,7 +9,7 @@ interface IExecuteCallback {
         address[] tokens;
         int256[] tokensDelta;
         bytes32[] lpIDs;
-        uint256[] lpDeltas;
+        uint128[] lpDeltas;
         Engine.OrderType[] orderTypes;
         bytes data;
     }

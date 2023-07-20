@@ -10,26 +10,28 @@ function balanceToLiquidity(
     Pairs.Pair storage pair,
     int24 strike,
     uint8 spread,
-    uint256 balance,
+    uint128 balance,
     bool roundUp
 )
     view
-    returns (uint256 liquidity)
+    returns (uint128 liquidity)
 {
     uint256 totalSupply = pair.strikes[strike].totalSupply[spread - 1];
     if (totalSupply == 0) {
         return balance;
     } else {
         return roundUp
-            ? mulDivRoundingUp(
-                balance,
-                pair.strikes[strike].liquidityBiDirectional[spread - 1] + pair.strikes[strike].liquidityBorrowed[spread - 1],
-                totalSupply
+            ? uint128(
+                (
+                    balance * pair.strikes[strike].liquidityBiDirectional[spread - 1]
+                        + pair.strikes[strike].liquidityBorrowed[spread - 1]
+                ) / totalSupply
             )
-            : mulDiv(
-                balance,
-                pair.strikes[strike].liquidityBiDirectional[spread - 1] + pair.strikes[strike].liquidityBorrowed[spread - 1],
-                totalSupply
+            : uint128(
+                (
+                    balance * pair.strikes[strike].liquidityBiDirectional[spread - 1]
+                        + pair.strikes[strike].liquidityBorrowed[spread - 1]
+                ) / totalSupply
             );
     }
 }
@@ -38,32 +40,32 @@ function liquidityToBalance(
     Pairs.Pair storage pair,
     int24 strike,
     uint8 spread,
-    uint256 liquidity,
+    uint128 liquidity,
     bool roundUp
 )
     view
-    returns (uint256 balance)
+    returns (uint128 balance)
 {
-    uint256 totalLiquidity =
+    uint128 totalLiquidity =
         pair.strikes[strike].liquidityBiDirectional[spread - 1] + pair.strikes[strike].liquidityBorrowed[spread - 1];
     if (totalLiquidity == 0) {
         return liquidity;
     } else {
         return roundUp
-            ? mulDivRoundingUp(liquidity, pair.strikes[strike].totalSupply[spread - 1], totalLiquidity)
-            : mulDiv(liquidity, pair.strikes[strike].totalSupply[spread - 1], totalLiquidity);
+            ? uint128((liquidity * pair.strikes[strike].totalSupply[spread - 1]) / totalLiquidity)
+            : uint128((liquidity * pair.strikes[strike].totalSupply[spread - 1]) / totalLiquidity);
     }
 }
 
 function debtBalanceToLiquidity(
-    uint256 balance,
+    uint128 balance,
     uint256 liquidityGrowthX128,
     bool roundUp
 )
     pure
-    returns (uint256 liquidity)
+    returns (uint128 liquidity)
 {
-    return (
+    return uint128(
         roundUp
             ? mulDivRoundingUp(balance, Q128, liquidityGrowthX128 + Q128)
             : mulDiv(balance, Q128, liquidityGrowthX128 + Q128)
@@ -71,14 +73,14 @@ function debtBalanceToLiquidity(
 }
 
 function debtLiquidityToBalance(
-    uint256 liquidity,
+    uint128 liquidity,
     uint256 liquidityGrowthX128,
     bool roundUp
 )
     pure
-    returns (uint256 balance)
+    returns (uint128 balance)
 {
-    return (
+    return uint128(
         roundUp
             ? mulDivRoundingUp(liquidity, liquidityGrowthX128 + Q128, Q128)
             : mulDiv(liquidity, liquidityGrowthX128 + Q128, Q128)
@@ -102,8 +104,8 @@ function getLiquidityCollateral(
 {}
 
 function addPositions(
-    uint256 balance0,
-    uint256 balance1,
+    uint128 balance0,
+    uint128 balance1,
     Positions.DebtData memory debtData0,
     Positions.DebtData memory debtData1
 )

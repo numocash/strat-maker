@@ -39,16 +39,12 @@ contract EngineHelper is IExecuteCallback {
         }
 
         for (uint256 i = 0; i < params.lpIDs.length;) {
-            uint256 delta = params.lpDeltas[i];
+            uint128 delta = params.lpDeltas[i];
 
-            if (delta < 0) {
-                bytes32 id = params.lpIDs[i];
+            bytes32 id = params.lpIDs[i];
 
-                if (params.lpIDs[i] != bytes32(0)) {
-                    engine.transfer(
-                        msg.sender, abi.encode(Positions.ILRTATransferDetails(id, params.orderTypes[i], delta))
-                    );
-                }
+            if (params.lpIDs[i] != bytes32(0)) {
+                engine.transfer(msg.sender, Positions.ILRTATransferDetails(id, params.orderTypes[i], delta));
             }
 
             unchecked {

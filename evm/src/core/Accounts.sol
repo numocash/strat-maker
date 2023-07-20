@@ -12,7 +12,7 @@ library Accounts {
         int256[] tokenDeltas;
         uint256[] balances;
         bytes32[] lpIDs;
-        uint256[] lpDeltas;
+        uint128[] lpDeltas;
         Engine.OrderType[] orderTypes;
     }
 
@@ -25,7 +25,7 @@ library Accounts {
 
         if (numLPs > 0) {
             account.lpIDs = new bytes32[](numLPs);
-            account.lpDeltas = new uint256[](numLPs);
+            account.lpDeltas = new uint128[](numLPs);
             account.orderTypes = new Engine.OrderType[](numLPs);
         }
     }
@@ -53,7 +53,7 @@ library Accounts {
     }
 
     /// @custom:team what if ids match but not data
-    function updateILRTA(Account memory account, bytes32 id, uint256 delta, Engine.OrderType orderType) internal pure {
+    function updateILRTA(Account memory account, bytes32 id, uint128 delta, Engine.OrderType orderType) internal pure {
         if (delta == 0) return;
 
         unchecked {

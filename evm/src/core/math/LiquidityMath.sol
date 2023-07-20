@@ -5,6 +5,14 @@ import {mulDiv, mulDivRoundingUp} from "./FullMath.sol";
 import {getRatioAtStrike, Q128} from "./StrikeMath.sol";
 import {Pairs} from "../Pairs.sol";
 
+function scaleLiquidityUp(uint128 liquidity, uint8 scalingFactor) pure returns (uint256) {
+    return liquidity * 2 ** scalingFactor;
+}
+
+function scaleLiquidityDown(uint256 liquidity, uint8 scalingFactor) pure returns (uint128) {
+    return uint128(liquidity / 2 ** scalingFactor);
+}
+
 /// @notice Calculate amount0 delta when moving completely through the liquidity at the strike.
 /// i.e. x = L / Pi
 function getAmount0Delta(uint256 liquidity, int24 strike, bool roundUp) pure returns (uint256 amount0) {
@@ -206,12 +214,18 @@ function getLiquidityForAmount1(
 }
 
 /// @notice Add signed liquidity delta to liquidity
-function addDelta(uint256 x, int256 y) pure returns (uint256 z) {
+function addDelta(uint128 x, int128 y) pure returns (uint128 z) {
     if (y < 0) {
-        return x - uint256(-y);
+        return x - uint128(-y);
     } else {
-        return x + uint256(y);
+        return x + uint128(y);
     }
+}
+
+/// @notice cast uint128 to int128, revert on overflow
+function toInt128(uint128 x) pure returns (int128 z) {
+    assert(x <= uint128(type(int128).max));
+    z = int128(x);
 }
 
 /// @notice cast uint256 to int256, revert on overflow

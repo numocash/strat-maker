@@ -48,7 +48,7 @@ contract MockPair is Positions {
         int24 strike,
         Engine.TokenSelector selectorCollateral,
         uint256 amountDesiredCollateral,
-        uint256 liquidityDebt
+        uint128 liquidityDebt
     )
         public
         returns (int256 amount0, int256 amount1)
@@ -76,7 +76,7 @@ contract MockPair is Positions {
         }
 
         uint256 _liquidityGrowthX128 = pair.strikes[strike].liquidityGrowthX128;
-        uint256 balance = debtLiquidityToBalance(liquidityDebt, _liquidityGrowthX128, false);
+        uint128 balance = debtLiquidityToBalance(liquidityDebt, _liquidityGrowthX128, false);
         uint256 leverageRatioX128 = mulDiv(liquidityCollateral, Q128, balance);
 
         // mint position to user
@@ -98,7 +98,7 @@ contract MockPair is Positions {
 
             IExecuteCallback(msg.sender).executeCallback(
                 IExecuteCallback.CallbackParams(
-                    tokens, tokenDeltas, new bytes32[](0), new uint256[](0), new Engine.OrderType[](0), bytes("")
+                    tokens, tokenDeltas, new bytes32[](0), new uint128[](0), new Engine.OrderType[](0), bytes("")
                 )
             );
         }
@@ -111,14 +111,14 @@ contract MockPair is Positions {
         int24 strike,
         Engine.TokenSelector selectorCollateral,
         uint256 leverageRatioX128,
-        uint256 balance
+        uint128 balance
     )
         public
         returns (int256 amount0, int256 amount1)
     {
         if (pair.cachedStrikeCurrent == strike) pair._accrue(strike);
         uint256 _liquidityGrowthX128 = pair.strikes[strike].liquidityGrowthX128;
-        uint256 liquidity = debtBalanceToLiquidity(balance, _liquidityGrowthX128, true);
+        uint128 liquidity = debtBalanceToLiquidity(balance, _liquidityGrowthX128, true);
         pair.repayLiquidity(strike, liquidity);
 
         {
@@ -154,7 +154,7 @@ contract MockPair is Positions {
 
             IExecuteCallback(msg.sender).executeCallback(
                 IExecuteCallback.CallbackParams(
-                    tokens, tokenDeltas, new bytes32[](0), new uint256[](0), new Engine.OrderType[](0), bytes("")
+                    tokens, tokenDeltas, new bytes32[](0), new uint128[](0), new Engine.OrderType[](0), bytes("")
                 )
             );
 
@@ -168,16 +168,16 @@ contract MockPair is Positions {
     function addLiquidity(
         int24 strike,
         uint8 spread,
-        uint256 balance
+        uint128 balance
     )
         public
         returns (uint256 amount0, uint256 amount1)
     {
         if (pair.cachedStrikeCurrent == strike) pair._accrue(strike);
-        uint256 liquidity = balanceToLiquidity(pair, strike, spread, uint256(balance), true);
+        uint128 liquidity = balanceToLiquidity(pair, strike, spread, balance, true);
         (amount0, amount1) = getAmountsForLiquidity(pair, strike, spread, uint256(liquidity), true);
 
-        pair.updateStrike(strike, spread, int256(balance), int256(liquidity));
+        pair.updateStrike(strike, spread, int128(balance), int128(liquidity));
 
         _mintBiDirectional(msg.sender, token0, token1, scalingFactor, strike, spread, balance);
 
@@ -194,7 +194,7 @@ contract MockPair is Positions {
 
         IExecuteCallback(msg.sender).executeCallback(
             IExecuteCallback.CallbackParams(
-                tokens, tokenDeltas, new bytes32[](0), new uint256[](0), new Engine.OrderType[](0), bytes("")
+                tokens, tokenDeltas, new bytes32[](0), new uint128[](0), new Engine.OrderType[](0), bytes("")
             )
         );
 
@@ -209,16 +209,16 @@ contract MockPair is Positions {
     function removeLiquidity(
         int24 strike,
         uint8 spread,
-        uint256 balance
+        uint128 balance
     )
         public
         returns (uint256 amount0, uint256 amount1)
     {
         if (pair.cachedStrikeCurrent == strike) pair._accrue(strike);
-        uint256 liquidity = balanceToLiquidity(pair, strike, spread, uint256(balance), false);
+        uint128 liquidity = balanceToLiquidity(pair, strike, spread, balance, false);
         (amount0, amount1) = getAmountsForLiquidity(pair, strike, spread, uint256(liquidity), false);
 
-        pair.updateStrike(strike, spread, -int256(balance), -int256(liquidity));
+        pair.updateStrike(strike, spread, -int128(balance), -int128(liquidity));
         SafeTransferLib.safeTransfer(token0, msg.sender, amount0);
         SafeTransferLib.safeTransfer(token1, msg.sender, amount1);
 
@@ -226,7 +226,7 @@ contract MockPair is Positions {
     }
 
     function swap(bool isToken0, int256 amountDesired) public returns (int256 amount0, int256 amount1) {
-        (amount0, amount1) = pair.swap(isToken0, amountDesired);
+        (amount0, amount1) = pair.swap(0, isToken0, amountDesired);
 
         address[] memory tokens = new address[](2);
         tokens[0] = token0;
@@ -241,7 +241,7 @@ contract MockPair is Positions {
             uint256 balance0Before = BalanceLib.getBalance(token0);
             IExecuteCallback(msg.sender).executeCallback(
                 IExecuteCallback.CallbackParams(
-                    tokens, tokenDeltas, new bytes32[](0), new uint256[](0), new Engine.OrderType[](0), bytes("")
+                    tokens, tokenDeltas, new bytes32[](0), new uint128[](0), new Engine.OrderType[](0), bytes("")
                 )
             );
             if (BalanceLib.getBalance(token0) < balance0Before + uint256(amount0)) revert();
@@ -250,7 +250,7 @@ contract MockPair is Positions {
             uint256 balance1Before = BalanceLib.getBalance(token1);
             IExecuteCallback(msg.sender).executeCallback(
                 IExecuteCallback.CallbackParams(
-                    tokens, tokenDeltas, new bytes32[](0), new uint256[](0), new Engine.OrderType[](0), bytes("")
+                    tokens, tokenDeltas, new bytes32[](0), new uint128[](0), new Engine.OrderType[](0), bytes("")
                 )
             );
             if (BalanceLib.getBalance(token1) < balance1Before + uint256(amount1)) revert();

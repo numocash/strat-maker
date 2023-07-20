@@ -45,7 +45,7 @@ abstract contract Positions is ILRTA {
     }
 
     struct ILRTAData {
-        uint256 balance;
+        uint128 balance;
         Engine.OrderType orderType;
         bytes data;
     }
@@ -53,7 +53,7 @@ abstract contract Positions is ILRTA {
     struct ILRTATransferDetails {
         bytes32 id;
         Engine.OrderType orderType;
-        uint256 amount;
+        uint128 amount;
     }
 
     struct SignatureTransfer {
@@ -93,8 +93,7 @@ abstract contract Positions is ILRTA {
         return _dataOf[owner][id];
     }
 
-    function transfer(address to, bytes calldata transferDetailsBytes) external returns (bool) {
-        ILRTATransferDetails memory transferDetails = abi.decode(transferDetailsBytes, (ILRTATransferDetails));
+    function transfer(address to, ILRTATransferDetails calldata transferDetails) external returns (bool) {
         return _transfer(msg.sender, to, transferDetails);
     }
 
@@ -207,8 +206,8 @@ abstract contract Positions is ILRTA {
             emit Transfer(from, to, abi.encode(transferDetails));
             return true;
         } else {
-            uint256 senderBalance = _dataOf[from][transferDetails.id].balance;
-            uint256 recipientBalance = _dataOf[to][transferDetails.id].balance;
+            uint128 senderBalance = _dataOf[from][transferDetails.id].balance;
+            uint128 recipientBalance = _dataOf[to][transferDetails.id].balance;
 
             uint256 leverageRatioX128 = recipientBalance == 0
                 ? abi.decode(_dataOf[from][transferDetails.id].data, (DebtData)).leverageRatioX128
@@ -312,7 +311,7 @@ abstract contract Positions is ILRTA {
         uint8 scalingFactor,
         int24 strike,
         uint8 spread,
-        uint256 amount
+        uint128 amount
     )
         internal
     {
@@ -352,13 +351,13 @@ abstract contract Positions is ILRTA {
         uint8 scalingFactor,
         int24 strike,
         Engine.TokenSelector selector,
-        uint256 amount,
+        uint128 amount,
         uint256 leverageRatioX128
     )
         internal
     {
         bytes32 id = _debtID(token0, token1, scalingFactor, strike, selector);
-        uint256 balance = _dataOf[to][id].balance;
+        uint128 balance = _dataOf[to][id].balance;
 
         if (balance == 0) {
             _dataOf[to][id].balance = amount;
@@ -384,7 +383,7 @@ abstract contract Positions is ILRTA {
         uint8 scalingFactor,
         int24 strike,
         uint8 spread,
-        uint256 amount
+        uint128 amount
     )
         internal
     {
@@ -395,7 +394,7 @@ abstract contract Positions is ILRTA {
         emit Transfer(from, address(0), abi.encode(ILRTATransferDetails(id, Engine.OrderType.BiDirectional, amount)));
     }
 
-    function _burn(address from, bytes32 id, uint256 amount, Engine.OrderType orderType) internal {
+    function _burn(address from, bytes32 id, uint128 amount, Engine.OrderType orderType) internal {
         _dataOf[from][id].balance -= amount;
 
         emit Transfer(from, address(0), abi.encode(ILRTATransferDetails(id, orderType, amount)));
@@ -426,13 +425,13 @@ abstract contract Positions is ILRTA {
         uint8 scalingFactor,
         int24 strike,
         Engine.TokenSelector selector,
-        uint256 amount
+        uint128 amount
     )
         internal
     {
         bytes32 id = _debtID(token0, token1, scalingFactor, strike, selector);
 
-        uint256 balance = _dataOf[from][id].balance;
+        uint128 balance = _dataOf[from][id].balance;
 
         if (balance == amount) delete _dataOf[from][id];
         else _dataOf[from][id].balance = balance - amount;

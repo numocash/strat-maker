@@ -58,7 +58,7 @@ contract Router is IExecuteCallback {
         // send all liquidity positions individually
         uint256 j = 0;
         for (uint256 i = 0; i < params.lpIDs.length;) {
-            uint256 delta = params.lpDeltas[i];
+            uint128 delta = params.lpDeltas[i];
             bytes32 id = params.lpIDs[i];
             if (delta > 0 && id != bytes32(0)) {
                 engine.transferBySuperSignature(

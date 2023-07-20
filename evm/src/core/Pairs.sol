@@ -3,7 +3,13 @@ pragma solidity ^0.8.19;
 
 import {BitMaps} from "./BitMaps.sol";
 import {mulDiv, mulDivRoundingUp} from "./math/FullMath.sol";
-import {getLiquidityDeltaAmount0, getLiquidityDeltaAmount1, addDelta, toInt256} from "./math/LiquidityMath.sol";
+import {
+    getLiquidityDeltaAmount0,
+    getLiquidityDeltaAmount1,
+    scaleLiquidityDown,
+    addDelta,
+    toInt256
+} from "./math/LiquidityMath.sol";
 import {getRatioAtStrike, MAX_STRIKE, MIN_STRIKE, Q128} from "./math/StrikeMath.sol";
 import {computeSwapStep} from "./math/SwapMath.sol";
 
@@ -40,9 +46,9 @@ library Pairs {
     /// @custom:team could we make reference a bitmap
     struct Strike {
         // Limit limit;
-        uint256[NUM_SPREADS] totalSupply;
-        uint256[NUM_SPREADS] liquidityBiDirectional;
-        uint256[NUM_SPREADS] liquidityBorrowed;
+        uint128[NUM_SPREADS] totalSupply;
+        uint128[NUM_SPREADS] liquidityBiDirectional;
+        uint128[NUM_SPREADS] liquidityBorrowed;
         uint256 liquidityGrowthX128;
         int24 next0To1;
         int24 next1To0;
@@ -147,7 +153,15 @@ library Pairs {
     /// @param amountDesired The desired amount change on the pair
     /// @return amount0 The delta of the balance of token0 of the pair
     /// @return amount1 The delta of the balance of token1 of the pair
-    function swap(Pair storage pair, bool isToken0, int256 amountDesired) internal returns (int256, int256) {
+    function swap(
+        Pair storage pair,
+        uint8 scalingFactor,
+        bool isToken0,
+        int256 amountDesired
+    )
+        internal
+        returns (int256, int256)
+    {
         if (pair.initialized != 1) revert Initialized();
         bool isSwap0To1 = isToken0 == amountDesired > 0;
 
@@ -183,104 +197,110 @@ library Pairs {
 
         while (true) {
             uint256 ratioX128 = getRatioAtStrike(state.cachedStrikeCurrent);
-            uint256 liquidityRemaining;
             {
-                uint256 amountIn;
-                uint256 amountOut;
-                (amountIn, amountOut, liquidityRemaining) =
-                    computeSwapStep(ratioX128, state.liquiditySwap, isToken0, amountDesired);
+                uint256 liquidityRemaining;
+                {
+                    uint256 amountIn;
+                    uint256 amountOut;
+                    (amountIn, amountOut, liquidityRemaining) =
+                        computeSwapStep(ratioX128, state.liquiditySwap, isToken0, amountDesired);
 
-                if (amountDesired > 0) {
-                    amountDesired -= toInt256(amountIn);
-                    state.amountA += toInt256(amountIn);
-                    state.amountB -= toInt256(amountOut);
-                } else {
-                    amountDesired += toInt256(amountOut);
-                    state.amountA -= toInt256(amountOut);
-                    state.amountB += toInt256(amountIn);
+                    if (amountDesired > 0) {
+                        amountDesired -= toInt256(amountIn);
+                        state.amountA += toInt256(amountIn);
+                        state.amountB -= toInt256(amountOut);
+                    } else {
+                        amountDesired += toInt256(amountOut);
+                        state.amountA -= toInt256(amountOut);
+                        state.amountB += toInt256(amountIn);
+                    }
+
+                    // calculate and store liquidity gained from fees
+                    unchecked {
+                        if (isSwap0To1) {
+                            if (state.liquiditySwap > 0) {
+                                for (uint256 i = 1; i <= NUM_SPREADS; i++) {
+                                    int24 activeStrike = state.cachedStrikeCurrent + int24(int256(i));
+
+                                    if (activeStrike == state.strikeCurrent[i - 1]) {
+                                        uint256 liquidityNew = getLiquidityDeltaAmount0(
+                                            mulDiv(
+                                                state.liquiditySwapSpread[i - 1],
+                                                amountIn * i,
+                                                state.liquiditySwap * 10_000
+                                            ),
+                                            state.cachedStrikeCurrent,
+                                            false
+                                        );
+                                        pair.strikes[activeStrike].liquidityBiDirectional[i - 1] +=
+                                            scaleLiquidityDown(liquidityNew, scalingFactor);
+                                        state.liquidityTotal += liquidityNew;
+                                    } else {
+                                        break;
+                                    }
+                                }
+                            }
+                        } else {
+                            if (state.liquiditySwap > 0) {
+                                for (uint256 i = 1; i <= NUM_SPREADS; i++) {
+                                    int24 activeStrike = state.cachedStrikeCurrent - int24(int256(i));
+
+                                    if (activeStrike == state.strikeCurrent[i - 1]) {
+                                        uint256 liquidityNew = getLiquidityDeltaAmount1(
+                                            mulDiv(
+                                                state.liquiditySwapSpread[i - 1],
+                                                amountIn * i,
+                                                state.liquiditySwap * 10_000
+                                            )
+                                        );
+                                        pair.strikes[activeStrike].liquidityBiDirectional[i - 1] +=
+                                            scaleLiquidityDown(liquidityNew, scalingFactor);
+                                        state.liquidityTotal += liquidityNew;
+                                    } else {
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
-                // calculate and store liquidity gained from fees
-                unchecked {
+                if (amountDesired == 0) {
                     if (isSwap0To1) {
-                        if (state.liquiditySwap > 0) {
+                        uint128 composition = uint128(mulDiv(liquidityRemaining, Q128, state.liquidityTotal));
+
+                        unchecked {
                             for (uint256 i = 1; i <= NUM_SPREADS; i++) {
                                 int24 activeStrike = state.cachedStrikeCurrent + int24(int256(i));
                                 int24 spreadStrikeCurrent = state.strikeCurrent[i - 1];
 
                                 if (activeStrike == spreadStrikeCurrent) {
-                                    uint256 liquidityNew = getLiquidityDeltaAmount0(
-                                        mulDiv(
-                                            state.liquiditySwapSpread[i - 1], amountIn * i, state.liquiditySwap * 10_000
-                                        ),
-                                        state.cachedStrikeCurrent,
-                                        false
-                                    );
-                                    pair.strikes[activeStrike].liquidityBiDirectional[i - 1] += liquidityNew;
-                                    state.liquidityTotal += liquidityNew;
+                                    pair.composition[i - 1] = composition;
                                 } else {
                                     break;
                                 }
                             }
                         }
                     } else {
-                        if (state.liquiditySwap > 0) {
+                        uint128 composition =
+                            type(uint128).max - uint128(mulDiv(liquidityRemaining, Q128, state.liquidityTotal));
+
+                        unchecked {
                             for (uint256 i = 1; i <= NUM_SPREADS; i++) {
                                 int24 activeStrike = state.cachedStrikeCurrent - int24(int256(i));
                                 int24 spreadStrikeCurrent = state.strikeCurrent[i - 1];
 
                                 if (activeStrike == spreadStrikeCurrent) {
-                                    uint256 liquidityNew = getLiquidityDeltaAmount1(
-                                        mulDiv(
-                                            state.liquiditySwapSpread[i - 1], amountIn * i, state.liquiditySwap * 10_000
-                                        )
-                                    );
-                                    pair.strikes[activeStrike].liquidityBiDirectional[i - 1] += liquidityNew;
-                                    state.liquidityTotal += liquidityNew;
+                                    pair.composition[i - 1] = composition;
                                 } else {
                                     break;
                                 }
                             }
                         }
                     }
+
+                    break;
                 }
-            }
-
-            if (amountDesired == 0) {
-                if (isSwap0To1) {
-                    uint128 composition = uint128(mulDiv(liquidityRemaining, Q128, state.liquidityTotal));
-
-                    unchecked {
-                        for (uint256 i = 1; i <= NUM_SPREADS; i++) {
-                            int24 activeStrike = state.cachedStrikeCurrent + int24(int256(i));
-                            int24 spreadStrikeCurrent = state.strikeCurrent[i - 1];
-
-                            if (activeStrike == spreadStrikeCurrent) {
-                                pair.composition[i - 1] = composition;
-                            } else {
-                                break;
-                            }
-                        }
-                    }
-                } else {
-                    uint128 composition =
-                        type(uint128).max - uint128(mulDiv(liquidityRemaining, Q128, state.liquidityTotal));
-
-                    unchecked {
-                        for (uint256 i = 1; i <= NUM_SPREADS; i++) {
-                            int24 activeStrike = state.cachedStrikeCurrent - int24(int256(i));
-                            int24 spreadStrikeCurrent = state.strikeCurrent[i - 1];
-
-                            if (activeStrike == spreadStrikeCurrent) {
-                                pair.composition[i - 1] = composition;
-                            } else {
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                break;
             }
 
             if (isSwap0To1) {
@@ -392,13 +412,13 @@ library Pairs {
 
     /// @notice Update a strike
     /// @param liquidity The amount of liquidity being added or removed
-    function updateStrike(Pair storage pair, int24 strike, uint8 spread, int256 balance, int256 liquidity) internal {
+    function updateStrike(Pair storage pair, int24 strike, uint8 spread, int128 balance, int128 liquidity) internal {
         if (pair.initialized != 1) revert Initialized();
         _checkStrike(strike - int8(spread));
         _checkStrike(strike + int8(spread));
         _checkSpread(spread);
 
-        uint256 existingLiquidity = pair.strikes[strike].liquidityBiDirectional[spread - 1];
+        uint128 existingLiquidity = pair.strikes[strike].liquidityBiDirectional[spread - 1];
         pair.strikes[strike].liquidityBiDirectional[spread - 1] = addDelta(existingLiquidity, liquidity);
         pair.strikes[strike].totalSupply[spread - 1] = addDelta(pair.strikes[strike].totalSupply[spread - 1], balance);
 
@@ -409,7 +429,7 @@ library Pairs {
 
                 _addStrike0To1(pair, strike0To1);
                 _addStrike1To0(pair, strike1To0);
-            } else if (liquidity < 0 && existingLiquidity == uint256(-liquidity)) {
+            } else if (liquidity < 0 && existingLiquidity == uint128(-liquidity)) {
                 int24 strike0To1 = strike - int8(spread);
                 int24 strike1To0 = strike + int8(spread);
 
@@ -419,7 +439,7 @@ library Pairs {
         }
     }
 
-    function borrowLiquidity(Pair storage pair, int24 strike, uint256 liquidity) internal {
+    function borrowLiquidity(Pair storage pair, int24 strike, uint128 liquidity) internal {
         if (pair.initialized != 1) revert Initialized();
 
         Strike storage strikeObj = pair.strikes[strike];
@@ -428,7 +448,7 @@ library Pairs {
         while (true) {
             // don't allow for borrowing the current strike
             if (pair.strikeCurrent[_activeSpread] == strike) revert();
-            uint256 availableLiquidity = strikeObj.liquidityBiDirectional[_activeSpread];
+            uint128 availableLiquidity = strikeObj.liquidityBiDirectional[_activeSpread];
 
             if (availableLiquidity >= liquidity) {
                 strikeObj.liquidityBiDirectional[_activeSpread] = availableLiquidity - liquidity;
@@ -448,13 +468,13 @@ library Pairs {
         strikeObj.activeSpread = _activeSpread;
     }
 
-    function repayLiquidity(Pair storage pair, int24 strike, uint256 liquidity) internal {
+    function repayLiquidity(Pair storage pair, int24 strike, uint128 liquidity) internal {
         if (pair.initialized != 1) revert Initialized();
         Strike storage strikeObj = pair.strikes[strike];
         uint8 _activeSpread = strikeObj.activeSpread;
 
         while (true) {
-            uint256 borrowedLiquidity = strikeObj.liquidityBorrowed[_activeSpread];
+            uint128 borrowedLiquidity = strikeObj.liquidityBorrowed[_activeSpread];
 
             if (borrowedLiquidity >= liquidity) {
                 strikeObj.liquidityBiDirectional[_activeSpread] += liquidity;
@@ -488,13 +508,13 @@ library Pairs {
         uint256 blocks = block.number - _cachedBlock;
         if (blocks == 0) return;
 
-        uint256 liquidityRepaid;
-        uint256 liquidityBorrowedTotal;
+        uint128 liquidityRepaid;
+        uint128 liquidityBorrowedTotal;
 
         for (uint256 i = 0; i <= pair.strikes[strike].activeSpread; i++) {
-            uint256 liquidityBorrowed = pair.strikes[strike].liquidityBorrowed[i];
+            uint128 liquidityBorrowed = pair.strikes[strike].liquidityBorrowed[i];
 
-            uint256 spreadGrowth = ((i + 1) * blocks * liquidityBorrowed) / 10_000;
+            uint128 spreadGrowth = uint128(((i + 1) * blocks * liquidityBorrowed) / 10_000);
 
             pair.strikes[strike].liquidityBiDirectional[i] += spreadGrowth;
             liquidityRepaid += spreadGrowth;
