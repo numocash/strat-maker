@@ -13,6 +13,7 @@ abstract contract Positions is ILRTA {
     struct BiDirectionalID {
         address token0;
         address token1;
+        uint8 scalingFactor;
         int24 strike;
         uint8 spread;
     }
@@ -28,6 +29,7 @@ abstract contract Positions is ILRTA {
     struct DebtID {
         address token0;
         address token1;
+        uint8 scalingFactor;
         int24 strike;
         Engine.TokenSelector selector;
     }
@@ -185,6 +187,7 @@ abstract contract Positions is ILRTA {
     function _biDirectionalID(
         address token0,
         address token1,
+        uint8 scalingFactor,
         int24 strike,
         uint8 spread
     )
@@ -194,7 +197,10 @@ abstract contract Positions is ILRTA {
     {
         return dataID(
             abi.encode(
-                ILRTADataID(Engine.OrderType.BiDirectional, abi.encode(BiDirectionalID(token0, token1, strike, spread)))
+                ILRTADataID(
+                    Engine.OrderType.BiDirectional,
+                    abi.encode(BiDirectionalID(token0, token1, scalingFactor, strike, spread))
+                )
             )
         );
     }
@@ -223,6 +229,7 @@ abstract contract Positions is ILRTA {
     function _debtID(
         address token0,
         address token1,
+        uint8 scalingFactor,
         int24 strike,
         Engine.TokenSelector selector
     )
@@ -230,14 +237,18 @@ abstract contract Positions is ILRTA {
         pure
         returns (bytes32)
     {
-        return
-            dataID(abi.encode(ILRTADataID(Engine.OrderType.Debt, abi.encode(DebtID(token0, token1, strike, selector)))));
+        return dataID(
+            abi.encode(
+                ILRTADataID(Engine.OrderType.Debt, abi.encode(DebtID(token0, token1, scalingFactor, strike, selector)))
+            )
+        );
     }
 
     function _dataOfDebt(
         address owner,
         address token0,
         address token1,
+        uint8 scalingFactor,
         int24 strike,
         Engine.TokenSelector selector
     )
@@ -245,7 +256,7 @@ abstract contract Positions is ILRTA {
         view
         returns (DebtData memory)
     {
-        ILRTAData memory data = _dataOf[owner][_debtID(token0, token1, strike, selector)];
+        ILRTAData memory data = _dataOf[owner][_debtID(token0, token1, scalingFactor, strike, selector)];
         return abi.decode(data.data, (DebtData));
     }
 
@@ -253,13 +264,14 @@ abstract contract Positions is ILRTA {
         address to,
         address token0,
         address token1,
+        uint8 scalingFactor,
         int24 strike,
         uint8 spread,
         uint256 amount
     )
         internal
     {
-        bytes32 id = _biDirectionalID(token0, token1, strike, spread);
+        bytes32 id = _biDirectionalID(token0, token1, scalingFactor, strike, spread);
         // change in liquidity cannot exceed the maximum liquidity in a strike
         unchecked {
             _dataOf[to][id].balance += amount;
@@ -292,6 +304,7 @@ abstract contract Positions is ILRTA {
         address to,
         address token0,
         address token1,
+        uint8 scalingFactor,
         int24 strike,
         Engine.TokenSelector selector,
         uint256 amount,
@@ -299,7 +312,7 @@ abstract contract Positions is ILRTA {
     )
         internal
     {
-        bytes32 id = _debtID(token0, token1, strike, selector);
+        bytes32 id = _debtID(token0, token1, scalingFactor, strike, selector);
         uint256 balance = _dataOf[to][id].balance;
 
         if (balance == 0) {
@@ -323,13 +336,14 @@ abstract contract Positions is ILRTA {
         address from,
         address token0,
         address token1,
+        uint8 scalingFactor,
         int24 strike,
         uint8 spread,
         uint256 amount
     )
         internal
     {
-        bytes32 id = _biDirectionalID(token0, token1, strike, spread);
+        bytes32 id = _biDirectionalID(token0, token1, scalingFactor, strike, spread);
 
         _dataOf[from][id].balance -= amount;
 
@@ -364,13 +378,14 @@ abstract contract Positions is ILRTA {
         address from,
         address token0,
         address token1,
+        uint8 scalingFactor,
         int24 strike,
         Engine.TokenSelector selector,
         uint256 amount
     )
         internal
     {
-        bytes32 id = _debtID(token0, token1, strike, selector);
+        bytes32 id = _debtID(token0, token1, scalingFactor, strike, selector);
 
         uint256 balance = _dataOf[from][id].balance;
 

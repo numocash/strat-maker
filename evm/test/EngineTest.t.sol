@@ -32,11 +32,11 @@ contract EngineTest is Test, EngineHelper {
         commands[0] = Engine.Commands.CreatePair;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(Engine.CreatePairParams(address(1), address(2), 1));
+        inputs[0] = abi.encode(Engine.CreatePairParams(address(1), address(2), 0, 1));
 
         engine.execute(address(0), commands, inputs, 0, 0, bytes(""));
 
-        (,,, int24 strikeCurrent, uint8 initialized) = engine.getPair(address(1), address(2));
+        (,,, int24 strikeCurrent, uint8 initialized) = engine.getPair(address(1), address(2), 0);
         assertEq(initialized, 1);
         assertEq(strikeCurrent, 1);
     }
@@ -46,22 +46,22 @@ contract EngineTest is Test, EngineHelper {
         commands[0] = Engine.Commands.CreatePair;
         bytes[] memory inputs = new bytes[](1);
 
-        inputs[0] = abi.encode(Engine.CreatePairParams(address(0), address(1), 1));
+        inputs[0] = abi.encode(Engine.CreatePairParams(address(0), address(1), 0, 1));
 
         vm.expectRevert(Engine.InvalidTokenOrder.selector);
         engine.execute(address(0), commands, inputs, 0, 0, bytes(""));
 
-        inputs[0] = abi.encode(Engine.CreatePairParams(address(1), address(0), 1));
+        inputs[0] = abi.encode(Engine.CreatePairParams(address(1), address(0), 0, 1));
 
         vm.expectRevert(Engine.InvalidTokenOrder.selector);
         engine.execute(address(0), commands, inputs, 0, 0, bytes(""));
 
-        inputs[0] = abi.encode(Engine.CreatePairParams(address(2), address(1), 1));
+        inputs[0] = abi.encode(Engine.CreatePairParams(address(2), address(1), 0, 1));
 
         vm.expectRevert(Engine.InvalidTokenOrder.selector);
         engine.execute(address(0), commands, inputs, 0, 0, bytes(""));
 
-        inputs[0] = abi.encode(Engine.CreatePairParams(address(1), address(1), 1));
+        inputs[0] = abi.encode(Engine.CreatePairParams(address(1), address(1), 0, 1));
 
         vm.expectRevert(Engine.InvalidTokenOrder.selector);
         engine.execute(address(0), commands, inputs, 0, 0, bytes(""));
@@ -72,7 +72,7 @@ contract EngineTest is Test, EngineHelper {
         commands[0] = Engine.Commands.CreatePair;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(Engine.CreatePairParams(address(1), address(2), 1));
+        inputs[0] = abi.encode(Engine.CreatePairParams(address(1), address(2), 0, 1));
 
         vm.expectEmit(true, true, false, true);
         emit PairCreated(address(1), address(2), 1);
@@ -84,7 +84,7 @@ contract EngineTest is Test, EngineHelper {
         commands[0] = Engine.Commands.CreatePair;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(Engine.CreatePairParams(address(1), address(2), 0));
+        inputs[0] = abi.encode(Engine.CreatePairParams(address(1), address(2), 0, 0));
 
         engine.execute(address(0), commands, inputs, 0, 0, bytes(""));
 
@@ -97,7 +97,7 @@ contract EngineTest is Test, EngineHelper {
         commands[0] = Engine.Commands.CreatePair;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(Engine.CreatePairParams(address(1), address(2), type(int24).max));
+        inputs[0] = abi.encode(Engine.CreatePairParams(address(1), address(2), 0, type(int24).max));
 
         vm.expectRevert(Pairs.InvalidStrike.selector);
         engine.execute(address(0), commands, inputs, 0, 0, bytes(""));
@@ -138,14 +138,14 @@ contract EngineTest is Test, EngineHelper {
         bytes[] memory inputs = new bytes[](1);
         inputs[0] = abi.encode(
             Engine.AddLiquidityParams(
-                address(token0), address(token1), 1, 1, Engine.TokenSelector.LiquidityPosition, 1e18
+                address(token0), address(token1), 0, 1, 1, Engine.TokenSelector.LiquidityPosition, 1e18
             )
         );
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
 
         (commands[0], inputs[0]) =
-            borrowLiquidityCommand(address(token0), address(token1), 1, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
+            borrowLiquidityCommand(address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
 
@@ -168,22 +168,22 @@ contract EngineTest is Test, EngineHelper {
         bytes[] memory inputs = new bytes[](1);
         inputs[0] = abi.encode(
             Engine.AddLiquidityParams(
-                address(token0), address(token1), 1, 1, Engine.TokenSelector.LiquidityPosition, 1e18
+                address(token0), address(token1), 0, 1, 1, Engine.TokenSelector.LiquidityPosition, 1e18
             )
         );
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
 
         (commands[0], inputs[0]) =
-            borrowLiquidityCommand(address(token0), address(token1), 1, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
+            borrowLiquidityCommand(address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
 
         (, uint256 leverageRatioX128) =
-            engine.getPositionDebt(address(this), address(token0), address(token1), 1, Engine.TokenSelector.Token0);
+            engine.getPositionDebt(address(this), address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0);
 
         (commands[0], inputs[0]) = repayLiquidityCommand(
-            address(token0), address(token1), 1, Engine.TokenSelector.Token0, leverageRatioX128, 0.5e18
+            address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0, leverageRatioX128, 0.5e18
         );
 
         engine.execute(address(this), commands, inputs, 1, 1, bytes(""));
@@ -205,7 +205,7 @@ contract EngineTest is Test, EngineHelper {
 
         bytes[] memory inputs = new bytes[](1);
         inputs[0] =
-            abi.encode(Engine.SwapParams(address(token0), address(token1), Engine.TokenSelector.Token1, 1e18 - 1));
+            abi.encode(Engine.SwapParams(address(token0), address(token1), 0, Engine.TokenSelector.Token1, 1e18 - 1));
 
         engine.execute(address(this), commands, inputs, 2, 0, bytes(""));
 
@@ -228,7 +228,7 @@ contract EngineTest is Test, EngineHelper {
         bytes[] memory inputs = new bytes[](1);
         inputs[0] = abi.encode(
             Engine.AddLiquidityParams(
-                address(token0), address(token1), 0, 1, Engine.TokenSelector.LiquidityPosition, 1e18
+                address(token0), address(token1), 0, 0, 1, Engine.TokenSelector.LiquidityPosition, 1e18
             )
         );
 
@@ -245,7 +245,7 @@ contract EngineTest is Test, EngineHelper {
         bytes[] memory inputs = createInputs();
 
         (Engine.Commands addCommand, bytes memory addInput) =
-            addLiquidityCommand(address(token0), address(token1), 0, 1, Engine.TokenSelector.LiquidityPosition, 1e18);
+            addLiquidityCommand(address(token0), address(token1), 0, 0, 1, Engine.TokenSelector.LiquidityPosition, 1e18);
 
         commands = pushCommands(commands, addCommand);
         inputs = pushInputs(inputs, addInput);
@@ -253,7 +253,7 @@ contract EngineTest is Test, EngineHelper {
         engine.execute(address(this), commands, inputs, 1, 1, bytes(""));
 
         (Engine.Commands removeCommand, bytes memory removeInput) = removeLiquidityCommand(
-            address(token0), address(token1), 0, 1, Engine.TokenSelector.LiquidityPosition, -1e18
+            address(token0), address(token1), 0, 0, 1, Engine.TokenSelector.LiquidityPosition, -1e18
         );
 
         commands[0] = removeCommand;
@@ -274,14 +274,14 @@ contract EngineTest is Test, EngineHelper {
         commands[0] = Engine.Commands.AddLiquidity;
         inputs[0] = abi.encode(
             Engine.AddLiquidityParams(
-                address(token0), address(token1), 1, 1, Engine.TokenSelector.LiquidityPosition, 1e18
+                address(token0), address(token1), 0, 1, 1, Engine.TokenSelector.LiquidityPosition, 1e18
             )
         );
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
 
         (commands[0], inputs[0]) =
-            borrowLiquidityCommand(address(token0), address(token1), 1, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
+            borrowLiquidityCommand(address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
 
         vm.resumeGasMetering();
 
@@ -298,22 +298,22 @@ contract EngineTest is Test, EngineHelper {
         bytes[] memory inputs = new bytes[](1);
         inputs[0] = abi.encode(
             Engine.AddLiquidityParams(
-                address(token0), address(token1), 1, 1, Engine.TokenSelector.LiquidityPosition, 1e18
+                address(token0), address(token1), 0, 1, 1, Engine.TokenSelector.LiquidityPosition, 1e18
             )
         );
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
 
         (commands[0], inputs[0]) =
-            borrowLiquidityCommand(address(token0), address(token1), 1, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
+            borrowLiquidityCommand(address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
 
         (, uint256 leverageRatioX128) =
-            engine.getPositionDebt(address(this), address(token0), address(token1), 1, Engine.TokenSelector.Token0);
+            engine.getPositionDebt(address(this), address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0);
 
         (commands[0], inputs[0]) = repayLiquidityCommand(
-            address(token0), address(token1), 1, Engine.TokenSelector.Token0, leverageRatioX128, 0.5e18
+            address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0, leverageRatioX128, 0.5e18
         );
 
         vm.resumeGasMetering();
@@ -331,7 +331,7 @@ contract EngineTest is Test, EngineHelper {
 
         bytes[] memory inputs = new bytes[](1);
         inputs[0] =
-            abi.encode(Engine.SwapParams(address(token0), address(token1), Engine.TokenSelector.Token1, 1e18 - 1));
+            abi.encode(Engine.SwapParams(address(token0), address(token1), 0, Engine.TokenSelector.Token1, 1e18 - 1));
 
         vm.resumeGasMetering();
 
@@ -347,13 +347,13 @@ contract EngineTest is Test, EngineHelper {
         bytes[] memory inputs = createInputs();
 
         (Engine.Commands _swapCommand, bytes memory swapInput) =
-            swapCommand(address(token0), address(token1), Engine.TokenSelector.Token0, -0.2e18);
+            swapCommand(address(token0), address(token1), 0, Engine.TokenSelector.Token0, -0.2e18);
 
         commands = pushCommands(commands, _swapCommand);
         inputs = pushInputs(inputs, swapInput);
 
         (Engine.Commands addCommand, bytes memory addInput) =
-            addLiquidityCommand(address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0, 0.2e18);
+            addLiquidityCommand(address(token0), address(token1), 0, 0, 1, Engine.TokenSelector.Token0, 0.2e18);
 
         commands = pushCommands(commands, addCommand);
         inputs = pushInputs(inputs, addInput);
@@ -376,8 +376,9 @@ contract EngineTest is Test, EngineHelper {
         Engine.Commands[] memory commands = createCommands();
         bytes[] memory inputs = createInputs();
 
-        (Engine.Commands addCommand, bytes memory addInput) =
-            addLiquidityCommand(address(token0), address(token1), -1, 1, Engine.TokenSelector.LiquidityPosition, 1e18);
+        (Engine.Commands addCommand, bytes memory addInput) = addLiquidityCommand(
+            address(token0), address(token1), 0, -1, 1, Engine.TokenSelector.LiquidityPosition, 1e18
+        );
 
         commands = pushCommands(commands, addCommand);
         inputs = pushInputs(inputs, addInput);
@@ -385,13 +386,13 @@ contract EngineTest is Test, EngineHelper {
         engine.execute(address(this), commands, inputs, 1, 1, bytes(""));
 
         (Engine.Commands removeCommand, bytes memory removeInput) =
-            removeLiquidityCommand(address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0, -0.2e18);
+            removeLiquidityCommand(address(token0), address(token1), 0, 0, 1, Engine.TokenSelector.Token0, -0.2e18);
 
         commands[0] = removeCommand;
         inputs[0] = removeInput;
 
         (Engine.Commands _swapCommand, bytes memory swapInput) =
-            swapCommand(address(token0), address(token1), Engine.TokenSelector.Token0, 0.2e18);
+            swapCommand(address(token0), address(token1), 0, Engine.TokenSelector.Token0, 0.2e18);
 
         commands = pushCommands(commands, _swapCommand);
         inputs = pushInputs(inputs, swapInput);

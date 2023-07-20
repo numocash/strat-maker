@@ -6,17 +6,19 @@ import {Engine} from "src/core/Engine.sol";
 function createCommand(
     address token0,
     address token1,
+    uint8 scalingFactor,
     int24 tickInitial
 )
     pure
     returns (Engine.Commands command, bytes memory input)
 {
-    return (Engine.Commands.CreatePair, abi.encode(Engine.CreatePairParams(token0, token1, tickInitial)));
+    return (Engine.Commands.CreatePair, abi.encode(Engine.CreatePairParams(token0, token1, scalingFactor, tickInitial)));
 }
 
 function borrowLiquidityCommand(
     address token0,
     address token1,
+    uint8 scalingFactor,
     int24 strike,
     Engine.TokenSelector selectorCollateral,
     uint256 amountDesiredCollateral,
@@ -29,7 +31,7 @@ function borrowLiquidityCommand(
         Engine.Commands.BorrowLiquidity,
         abi.encode(
             Engine.BorrowLiquidityParams(
-                token0, token1, strike, selectorCollateral, amountDesiredCollateral, amountDesiredDebt
+                token0, token1, scalingFactor, strike, selectorCollateral, amountDesiredCollateral, amountDesiredDebt
             )
             )
     );
@@ -38,6 +40,7 @@ function borrowLiquidityCommand(
 function repayLiquidityCommand(
     address token0,
     address token1,
+    uint8 scalingFactor,
     int24 strike,
     Engine.TokenSelector selectorCollateral,
     uint256 leverageRatioX128,
@@ -50,7 +53,7 @@ function repayLiquidityCommand(
         Engine.Commands.RepayLiquidity,
         abi.encode(
             Engine.RepayLiquidityParams(
-                token0, token1, strike, selectorCollateral, leverageRatioX128, amountDesiredDebt
+                token0, token1, scalingFactor, strike, selectorCollateral, leverageRatioX128, amountDesiredDebt
             )
             )
     );
@@ -59,6 +62,7 @@ function repayLiquidityCommand(
 function addLiquidityCommand(
     address token0,
     address token1,
+    uint8 scalingFactor,
     int24 strike,
     uint8 spread,
     Engine.TokenSelector selector,
@@ -69,13 +73,14 @@ function addLiquidityCommand(
 {
     return (
         Engine.Commands.AddLiquidity,
-        abi.encode(Engine.AddLiquidityParams(token0, token1, strike, spread, selector, amountDesired))
+        abi.encode(Engine.AddLiquidityParams(token0, token1, scalingFactor, strike, spread, selector, amountDesired))
     );
 }
 
 function removeLiquidityCommand(
     address token0,
     address token1,
+    uint8 scalingFactor,
     int24 strike,
     uint8 spread,
     Engine.TokenSelector selector,
@@ -86,20 +91,21 @@ function removeLiquidityCommand(
 {
     return (
         Engine.Commands.RemoveLiquidity,
-        abi.encode(Engine.RemoveLiquidityParams(token0, token1, strike, spread, selector, amountDesired))
+        abi.encode(Engine.RemoveLiquidityParams(token0, token1, scalingFactor, strike, spread, selector, amountDesired))
     );
 }
 
 function swapCommand(
     address token0,
     address token1,
+    uint8 scalingFactor,
     Engine.TokenSelector selector,
     int256 amountDesired
 )
     pure
     returns (Engine.Commands command, bytes memory input)
 {
-    return (Engine.Commands.Swap, abi.encode(Engine.SwapParams(token0, token1, selector, amountDesired)));
+    return (Engine.Commands.Swap, abi.encode(Engine.SwapParams(token0, token1, scalingFactor, selector, amountDesired)));
 }
 
 function createCommands() pure returns (Engine.Commands[] memory commands) {

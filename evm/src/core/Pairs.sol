@@ -68,20 +68,21 @@ library Pairs {
                                 GET LOGIC
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    function getPairID(address token0, address token1) internal pure returns (bytes32 pairID) {
-        return keccak256(abi.encodePacked(token0, token1));
+    function getPairID(address token0, address token1, uint8 scalingFactor) internal pure returns (bytes32 pairID) {
+        return keccak256(abi.encodePacked(token0, token1, scalingFactor));
     }
 
     function getPairAndID(
         mapping(bytes32 => Pair) storage pairs,
         address token0,
-        address token1
+        address token1,
+        uint8 scalingFactor
     )
         internal
         view
         returns (bytes32 pairID, Pair storage pair)
     {
-        pairID = getPairID(token0, token1);
+        pairID = getPairID(token0, token1, scalingFactor);
         pair = pairs[pairID];
     }
 

@@ -25,6 +25,7 @@ contract MockPair is Positions {
 
     address private immutable token0;
     address private immutable token1;
+    uint8 private immutable scalingFactor;
 
     Pairs.Pair private pair;
 
@@ -32,12 +33,14 @@ contract MockPair is Positions {
         address _superSignature,
         address _token0,
         address _token1,
+        uint8 _scalingFactor,
         int24 strikeInitial
     )
         Positions(_superSignature)
     {
         token0 = _token0;
         token1 = _token1;
+        scalingFactor = _scalingFactor;
         pair.initialize(strikeInitial);
     }
 
@@ -77,7 +80,7 @@ contract MockPair is Positions {
         uint256 leverageRatioX128 = mulDiv(liquidityCollateral, Q128, balance);
 
         // mint position to user
-        _mintDebt(msg.sender, token0, token1, strike, selectorCollateral, balance, leverageRatioX128);
+        _mintDebt(msg.sender, token0, token1, scalingFactor, strike, selectorCollateral, balance, leverageRatioX128);
 
         uint256 balance0Before = BalanceLib.getBalance(token0);
         uint256 balance1Before = BalanceLib.getBalance(token1);
@@ -159,7 +162,7 @@ contract MockPair is Positions {
             if (amount1 > 0 && BalanceLib.getBalance(token1) < balance1Before + uint256(amount1)) revert();
         }
 
-        _burnDebt(msg.sender, token0, token1, strike, selectorCollateral, balance);
+        _burnDebt(msg.sender, token0, token1, scalingFactor, strike, selectorCollateral, balance);
     }
 
     function addLiquidity(
@@ -176,7 +179,7 @@ contract MockPair is Positions {
 
         pair.updateStrike(strike, spread, int256(balance), int256(liquidity));
 
-        _mintBiDirectional(msg.sender, token0, token1, strike, spread, balance);
+        _mintBiDirectional(msg.sender, token0, token1, scalingFactor, strike, spread, balance);
 
         address[] memory tokens = new address[](2);
         tokens[0] = token0;
@@ -219,7 +222,7 @@ contract MockPair is Positions {
         SafeTransferLib.safeTransfer(token0, msg.sender, amount0);
         SafeTransferLib.safeTransfer(token1, msg.sender, amount1);
 
-        _burnBiDirectional(msg.sender, token0, token1, strike, spread, balance);
+        _burnBiDirectional(msg.sender, token0, token1, scalingFactor, strike, spread, balance);
     }
 
     function swap(bool isToken0, int256 amountDesired) public returns (int256 amount0, int256 amount1) {
@@ -282,7 +285,7 @@ contract MockPair is Positions {
         view
         returns (uint256 balance)
     {
-        return _dataOf[owner][_biDirectionalID(token0, token1, strike, spread)].balance;
+        return _dataOf[owner][_biDirectionalID(token0, token1, scalingFactor, strike, spread)].balance;
     }
 
     // function getPositionLimit(
@@ -307,8 +310,8 @@ contract MockPair is Positions {
         view
         returns (uint256 balance, uint256 leverageRatioX128)
     {
-        balance = _dataOf[owner][_debtID(token0, token1, strike, selector)].balance;
-        Positions.DebtData memory debtData = _dataOfDebt(owner, token0, token1, strike, selector);
+        balance = _dataOf[owner][_debtID(token0, token1, scalingFactor, strike, selector)].balance;
+        Positions.DebtData memory debtData = _dataOfDebt(owner, token0, token1, scalingFactor, strike, selector);
 
         return (balance, debtData.leverageRatioX128);
     }

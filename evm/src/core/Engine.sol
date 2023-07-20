@@ -95,6 +95,7 @@ contract Engine is Positions {
     struct SwapParams {
         address token0;
         address token1;
+        uint8 scalingFactor;
         TokenSelector selector;
         int256 amountDesired;
     }
@@ -102,6 +103,7 @@ contract Engine is Positions {
     struct AddLiquidityParams {
         address token0;
         address token1;
+        uint8 scalingFactor;
         int24 strike;
         uint8 spread;
         TokenSelector selector;
@@ -111,6 +113,7 @@ contract Engine is Positions {
     struct BorrowLiquidityParams {
         address token0;
         address token1;
+        uint8 scalingFactor;
         int24 strike;
         TokenSelector selectorCollateral;
         uint256 amountDesiredCollateral;
@@ -121,6 +124,7 @@ contract Engine is Positions {
     struct RepayLiquidityParams {
         address token0;
         address token1;
+        uint8 scalingFactor;
         int24 strike;
         TokenSelector selectorCollateral;
         uint256 leverageRatioX128;
@@ -131,6 +135,7 @@ contract Engine is Positions {
     struct RemoveLiquidityParams {
         address token0;
         address token1;
+        uint8 scalingFactor;
         int24 strike;
         uint8 spread;
         TokenSelector selector;
@@ -140,11 +145,13 @@ contract Engine is Positions {
     struct AccrueParams {
         address token0;
         address token1;
+        uint8 scalingFactor;
     }
 
     struct CreatePairParams {
         address token0;
         address token1;
+        uint8 scalingFactor;
         int24 strikeInitial;
     }
 
@@ -309,7 +316,8 @@ contract Engine is Positions {
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     function _swap(SwapParams memory params, Accounts.Account memory account) private {
-        (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
+        (bytes32 pairID, Pairs.Pair storage pair) =
+            pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
 
         if (params.selector != TokenSelector.Token0 && params.selector != TokenSelector.Token1) {
             revert InvalidSelector();
@@ -323,7 +331,8 @@ contract Engine is Positions {
     }
 
     function _addLiquidity(address to, AddLiquidityParams memory params, Accounts.Account memory account) private {
-        (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
+        (bytes32 pairID, Pairs.Pair storage pair) =
+            pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
         if (pair.cachedStrikeCurrent == params.strike) pair._accrue(params.strike);
 
         // calculate how much to add
@@ -372,7 +381,9 @@ contract Engine is Positions {
         account.updateToken(params.token1, amount1);
 
         // mint position token
-        _mintBiDirectional(to, params.token0, params.token1, params.strike, params.spread, uint256(balance));
+        _mintBiDirectional(
+            to, params.token0, params.token1, params.scalingFactor, params.strike, params.spread, uint256(balance)
+        );
 
         emit AddLiquidity(pairID, params.strike, params.spread, uint256(balance));
     }
@@ -384,7 +395,8 @@ contract Engine is Positions {
     )
         private
     {
-        (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
+        (bytes32 pairID, Pairs.Pair storage pair) =
+            pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
 
         pair.borrowLiquidity(params.strike, params.amountDesiredDebt);
 
@@ -420,6 +432,7 @@ contract Engine is Positions {
             to,
             params.token0,
             params.token1,
+            params.scalingFactor,
             params.strike,
             params.selectorCollateral,
             balance,
@@ -430,7 +443,8 @@ contract Engine is Positions {
     }
 
     function _repayLiquidity(RepayLiquidityParams memory params, Accounts.Account memory account) private {
-        (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
+        (bytes32 pairID, Pairs.Pair storage pair) =
+            pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
         if (pair.cachedStrikeCurrent == params.strike) pair._accrue(params.strike);
 
         uint256 _liquidityGrowthX128 = pair.strikes[params.strike].liquidityGrowthX128;
@@ -466,7 +480,8 @@ contract Engine is Positions {
 
         // add burned position to account
         {
-            bytes32 id = _debtID(params.token0, params.token1, params.strike, params.selectorCollateral);
+            bytes32 id =
+                _debtID(params.token0, params.token1, params.scalingFactor, params.strike, params.selectorCollateral);
             account.updateILRTA(id, params.amountDesiredDebt, OrderType.Debt);
         }
 
@@ -474,7 +489,8 @@ contract Engine is Positions {
     }
 
     function _removeLiquidity(RemoveLiquidityParams memory params, Accounts.Account memory account) private {
-        (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
+        (bytes32 pairID, Pairs.Pair storage pair) =
+            pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
         if (pair.cachedStrikeCurrent == params.strike) pair._accrue(params.strike);
 
         // calculate how much to remove
@@ -518,7 +534,7 @@ contract Engine is Positions {
         account.updateToken(params.token0, amount0);
         account.updateToken(params.token1, amount1);
         account.updateILRTA(
-            _biDirectionalID(params.token0, params.token1, params.strike, params.spread),
+            _biDirectionalID(params.token0, params.token1, params.scalingFactor, params.strike, params.spread),
             uint256(-balance),
             OrderType.BiDirectional
         );
@@ -527,7 +543,8 @@ contract Engine is Positions {
     }
 
     function _accrue(AccrueParams memory params) private {
-        (bytes32 pairID, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
+        (bytes32 pairID, Pairs.Pair storage pair) =
+            pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
 
         pair.accrue();
 
@@ -537,7 +554,7 @@ contract Engine is Positions {
     function _createPair(CreatePairParams memory params) private {
         if (params.token0 >= params.token1 || params.token0 == address(0)) revert InvalidTokenOrder();
 
-        (, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1);
+        (, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
         pair.initialize(params.strikeInitial);
 
         emit PairCreated(params.token0, params.token1, params.strikeInitial);
@@ -549,7 +566,8 @@ contract Engine is Positions {
 
     function getPair(
         address token0,
-        address token1
+        address token1,
+        uint8 scalingFactor
     )
         external
         view
@@ -561,13 +579,22 @@ contract Engine is Positions {
             uint8 initialized
         )
     {
-        (, Pairs.Pair storage pair) = pairs.getPairAndID(token0, token1);
+        (, Pairs.Pair storage pair) = pairs.getPairAndID(token0, token1, scalingFactor);
         (cachedBlock, composition, strikeCurrent, cachedStrikeCurrent, initialized) =
             (pair.cachedBlock, pair.composition, pair.strikeCurrent, pair.cachedStrikeCurrent, pair.initialized);
     }
 
-    function getStrike(address token0, address token1, int24 strike) external view returns (Pairs.Strike memory) {
-        (, Pairs.Pair storage pair) = pairs.getPairAndID(token0, token1);
+    function getStrike(
+        address token0,
+        address token1,
+        uint8 scalingFactor,
+        int24 strike
+    )
+        external
+        view
+        returns (Pairs.Strike memory)
+    {
+        (, Pairs.Pair storage pair) = pairs.getPairAndID(token0, token1, scalingFactor);
 
         return pair.strikes[strike];
     }
@@ -576,6 +603,7 @@ contract Engine is Positions {
         address owner,
         address token0,
         address token1,
+        uint8 scalingFactor,
         int24 strike,
         uint8 spread
     )
@@ -583,7 +611,7 @@ contract Engine is Positions {
         view
         returns (uint256 balance)
     {
-        return _dataOf[owner][_biDirectionalID(token0, token1, strike, spread)].balance;
+        return _dataOf[owner][_biDirectionalID(token0, token1, scalingFactor, strike, spread)].balance;
     }
 
     // function getPositionLimit(
@@ -605,6 +633,7 @@ contract Engine is Positions {
         address owner,
         address token0,
         address token1,
+        uint8 scalingFactor,
         int24 strike,
         Engine.TokenSelector selector
     )
@@ -612,8 +641,8 @@ contract Engine is Positions {
         view
         returns (uint256 balance, uint256 leverageRatioX128)
     {
-        balance = _dataOf[owner][_debtID(token0, token1, strike, selector)].balance;
-        Positions.DebtData memory debtData = _dataOfDebt(owner, token0, token1, strike, selector);
+        balance = _dataOf[owner][_debtID(token0, token1, scalingFactor, strike, selector)].balance;
+        Positions.DebtData memory debtData = _dataOfDebt(owner, token0, token1, scalingFactor, strike, selector);
 
         return (balance, debtData.leverageRatioX128);
     }
