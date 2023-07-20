@@ -13,7 +13,6 @@ import {SuperSignature} from "ilrta/SuperSignature.sol";
 contract Router is IExecuteCallback {
     Engine private immutable engine;
     Permit3 private immutable permit3;
-    SuperSignature private immutable superSignature;
 
     error InvalidCaller(address caller);
 
@@ -24,10 +23,9 @@ contract Router is IExecuteCallback {
         address payer;
     }
 
-    constructor(address _engine, address _permit3, address _superSignature) {
+    constructor(address _engine, address _permit3) {
         engine = Engine(_engine);
         permit3 = Permit3(_permit3);
-        superSignature = SuperSignature(_superSignature);
     }
 
     struct RouteParams {
@@ -43,7 +41,7 @@ contract Router is IExecuteCallback {
     }
 
     function route(RouteParams calldata params) external {
-        superSignature.verifyAndStoreRoot(msg.sender, params.verify, params.signature);
+        permit3.verifyAndStoreRoot(msg.sender, params.verify, params.signature);
 
         CallbackData memory callbackData =
             CallbackData(params.permitTransfers, params.positionTransfers, params.verify.dataHash, msg.sender);
@@ -65,9 +63,9 @@ contract Router is IExecuteCallback {
             if (delta > 0 && id != bytes32(0)) {
                 engine.transferBySuperSignature(
                     callbackData.payer,
-                    abi.encode(callbackData.positionTransfers[j]),
-                    ILRTA.RequestedTransfer(
-                        msg.sender, abi.encode(Positions.ILRTATransferDetails(id, delta, params.orderTypes[i]))
+                    callbackData.positionTransfers[j],
+                    Positions.RequestedTransfer(
+                        msg.sender, Positions.ILRTATransferDetails(id, params.orderTypes[i], delta)
                     ),
                     callbackData.dataHash
                 );

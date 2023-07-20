@@ -46,7 +46,7 @@ contract EngineHelper is IExecuteCallback {
 
                 if (params.lpIDs[i] != bytes32(0)) {
                     engine.transfer(
-                        msg.sender, abi.encode(Positions.ILRTATransferDetails(id, delta, params.orderTypes[i]))
+                        msg.sender, abi.encode(Positions.ILRTATransferDetails(id, params.orderTypes[i], delta))
                     );
                 }
             }

@@ -25,7 +25,6 @@ import {
 contract RouterTest is Test {
     Engine private engine;
     Permit3 private permit3;
-    SuperSignature private superSignature;
     Router private router;
     MockERC20 private token0;
     MockERC20 private token1;
@@ -43,10 +42,11 @@ contract RouterTest is Test {
 
     bytes32 private constant SUPER_SIGNATURE_ILRTA_TRANSFER_TYPEHASH = keccak256(
         // solhint-disable-next-line max-line-length
-        "Transfer(TransferDetails transferDetails,address spender)TransferDetails(bytes32 id,uint256 amount)"
+        "Transfer(TransferDetails transferDetails,address spender)TransferDetails(bytes32 id,uint8 orderType,uint256 amount)"
     );
 
-    bytes32 private constant ILRTA_TRANSFER_DETAILS_TYPEHASH = keccak256("TransferDetails(bytes32 id,uint256 amount)");
+    bytes32 private constant ILRTA_TRANSFER_DETAILS_TYPEHASH =
+        keccak256("TransferDetails(bytes32 id,uint8 orderType,uint256 amount)");
 
     function permitDataHash(Permit3.TransferDetails[] memory permitTransfers) private view returns (bytes32) {
         uint256 length = permitTransfers.length;
@@ -85,7 +85,7 @@ contract RouterTest is Test {
                 keccak256(
                     abi.encode(
                         SUPER_SIGNATURE_ILRTA_TRANSFER_TYPEHASH,
-                        keccak256(abi.encode(ILRTA_TRANSFER_DETAILS_TYPEHASH, abi.encode(positionTransfer))),
+                        keccak256(abi.encode(ILRTA_TRANSFER_DETAILS_TYPEHASH, positionTransfer)),
                         address(router)
                     )
                 )
@@ -101,7 +101,7 @@ contract RouterTest is Test {
             keccak256(
                 abi.encodePacked(
                     "\x19\x01",
-                    superSignature.DOMAIN_SEPARATOR(),
+                    permit3.DOMAIN_SEPARATOR(),
                     keccak256(
                         abi.encode(
                             VERIFY_TYPEHASH, keccak256(abi.encodePacked(verify.dataHash)), verify.nonce, verify.deadline
@@ -115,10 +115,9 @@ contract RouterTest is Test {
     }
 
     function setUp() external {
-        superSignature = new SuperSignature();
-        permit3 = new Permit3(address(superSignature));
-        engine = new Engine(address(superSignature));
-        router = new Router(address(engine), address(permit3), address(superSignature));
+        permit3 = new Permit3();
+        engine = new Engine(address(permit3));
+        router = new Router(address(engine), address(permit3));
 
         MockERC20 tokenA = new MockERC20();
         MockERC20 tokenB = new MockERC20();
@@ -232,15 +231,13 @@ contract RouterTest is Test {
         Positions.ILRTATransferDetails[] memory positionTransfer = new Positions.ILRTATransferDetails[](1);
         positionTransfer[0] = Positions.ILRTATransferDetails(
             engine.dataID(
-                abi.encode(
-                    Positions.ILRTADataID(
-                        Engine.OrderType.BiDirectional,
-                        abi.encode(Positions.BiDirectionalID(address(token0), address(token1), 0, 0, 1))
-                    )
+                Positions.ILRTADataID(
+                    Engine.OrderType.BiDirectional,
+                    abi.encode(Positions.BiDirectionalID(address(token0), address(token1), 0, 0, 1))
                 )
             ),
-            1e18,
-            Engine.OrderType.BiDirectional
+            Engine.OrderType.BiDirectional,
+            1e18
         );
 
         dataHash[0] = positionsDataHash(positionTransfer[0]);
@@ -504,17 +501,13 @@ contract RouterTest is Test {
         Positions.ILRTATransferDetails[] memory positionTransfer = new Positions.ILRTATransferDetails[](1);
         positionTransfer[0] = Positions.ILRTATransferDetails(
             engine.dataID(
-                abi.encode(
-                    Positions.ILRTADataID(
-                        Engine.OrderType.Debt,
-                        abi.encode(
-                            Positions.DebtID(address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0)
-                        )
-                    )
+                Positions.ILRTADataID(
+                    Engine.OrderType.Debt,
+                    abi.encode(Positions.DebtID(address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0))
                 )
             ),
-            0.5e18,
-            Engine.OrderType.Debt
+            Engine.OrderType.Debt,
+            0.5e18
         );
 
         dataHash[0] = positionsDataHash(positionTransfer[0]);

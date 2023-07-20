@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import {Engine} from "./Engine.sol";
 import {addPositions} from "./math/PositionMath.sol";
 import {ILRTA} from "ilrta/ILRTA.sol";
+import {SignatureVerification} from "ilrta/SignatureVerification.sol";
 
 abstract contract Positions is ILRTA {
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
@@ -51,8 +52,19 @@ abstract contract Positions is ILRTA {
 
     struct ILRTATransferDetails {
         bytes32 id;
-        uint256 amount;
         Engine.OrderType orderType;
+        uint256 amount;
+    }
+
+    struct SignatureTransfer {
+        uint256 nonce;
+        uint256 deadline;
+        ILRTATransferDetails transferDetails;
+    }
+
+    struct RequestedTransfer {
+        address to;
+        ILRTATransferDetails transferDetails;
     }
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
@@ -66,22 +78,22 @@ abstract contract Positions is ILRTA {
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     constructor(address _superSignature)
-        ILRTA(_superSignature, "Numoen Dry Powder", "DP", "TransferDetails(bytes32 id,uint256 amount)")
+        ILRTA(_superSignature, "Numoen Dry Powder", "DP", "TransferDetails(bytes32 id,uint8 orderType,uint256 amount)")
     {}
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                  LOGIC
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    function dataID(bytes memory dataIDBytes) public pure override returns (bytes32) {
-        return keccak256(dataIDBytes);
+    function dataID(ILRTADataID memory data) public pure returns (bytes32) {
+        return keccak256(abi.encode(data));
     }
 
-    function dataOf(address owner, bytes32 id) external view override returns (bytes memory) {
-        return abi.encode(_dataOf[owner][id]);
+    function dataOf(address owner, bytes32 id) external view returns (ILRTAData memory) {
+        return _dataOf[owner][id];
     }
 
-    function transfer(address to, bytes calldata transferDetailsBytes) external override returns (bool) {
+    function transfer(address to, bytes calldata transferDetailsBytes) external returns (bool) {
         ILRTATransferDetails memory transferDetails = abi.decode(transferDetailsBytes, (ILRTATransferDetails));
         return _transfer(msg.sender, to, transferDetails);
     }
@@ -93,45 +105,82 @@ abstract contract Positions is ILRTA {
         bytes calldata signature
     )
         external
-        override
         returns (bool)
     {
-        ILRTATransferDetails memory transferDetails =
-            abi.decode(requestedTransfer.transferDetails, (ILRTATransferDetails));
-        ILRTATransferDetails memory signatureTransferDetails =
-            abi.decode(signatureTransfer.transferDetails, (ILRTATransferDetails));
+        _checkTransferRequest(requestedTransfer.transferDetails, signatureTransfer.transferDetails);
 
-        _checkTransferRequest(transferDetails, signatureTransferDetails);
+        _verifySignature(from, signatureTransfer, signature);
 
-        verifySignature(from, signatureTransfer, signature);
-
-        return _transfer(from, requestedTransfer.to, transferDetails);
+        return _transfer(from, requestedTransfer.to, requestedTransfer.transferDetails);
     }
 
     function transferBySuperSignature(
         address from,
-        bytes calldata transferDetails,
+        ILRTATransferDetails calldata transferDetails,
         RequestedTransfer calldata requestedTransfer,
         bytes32[] calldata dataHash
     )
         external
-        override
         returns (bool)
     {
-        ILRTATransferDetails memory requestedTransferDetails =
-            abi.decode(requestedTransfer.transferDetails, (ILRTATransferDetails));
-        ILRTATransferDetails memory signatureTransferDetails = abi.decode(transferDetails, (ILRTATransferDetails));
+        _checkTransferRequest(requestedTransfer.transferDetails, transferDetails);
 
-        _checkTransferRequest(requestedTransferDetails, signatureTransferDetails);
+        _verifySuperSignature(from, transferDetails, dataHash);
 
-        verifySuperSignature(from, transferDetails, dataHash);
-
-        return _transfer(from, requestedTransfer.to, requestedTransferDetails);
+        return _transfer(from, requestedTransfer.to, requestedTransfer.transferDetails);
     }
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                              INTERNAL LOGIC
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
+
+    function _verifySignature(
+        address from,
+        SignatureTransfer calldata signatureTransfer,
+        bytes calldata signature
+    )
+        private
+    {
+        if (block.timestamp > signatureTransfer.deadline) revert SignatureExpired(signatureTransfer.deadline);
+
+        useUnorderedNonce(from, signatureTransfer.nonce);
+
+        bytes32 signatureHash = hashTypedData(
+            keccak256(
+                abi.encode(
+                    TRANSFER_TYPEHASH,
+                    keccak256(abi.encode(TRANSFER_DETAILS_TYPEHASH, signatureTransfer.transferDetails)),
+                    msg.sender,
+                    signatureTransfer.nonce,
+                    signatureTransfer.deadline
+                )
+            )
+        );
+
+        SignatureVerification.verify(signature, signatureHash, from);
+    }
+
+    function _verifySuperSignature(
+        address from,
+        ILRTATransferDetails calldata transferDetails,
+        bytes32[] calldata dataHash
+    )
+        private
+    {
+        bytes32 signatureHash = hashTypedData(
+            keccak256(
+                abi.encode(
+                    SUPER_SIGNATURE_TRANSFER_TYPEHASH,
+                    keccak256(abi.encode(TRANSFER_DETAILS_TYPEHASH, transferDetails)),
+                    msg.sender
+                )
+            )
+        );
+
+        if (dataHash[0] != signatureHash) revert DataHashMismatch();
+
+        superSignature.verifyData(from, dataHash);
+    }
 
     function _checkTransferRequest(
         ILRTATransferDetails memory requestedTransferDetails,
@@ -196,11 +245,9 @@ abstract contract Positions is ILRTA {
         returns (bytes32)
     {
         return dataID(
-            abi.encode(
-                ILRTADataID(
-                    Engine.OrderType.BiDirectional,
-                    abi.encode(BiDirectionalID(token0, token1, scalingFactor, strike, spread))
-                )
+            ILRTADataID(
+                Engine.OrderType.BiDirectional,
+                abi.encode(BiDirectionalID(token0, token1, scalingFactor, strike, spread))
             )
         );
     }
@@ -238,9 +285,7 @@ abstract contract Positions is ILRTA {
         returns (bytes32)
     {
         return dataID(
-            abi.encode(
-                ILRTADataID(Engine.OrderType.Debt, abi.encode(DebtID(token0, token1, scalingFactor, strike, selector)))
-            )
+            ILRTADataID(Engine.OrderType.Debt, abi.encode(DebtID(token0, token1, scalingFactor, strike, selector)))
         );
     }
 
@@ -277,7 +322,7 @@ abstract contract Positions is ILRTA {
             _dataOf[to][id].balance += amount;
         }
 
-        emit Transfer(address(0), to, abi.encode(ILRTATransferDetails(id, amount, Engine.OrderType.BiDirectional)));
+        emit Transfer(address(0), to, abi.encode(ILRTATransferDetails(id, Engine.OrderType.BiDirectional, amount)));
     }
 
     // function _mintLimit(
@@ -329,7 +374,7 @@ abstract contract Positions is ILRTA {
             }
         }
 
-        emit Transfer(address(0), to, abi.encode(ILRTATransferDetails(id, amount, Engine.OrderType.Debt)));
+        emit Transfer(address(0), to, abi.encode(ILRTATransferDetails(id, Engine.OrderType.Debt, amount)));
     }
 
     function _burnBiDirectional(
@@ -347,13 +392,13 @@ abstract contract Positions is ILRTA {
 
         _dataOf[from][id].balance -= amount;
 
-        emit Transfer(from, address(0), abi.encode(ILRTATransferDetails(id, amount, Engine.OrderType.BiDirectional)));
+        emit Transfer(from, address(0), abi.encode(ILRTATransferDetails(id, Engine.OrderType.BiDirectional, amount)));
     }
 
     function _burn(address from, bytes32 id, uint256 amount, Engine.OrderType orderType) internal {
         _dataOf[from][id].balance -= amount;
 
-        emit Transfer(from, address(0), abi.encode(ILRTATransferDetails(id, amount, orderType)));
+        emit Transfer(from, address(0), abi.encode(ILRTATransferDetails(id, orderType, amount)));
     }
 
     // function _burnLimit(
@@ -392,6 +437,6 @@ abstract contract Positions is ILRTA {
         if (balance == amount) delete _dataOf[from][id];
         else _dataOf[from][id].balance = balance - amount;
 
-        emit Transfer(from, address(0), abi.encode(ILRTATransferDetails(id, amount, Engine.OrderType.Debt)));
+        emit Transfer(from, address(0), abi.encode(ILRTATransferDetails(id, Engine.OrderType.Debt, amount)));
     }
 }
