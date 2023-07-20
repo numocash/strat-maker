@@ -1,15 +1,9 @@
-import {
-  engineABI,
-  permit3ABI,
-  routerABI,
-  superSignatureABI,
-} from "./generated.js";
+import { engineABI, permit3ABI, routerABI } from "./generated.js";
 import { ALICE, BOB } from "./test/constants.js";
 import { publicClient, testClient, walletClient } from "./test/utils.js";
 import Engine from "dry-powder/out/Engine.sol/Engine.json";
 import Router from "dry-powder/out/Router.sol/Router.json";
 import Permit3 from "ilrta-evm/out/Permit3.sol/Permit3.json";
-import SuperSignature from "ilrta-evm/out/SuperSignature.sol/SuperSignature.json";
 import invariant from "tiny-invariant";
 import { type Hex, getAddress } from "viem";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
