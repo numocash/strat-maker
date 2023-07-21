@@ -20,7 +20,7 @@ type _TupleOf<T, N extends number, R extends T[]> = R["length"] extends N
   ? R
   : _TupleOf<T, N, [T, ...R]>;
 
-export type Pair = { token0: Token; token1: Token };
+export type Pair = { token0: Token; token1: Token; scalingFactor: number };
 
 export type Strike = AbiTypeToPrimitiveType<"int24">;
 
@@ -106,7 +106,7 @@ export type BorrowLiquidityCommand = CommandType<
     strike: Strike;
     selectorCollateral: Exclude<TokenSelector, "LiquidityPosition">;
     amountDesiredCollateral: bigint;
-    selectorDebt: TokenSelector;
+    // selectorDebt: TokenSelector;
     amountDesiredDebt: bigint;
   }
 >;
@@ -118,7 +118,7 @@ export type RepayLiquidityCommand = CommandType<
     strike: Strike;
     selectorCollateral: Exclude<TokenSelector, "LiquidityPosition">;
     leverageRatio: Fraction;
-    selectorDebt: TokenSelector;
+    // selectorDebt: TokenSelector;
     amountDesiredDebt: bigint;
   }
 >;

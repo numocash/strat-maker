@@ -37,7 +37,7 @@ const token1 = {
   symbol: "TOKEN1",
 } as const satisfies Token;
 
-const pair = { token0, token1 } as const satisfies Pair;
+const pair = { token0, token1, scalingFactor: 0 } as const satisfies Pair;
 
 const oneEther = parseEther("1");
 const ratioAtStrikeNeg1 = 0xfff97272373d413259a407b06395f90fn;
@@ -157,7 +157,7 @@ describe.concurrent("amounts", () => {
       1,
       "Token0",
       parseEther("1.5"),
-      "LiquidityPosition",
+      // "LiquidityPosition",
       parseEther("0.5"),
     );
 
@@ -215,7 +215,7 @@ describe.concurrent("amounts", () => {
       1,
       "Token0",
       parseEther("1.5"),
-      "LiquidityPosition",
+      // "LiquidityPosition",
       parseEther("0.5"),
     );
     const { amount0, amount1, positionDebt } = calculateRepayLiquidity(
@@ -227,7 +227,7 @@ describe.concurrent("amounts", () => {
         (parseEther("1.5") * Q128) / ratioAtStrikeNeg1,
         parseEther("0.5"),
       ),
-      "LiquidityPosition",
+      // "LiquidityPosition",
       parseEther("0.5"),
     );
 

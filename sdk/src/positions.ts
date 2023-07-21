@@ -4,7 +4,6 @@ import {
   TokenSelectorEnum,
 } from "./constants.js";
 import type { OrderType, Spread, Strike, TokenSelector } from "./types.js";
-import { fractionToQ128 } from "./utils.js";
 import type { Fraction, Token } from "reverse-mirage";
 import invariant from "tiny-invariant";
 import {
@@ -42,16 +41,16 @@ export type PositionBiDirectional = ILRTADataID<
   }
 >;
 
-export type PositionLimit = ILRTADataID<
-  "Limit",
-  {
-    token0: Token;
-    token1: Token;
-    strike: Strike;
-    zeroToOne: boolean;
-    liquidityGrowthLast: Fraction;
-  }
->;
+// export type PositionLimit = ILRTADataID<
+//   "Limit",
+//   {
+//     token0: Token;
+//     token1: Token;
+//     strike: Strike;
+//     zeroToOne: boolean;
+//     liquidityGrowthLast: Fraction;
+//   }
+// >;
 
 export type PositionDebt = ILRTADataID<
   "Debt",
@@ -65,7 +64,7 @@ export type PositionDebt = ILRTADataID<
 
 export type PositionBiDirectionalData = ILRTAData<PositionBiDirectional, {}>;
 
-export type PositionLimitData = ILRTAData<PositionLimit, {}>;
+// export type PositionLimitData = ILRTAData<PositionLimit, {}>;
 
 export type PositionDebtData = ILRTAData<
   PositionDebt,
@@ -108,25 +107,25 @@ export const BiDirectionalID = [
   },
 ] as const;
 
-export const LimitID = [
-  {
-    components: [
-      {
-        name: "token0",
-        type: "address",
-      },
-      {
-        name: "token1",
-        type: "address",
-      },
-      { name: "strike", type: "int24" },
-      { name: "zeroToOne", type: "bool" },
-      { name: "liquidityGrowthLast", type: "uint256" },
-    ],
-    name: "limitID",
-    type: "tuple",
-  },
-] as const;
+// export const LimitID = [
+//   {
+//     components: [
+//       {
+//         name: "token0",
+//         type: "address",
+//       },
+//       {
+//         name: "token1",
+//         type: "address",
+//       },
+//       { name: "strike", type: "int24" },
+//       { name: "zeroToOne", type: "bool" },
+//       { name: "liquidityGrowthLast", type: "uint256" },
+//     ],
+//     name: "limitID",
+//     type: "tuple",
+//   },
+// ] as const;
 
 export const DebtID = [
   {
@@ -147,9 +146,7 @@ export const DebtID = [
   },
 ] as const;
 
-export const dataID = (
-  position: PositionBiDirectional | PositionLimit | PositionDebt,
-): Hex =>
+export const dataID = (position: PositionBiDirectional | PositionDebt): Hex =>
   position.orderType === "BiDirectional"
     ? keccak256(
         encodeAbiParameters(ILRTADataID, [
@@ -166,26 +163,26 @@ export const dataID = (
           },
         ]),
       )
-    : position.orderType === "Limit"
-    ? keccak256(
-        encodeAbiParameters(ILRTADataID, [
-          {
-            orderType: OrderTypeEnum.Limit,
-            data: encodeAbiParameters(LimitID, [
-              {
-                token0: position.data.token0.address,
-                token1: position.data.token1.address,
-                strike: position.data.strike,
-                zeroToOne: position.data.zeroToOne,
-                liquidityGrowthLast: fractionToQ128(
-                  position.data.liquidityGrowthLast,
-                ),
-              },
-            ]),
-          },
-        ]),
-      )
-    : keccak256(
+    : // : position.orderType === "Limit"
+      // ? keccak256(
+      //     encodeAbiParameters(ILRTADataID, [
+      //       {
+      //         orderType: OrderTypeEnum.Limit,
+      //         data: encodeAbiParameters(LimitID, [
+      //           {
+      //             token0: position.data.token0.address,
+      //             token1: position.data.token1.address,
+      //             strike: position.data.strike,
+      //             zeroToOne: position.data.zeroToOne,
+      //             liquidityGrowthLast: fractionToQ128(
+      //               position.data.liquidityGrowthLast,
+      //             ),
+      //           },
+      //         ]),
+      //       },
+      //     ]),
+      //   )
+      keccak256(
         encodeAbiParameters(ILRTADataID, [
           {
             orderType: OrderTypeEnum.Debt,
@@ -217,7 +214,7 @@ export const getTransferTypedDataHash = (
   transfer: {
     positionData:
       | PositionBiDirectionalData
-      | PositionLimitData
+      // | PositionLimitData
       | PositionDebtData;
   },
 ): Hex => {
@@ -248,7 +245,7 @@ export const signTransfer = (
   transfer: {
     positionData:
       | PositionBiDirectionalData
-      | PositionLimitData
+      // | PositionLimitData
       | PositionDebtData;
   },
 ): Promise<Hex> => {

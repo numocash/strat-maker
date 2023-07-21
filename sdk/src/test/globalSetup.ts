@@ -9,6 +9,7 @@ export default async function () {
       chainId: 1,
       forkUrl,
       forkBlockNumber,
+      codeSizeLimit: 0x10000,
     },
   });
 }

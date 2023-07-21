@@ -17,7 +17,6 @@ import { addDebtPositions } from "./math.js";
 import {
   type PositionBiDirectionalData,
   type PositionDebtData,
-  type PositionLimitData,
   dataID,
   getTransferTypedDataHash as getTransferTypedDataHashLP,
 } from "./positions.js";
@@ -61,6 +60,8 @@ export const routerRoute = async (
 ): Promise<ReverseMirageWrite<typeof routerABI, "route">> => {
   const blockNumber = await publicClient.getBlockNumber();
   const account: Account = { tokens: {}, liquidityPositions: {} };
+
+  // TODO: when can we write directly to engine
 
   // calculate amounts
   for (const c of args.commands) {
@@ -107,7 +108,7 @@ export const routerRoute = async (
         c.inputs.strike,
         c.inputs.selectorCollateral,
         c.inputs.amountDesiredCollateral,
-        c.inputs.selectorDebt,
+        // c.inputs.selectorDebt,
         c.inputs.amountDesiredDebt,
       );
       updateToken(account, amount0);
@@ -120,7 +121,7 @@ export const routerRoute = async (
         c.inputs.strike,
         c.inputs.selectorCollateral,
         c.inputs.leverageRatio,
-        c.inputs.selectorDebt,
+        // c.inputs.selectorDebt,
         c.inputs.amountDesiredDebt,
       );
       updateToken(account, amount0);
@@ -157,6 +158,7 @@ export const routerRoute = async (
   );
 
   // sign
+  // TODO: don't need to sign if nothing is being done
   const signature = await signSuperSignature(walletClient, userAccount, {
     dataHash: lpTransferDataHash.concat(permitTransferDataHash),
     nonce: args.nonce,
@@ -204,7 +206,7 @@ type Account = {
   liquidityPositions: {
     [id_orderType: `${Hex}_${OrderType}`]:
       | PositionBiDirectionalData
-      | PositionLimitData
+      // | PositionLimitData
       | PositionDebtData;
   };
 };
@@ -227,7 +229,7 @@ const updateLiquidityPosition = (
   account: Account,
   positionData:
     | PositionBiDirectionalData
-    | PositionLimitData
+    // | PositionLimitData
     | PositionDebtData,
 ) => {
   const id = `${dataID(positionData.position)}_${
@@ -252,6 +254,7 @@ const encodeInput = (command: Command): Hex =>
     ? encodeAbiParameters(AddLiquidityParams, [
         command.inputs.pair.token0.address,
         command.inputs.pair.token1.address,
+        command.inputs.pair.scalingFactor,
         command.inputs.strike,
         command.inputs.spread,
         TokenSelectorEnum[command.inputs.tokenSelector],
@@ -261,6 +264,7 @@ const encodeInput = (command: Command): Hex =>
     ? encodeAbiParameters(RemoveLiquidityParams, [
         command.inputs.pair.token0.address,
         command.inputs.pair.token1.address,
+        command.inputs.pair.scalingFactor,
         command.inputs.strike,
         command.inputs.spread,
         TokenSelectorEnum[command.inputs.tokenSelector],
@@ -270,26 +274,29 @@ const encodeInput = (command: Command): Hex =>
     ? encodeAbiParameters(BorrowLiquidityParams, [
         command.inputs.pair.token0.address,
         command.inputs.pair.token1.address,
+        command.inputs.pair.scalingFactor,
         command.inputs.strike,
         TokenSelectorEnum[command.inputs.selectorCollateral],
         command.inputs.amountDesiredCollateral,
-        TokenSelectorEnum[command.inputs.selectorDebt],
+        // TokenSelectorEnum[command.inputs.selectorDebt],
         command.inputs.amountDesiredDebt,
       ])
     : command.command === "RepayLiquidity"
     ? encodeAbiParameters(RepayLiquidityParams, [
         command.inputs.pair.token0.address,
         command.inputs.pair.token1.address,
+        command.inputs.pair.scalingFactor,
         command.inputs.strike,
         TokenSelectorEnum[command.inputs.selectorCollateral],
         fractionToQ128(command.inputs.leverageRatio),
-        TokenSelectorEnum[command.inputs.selectorDebt],
+        // TokenSelectorEnum[command.inputs.selectorDebt],
         command.inputs.amountDesiredDebt,
       ])
     : command.command === "Swap"
     ? encodeAbiParameters(SwapParams, [
         command.inputs.pair.token0.address,
         command.inputs.pair.token1.address,
+        command.inputs.pair.scalingFactor,
         currencyEqualTo(
           command.inputs.amountDesired.currency,
           command.inputs.pair.token0,
@@ -302,65 +309,74 @@ const encodeInput = (command: Command): Hex =>
     ? encodeAbiParameters(AccrueParams, [
         command.inputs.pair.token0.address,
         command.inputs.pair.token1.address,
+        command.inputs.pair.scalingFactor,
       ])
     : encodeAbiParameters(CreatePairParams, [
         command.inputs.pair.token0.address,
         command.inputs.pair.token1.address,
+        command.inputs.pair.scalingFactor,
         command.inputs.strike,
       ]);
 
-const SwapParams = [
+export const SwapParams = [
   { name: "token0", type: "address" },
   { name: "token1", type: "address" },
+  { name: "scalingFactor", type: "uint8" },
   { name: "selector", type: "uint8" },
   { name: "amountDesired", type: "int256" },
 ] as const;
 
-const AddLiquidityParams = [
+export const AddLiquidityParams = [
   { name: "token0", type: "address" },
   { name: "token1", type: "address" },
+  { name: "scalingFactor", type: "uint8" },
   { name: "strike", type: "int24" },
   { name: "spread", type: "uint8" },
   { name: "selector", type: "uint8" },
   { name: "amountDesired", type: "int256" },
 ] as const;
 
-const BorrowLiquidityParams = [
+export const BorrowLiquidityParams = [
   { name: "token0", type: "address" },
   { name: "token1", type: "address" },
+  { name: "scalingFactor", type: "uint8" },
   { name: "strike", type: "int24" },
   { name: "selectorCollateral", type: "uint8" },
   { name: "amountDesiredCollateral", type: "int256" },
-  { name: "selectorDebt", type: "uint8" },
+  // { name: "selectorDebt", type: "uint8" },
   { name: "amountDesiredDebt", type: "uint256" },
 ] as const;
 
-const RepayLiquidityParams = [
+export const RepayLiquidityParams = [
   { name: "token0", type: "address" },
   { name: "token1", type: "address" },
+  { name: "scalingFactor", type: "uint8" },
   { name: "strike", type: "int24" },
   { name: "selectorCollateral", type: "uint8" },
   { name: "leverageRatioX128", type: "uint256" },
-  { name: "selectorDebt", type: "uint8" },
+  // { name: "selectorDebt", type: "uint8" },
   { name: "amountDesiredDebt", type: "uint256" },
 ] as const;
 
-const RemoveLiquidityParams = [
+export const RemoveLiquidityParams = [
   { name: "token0", type: "address" },
   { name: "token1", type: "address" },
+  { name: "scalingFactor", type: "uint8" },
   { name: "strike", type: "int24" },
   { name: "spread", type: "uint8" },
   { name: "selector", type: "uint8" },
   { name: "amountDesired", type: "int256" },
 ] as const;
 
-const AccrueParams = [
+export const AccrueParams = [
   { name: "token0", type: "address" },
   { name: "token1", type: "address" },
+  { name: "scalingFactor", type: "uint8" },
 ] as const;
 
-const CreatePairParams = [
+export const CreatePairParams = [
   { name: "token0", type: "address" },
   { name: "token1", type: "address" },
+  { name: "scalingFactor", type: "uint8" },
   { name: "strikeInitial", type: "int24" },
 ] as const;

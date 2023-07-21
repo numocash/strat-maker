@@ -265,7 +265,7 @@ export const calculateBorrowLiquidity = (
   strike: Strike,
   selectorCollateral: Exclude<TokenSelector, "LiquidityPosition">,
   amountDesiredCollateral: bigint,
-  selectorDebt: TokenSelector,
+  // selectorDebt: TokenSelector,
   amountDesiredDebt: bigint,
 ): {
   amount0: CurrencyAmount<Pair["token0"]>;
@@ -274,19 +274,14 @@ export const calculateBorrowLiquidity = (
 } => {
   invariant(pairData.initialized, "Dry Powder SDK: Pair is not initialized");
 
-  let liquidity: bigint;
+  const liquidity = amountDesiredDebt;
   let amount0 = 0n;
   let amount1 = 0n;
 
-  if (selectorDebt === "LiquidityPosition") {
-    liquidity = amountDesiredDebt;
-    if (strike > pairData.cachedStrikeCurrent) {
-      amount0 = -getAmount0Delta(liquidity, strike);
-    } else {
-      amount1 = -getAmount1Delta(liquidity);
-    }
+  if (strike > pairData.cachedStrikeCurrent) {
+    amount0 = -getAmount0Delta(liquidity, strike);
   } else {
-    throw Error();
+    amount1 = -getAmount1Delta(liquidity);
   }
 
   borrowLiquidity(pairData, strike, liquidity);
@@ -335,7 +330,7 @@ export const calculateRepayLiquidity = (
   strike: Strike,
   selectorCollateral: Exclude<TokenSelector, "LiquidityPosition">,
   leverageRatio: Fraction,
-  selectorDebt: TokenSelector,
+  // selectorDebt: TokenSelector,
   amountDesiredDebt: bigint,
 ): {
   amount0: CurrencyAmount<Pair["token0"]>;
@@ -344,26 +339,20 @@ export const calculateRepayLiquidity = (
 } => {
   invariant(pairData.initialized, "Dry Powder SDK: Pair is not initialized");
 
-  let balance: bigint;
-  let liquidity: bigint;
+  const balance = amountDesiredDebt;
+  const liquidity = debtBalanceToLiquidity(
+    balance,
+    pairData.strikes[strike]!.liquidityGrowth,
+  );
   let amount0: bigint;
   let amount1: bigint;
 
-  if (selectorDebt === "LiquidityPosition") {
-    balance = amountDesiredDebt;
-    liquidity = debtBalanceToLiquidity(
-      balance,
-      pairData.strikes[strike]!.liquidityGrowth,
-    );
-    [amount0, amount1] = getAmountsForLiquidity(
-      pairData,
-      strike,
-      (pairData.strikes[strike]!.activeSpread + 1) as Spread,
-      liquidity,
-    );
-  } else {
-    throw Error();
-  }
+  [amount0, amount1] = getAmountsForLiquidity(
+    pairData,
+    strike,
+    (pairData.strikes[strike]!.activeSpread + 1) as Spread,
+    liquidity,
+  );
 
   repayLiquidity(pairData, strike, liquidity);
 
