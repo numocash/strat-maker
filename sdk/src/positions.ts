@@ -36,6 +36,7 @@ export type PositionBiDirectional = ILRTADataID<
   {
     token0: Token;
     token1: Token;
+    scalingFactor: number;
     strike: Strike;
     spread: Spread;
   }
@@ -57,6 +58,7 @@ export type PositionDebt = ILRTADataID<
   {
     token0: Token;
     token1: Token;
+    scalingFactor: number;
     strike: Strike;
     selectorCollateral: Exclude<TokenSelector, "LiquidityPosition">;
   }

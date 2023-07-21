@@ -1,6 +1,11 @@
 import { CommandEnum, TokenSelectorEnum } from "./constants.js";
 import { engineABI, mockErc20ABI, permit3ABI, routerABI } from "./generated.js";
-import { engineGetPair } from "./reads.js";
+import {
+  engineGetPair,
+  engineGetPositionBiDirectional,
+  engineGetPositionDebt,
+  engineGetStrike,
+} from "./reads.js";
 import { ALICE } from "./test/constants.js";
 import { publicClient, testClient, walletClient } from "./test/utils.js";
 import {
@@ -297,7 +302,7 @@ afterAll(async () => {
 });
 
 describe("reads", () => {
-  test("read initialized", async () => {
+  test("get pair", async () => {
     const pairData = await readAndParse(
       engineGetPair(publicClient, {
         pair: { token0, token1, scalingFactor: 0 },
@@ -308,5 +313,61 @@ describe("reads", () => {
 
     expect(pairData.initialized).toBeTruthy();
     expect(pairData.cachedStrikeCurrent).toBe(0);
+  });
+
+  test("get strike", async () => {
+    const strikeData = await readAndParse(
+      engineGetStrike(publicClient, {
+        pair: { token0, token1, scalingFactor: 0 },
+        strike: 1,
+      }),
+    );
+
+    expect(strikeData).toBeTruthy();
+    expect(strikeData.totalSupply[0]).toBeGreaterThan(0n);
+    expect(strikeData.liquidityBiDirectional[0]).toBeGreaterThan(0n);
+    expect(strikeData.liquidityBorrowed[0]).toBeGreaterThan(0n);
+  });
+
+  test("get bi directional", async () => {
+    const positionData = await readAndParse(
+      engineGetPositionBiDirectional(publicClient, {
+        owner: ALICE,
+        positionBiDirectional: {
+          orderType: "BiDirectional",
+          data: {
+            token0,
+            token1,
+            scalingFactor: 0,
+            strike: 1,
+            spread: 1,
+          },
+        },
+      }),
+    );
+
+    expect(positionData).toBeTruthy();
+    expect(positionData.balance).toBeGreaterThan(0n);
+  });
+
+  test("get debt", async () => {
+    const positionData = await readAndParse(
+      engineGetPositionDebt(publicClient, {
+        owner: ALICE,
+        positionDebt: {
+          orderType: "Debt",
+          data: {
+            token0,
+            token1,
+            scalingFactor: 0,
+            strike: 1,
+            selectorCollateral: "Token0",
+          },
+        },
+      }),
+    );
+
+    expect(positionData).toBeTruthy();
+    expect(positionData.balance).toBeGreaterThan(0n);
   });
 });
