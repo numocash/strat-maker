@@ -46,6 +46,8 @@ import {
   encodeAbiParameters,
 } from "viem";
 
+// TODO: write directly to engine when doing actions that don't require payment
+
 export const routerRoute = async (
   publicClient: PublicClient,
   walletClient: WalletClient,
@@ -60,8 +62,6 @@ export const routerRoute = async (
 ): Promise<ReverseMirageWrite<typeof routerABI, "route">> => {
   const blockNumber = await publicClient.getBlockNumber();
   const account: Account = { tokens: {}, liquidityPositions: {} };
-
-  // TODO: when can we write directly to engine
 
   // calculate amounts
   for (const c of args.commands) {
@@ -158,7 +158,6 @@ export const routerRoute = async (
   );
 
   // sign
-  // TODO: don't need to sign if nothing is being done
   const signature = await signSuperSignature(walletClient, userAccount, {
     dataHash: lpTransferDataHash.concat(permitTransferDataHash),
     nonce: args.nonce,

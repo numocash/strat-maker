@@ -177,7 +177,13 @@ export const calculateAddLiquidity = (
     positionBiDirectional: {
       position: {
         orderType: "BiDirectional",
-        data: { token0: pair.token0, token1: pair.token1, strike, spread },
+        data: {
+          token0: pair.token0,
+          token1: pair.token1,
+          scalingFactor: pair.scalingFactor,
+          strike,
+          spread,
+        },
       },
       orderType: "BiDirectional",
       balance,
@@ -250,7 +256,13 @@ export const calculateRemoveLiquidity = (
     positionBiDirectional: {
       position: {
         orderType: "BiDirectional",
-        data: { token0: pair.token0, token1: pair.token1, strike, spread },
+        data: {
+          token0: pair.token0,
+          token1: pair.token1,
+          scalingFactor: pair.scalingFactor,
+          strike,
+          spread,
+        },
       },
       orderType: "BiDirectional",
       balance: -balance,
@@ -313,6 +325,7 @@ export const calculateBorrowLiquidity = (
         data: {
           token0: pair.token0,
           token1: pair.token1,
+          scalingFactor: pair.scalingFactor,
           strike,
           selectorCollateral,
         },
@@ -375,6 +388,7 @@ export const calculateRepayLiquidity = (
         data: {
           token0: pair.token0,
           token1: pair.token1,
+          scalingFactor: pair.scalingFactor,
           strike,
           selectorCollateral,
         },

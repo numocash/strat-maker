@@ -49,8 +49,8 @@
     "@wagmi/cli": "^1.3.0",
     "abitype": "^0.9.3",
     "rome": "^12.1.3",
-    "typescript": "^5.0.4",
-    "viem": "^1.3.0",
+    "typescript": "^5.1.6",
+    "viem": "^1.3.1",
     "vitest": "^0.33.0"
   }
 }

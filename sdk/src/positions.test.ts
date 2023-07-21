@@ -16,6 +16,7 @@ describe("positions", () => {
       data: {
         token0: mockERC20,
         token1: mockERC20,
+        scalingFactor: 0,
         strike: 0,
         spread: 1,
       },
@@ -45,6 +46,7 @@ describe("positions", () => {
       data: {
         token0: mockERC20,
         token1: mockERC20,
+        scalingFactor: 0,
         strike: 0,
         selectorCollateral: "Token0",
       },
@@ -60,6 +62,7 @@ describe("positions", () => {
         data: {
           token0: mockERC20,
           token1: mockERC20,
+          scalingFactor: 0,
           strike: 0,
           spread: 1,
         },
