@@ -1,14 +1,18 @@
 import { CommandEnum, TokenSelectorEnum } from "./constants.js";
 import { engineABI, mockErc20ABI, permit3ABI, routerABI } from "./generated.js";
 import { engineGetPair } from "./reads.js";
-import { ALICE, BOB } from "./test/constants.js";
+import { ALICE } from "./test/constants.js";
 import { publicClient, testClient, walletClient } from "./test/utils.js";
-import { AddLiquidityParams, CreatePairParams } from "./writes.js";
+import {
+  AddLiquidityParams,
+  BorrowLiquidityParams,
+  CreatePairParams,
+} from "./writes.js";
 import Engine from "dry-powder/out/Engine.sol/Engine.json";
 import MockERC20 from "dry-powder/out/MockERC20.sol/MockERC20.json";
 import Router from "dry-powder/out/Router.sol/Router.json";
 import Permit3 from "ilrta-evm/out/Permit3.sol/Permit3.json";
-import { getTransferTypedDataHash, signSuperSignature } from "ilrta-sdk";
+import { getTransferBatchTypedDataHash, signSuperSignature } from "ilrta-sdk";
 import {
   type Token,
   currencySortsBefore,
@@ -45,7 +49,7 @@ beforeAll(async () => {
 
   // deploy engine
   deployHash = await walletClient.deployContract({
-    account: BOB,
+    account: ALICE,
     abi: engineABI,
     bytecode: Engine.bytecode.object as Hex,
     args: [getAddress(Permit3Address)],
@@ -118,6 +122,56 @@ beforeAll(async () => {
     ? [tokenA, tokenB]
     : [tokenB, tokenA];
 
+  // mint tokens
+  const { request: mintRequest1 } = await publicClient.simulateContract({
+    abi: mockErc20ABI,
+    account: ALICE,
+    address: token0.address,
+    functionName: "mint",
+    args: [ALICE, parseEther("3")],
+  });
+  let hash = await walletClient.writeContract(mintRequest1);
+  await publicClient.waitForTransactionReceipt({
+    hash,
+  });
+
+  const { request: mintRequest2 } = await publicClient.simulateContract({
+    abi: mockErc20ABI,
+    account: ALICE,
+    address: token1.address,
+    functionName: "mint",
+    args: [ALICE, parseEther("1")],
+  });
+  hash = await walletClient.writeContract(mintRequest2);
+  await publicClient.waitForTransactionReceipt({
+    hash,
+  });
+
+  // approve tokens
+  const { request: approveRequest1 } = await publicClient.simulateContract({
+    abi: mockErc20ABI,
+    account: ALICE,
+    address: token0.address,
+    functionName: "approve",
+    args: [Permit3Address, parseEther("3")],
+  });
+  hash = await walletClient.writeContract(approveRequest1);
+  await publicClient.waitForTransactionReceipt({
+    hash,
+  });
+
+  const { request: approveRequest2 } = await publicClient.simulateContract({
+    abi: mockErc20ABI,
+    account: ALICE,
+    address: token1.address,
+    functionName: "approve",
+    args: [Permit3Address, parseEther("1")],
+  });
+  hash = await walletClient.writeContract(approveRequest2);
+  await publicClient.waitForTransactionReceipt({
+    hash,
+  });
+
   // create pair
   const simCreatePair = await publicClient.simulateContract({
     abi: engineABI,
@@ -139,72 +193,103 @@ beforeAll(async () => {
       "0x",
     ],
   });
-  let hash = await walletClient.writeContract(simCreatePair.request);
+  hash = await walletClient.writeContract(simCreatePair.request);
   await publicClient.waitForTransactionReceipt({ hash });
 
   // add liquidity
   const block = await publicClient.getBlock();
-  const dataHash = getTransferTypedDataHash(1, {
-    transferDetails: makeCurrencyAmountFromString(token0, "1"),
+  let dataHash = getTransferBatchTypedDataHash(1, {
+    transferDetails: [makeCurrencyAmountFromString(token0, "1")],
     spender: RouterAddress,
   });
-  const signature = await signSuperSignature(walletClient, ALICE, {
+
+  let verify = {
     dataHash: [dataHash],
     nonce: 0n,
     deadline: block.timestamp + 100n,
+  };
+  let signature = await signSuperSignature(walletClient, ALICE, verify);
+
+  const simAddLiquidity = await publicClient.simulateContract({
+    abi: routerABI,
+    functionName: "route",
+    address: RouterAddress,
+    account: ALICE,
+    args: [
+      {
+        to: ALICE,
+        commands: [CommandEnum.AddLiquidity],
+        inputs: [
+          encodeAbiParameters(AddLiquidityParams, [
+            token0.address,
+            token1.address,
+            0,
+            1,
+            1,
+            TokenSelectorEnum.LiquidityPosition,
+            parseEther("1"),
+          ]),
+        ],
+        numTokens: 1n,
+        numLPs: 1n,
+        permitTransfers: [
+          { token: getAddress(token0.address), amount: parseEther("1") },
+        ],
+        positionTransfers: [],
+        verify,
+        signature,
+      },
+    ],
+  });
+  hash = await walletClient.writeContract(simAddLiquidity.request);
+  await publicClient.waitForTransactionReceipt({ hash });
+
+  // borrow liquidity
+  dataHash = getTransferBatchTypedDataHash(1, {
+    transferDetails: [makeCurrencyAmountFromString(token0, "1.5")],
+    spender: RouterAddress,
   });
 
-  // const simAddLiquidity = await publicClient.simulateContract({
-  //   abi: routerABI,
-  //   functionName: "route",
-  //   address: RouterAddress,
-  //   args: [
-  //     {
-  //       to: ALICE,
-  //       commands: [CommandEnum.AddLiquidity],
-  //       inputs: [
-  //         encodeAbiParameters(AddLiquidityParams, [
-  //           token0.address,
-  //           token1.address,
-  //           0,
-  //           0,
-  //           1,
-  //           TokenSelectorEnum.LiquidityPosition,
-  //           parseEther("1"),
-  //         ]),
-  //       ],
-  //       numLPs: 1n,
-  //       numTokens: 1n,
-  //       permitTransfers: [{ token: token0.address, amount: parseEther("1") }],
-  //       positionTransfers: [],
-  //       verify: {
-  //         dataHash: [dataHash],
-  //         nonce: 0n,
-  //         deadline: block.timestamp + 100n,
-  //       },
-  //       signature,
-  //     },
-  //     // ALICE,
-  //     // [CommandEnum.AddLiquidity],
-  //     // [
-  //     //   encodeAbiParameters(AddLiquidityParams, [
-  //     //     token0.address,
-  //     //     token1.address,
-  //     //     0,
-  //     //     0,
-  //     //     1,
-  //     //     TokenSelectorEnum.LiquidityPosition,
-  //     //     parseEther("1"),
-  //     //   ]),
-  //     // ],
-  //     // 1n,
-  //     // 1n,
-  //     // signature,
-  //   ],
-  // });
-  // hash = await walletClient.writeContract(simAddLiquidity.request);
-  // await publicClient.waitForTransactionReceipt({ hash });
-  // borrow liquidity
+  verify = {
+    dataHash: [dataHash],
+    nonce: 1n,
+    deadline: block.timestamp + 100n,
+  };
+  signature = await signSuperSignature(walletClient, ALICE, verify);
+
+  const simBorrowLiquidity = await publicClient.simulateContract({
+    abi: routerABI,
+    functionName: "route",
+    address: RouterAddress,
+    account: ALICE,
+    args: [
+      {
+        to: ALICE,
+        commands: [CommandEnum.BorrowLiquidity],
+        inputs: [
+          encodeAbiParameters(BorrowLiquidityParams, [
+            token0.address,
+            token1.address,
+            0,
+            1,
+            TokenSelectorEnum.Token0,
+            parseEther("1.5"),
+            parseEther("0.5"),
+          ]),
+        ],
+        numTokens: 1n,
+        numLPs: 1n,
+        permitTransfers: [
+          { token: getAddress(token0.address), amount: parseEther("1.5") },
+        ],
+        positionTransfers: [],
+        verify,
+        signature,
+      },
+    ],
+  });
+  hash = await walletClient.writeContract(simBorrowLiquidity.request);
+  await publicClient.waitForTransactionReceipt({ hash });
 }, 200_000);
 
 afterAll(async () => {
