@@ -12,6 +12,8 @@ import {
   fractionAdd,
   fractionDivide,
   fractionMultiply,
+  fractionQuotient,
+  makeFraction,
 } from "reverse-mirage";
 import invariant from "tiny-invariant";
 
@@ -183,15 +185,17 @@ export const debtBalanceToLiquidity = (
   balance: bigint,
   liquidityGrowth: Fraction,
 ): bigint =>
-  (balance * liquidityGrowth.denominator * Q128) /
-  (liquidityGrowth.numerator + Q128);
+  fractionQuotient(
+    fractionDivide(makeFraction(balance), fractionAdd(liquidityGrowth, 1)),
+  );
 
 export const debtLiquidityToBalance = (
   liquidity: bigint,
   liquidityGrowth: Fraction,
 ): bigint =>
-  (liquidity * (liquidityGrowth.numerator + Q128)) /
-  (liquidityGrowth.denominator * Q128);
+  fractionQuotient(
+    fractionMultiply(fractionAdd(liquidityGrowth, 1), liquidity),
+  );
 
 export const getRatioAtStrike = (strike: Strike): Fraction => {
   const x = strike < 0 ? -strike : strike;

@@ -16,7 +16,6 @@ import {
   liquidityToBalance,
 } from "./math.js";
 import { type PositionData, makePosition } from "./positions.js";
-
 import type {
   Pair,
   PairData,
@@ -287,7 +286,6 @@ export const calculateBorrowLiquidity = (
   }
 
   borrowLiquidity(pairData, strike, liquidity);
-
   let liquidityCollateral: bigint;
   if (selectorCollateral === "Token0") {
     amount0 += amountDesiredCollateral;

@@ -20,8 +20,8 @@ import {
   getTransferTypedDataHash as getTransferTypedDataHashLP,
   positionIsBiDirectional,
 } from "./positions.js";
-import { engineGetPair } from "./reads.js";
-import type { Command, OrderType, PairData } from "./types.js";
+import { engineGetPair, engineGetStrike } from "./reads.js";
+import type { Command, OrderType, PairData, Strike } from "./types.js";
 import { fractionToQ128 } from "./utils.js";
 import { signSuperSignature } from "ilrta-sdk";
 import { getTransferBatchTypedDataHash } from "ilrta-sdk";
@@ -78,16 +78,23 @@ export const routerRoute = async (
         }),
       );
     }
-    //   const pairData = await readAndParse(
-    //   engineGetPair(publicClient, {
-    //     pair: c.inputs.pair,
-    //   }),
-    // );
+
+    const loadStrike = async (strike: Strike) => {
+      if (pairData[id]!.strikes[strike] !== undefined) return;
+      const strikeData = await readAndParse(
+        engineGetStrike(publicClient, {
+          pair: c.inputs.pair,
+          strike: strike,
+        }),
+      );
+      pairData[id]!.strikes[strike] = strikeData;
+    };
 
     if (c.command === "CreatePair") {
       // TODO": a pair that isn't created
     } else if (c.command === "AddLiquidity") {
-      // TODO: load strike data
+      await loadStrike(c.inputs.strike);
+
       const { amount0, amount1, position } = calculateAddLiquidity(
         c.inputs.pair,
         pairData[id]!,
@@ -101,6 +108,8 @@ export const routerRoute = async (
       updateToken(account, amount1);
       updateLiquidityPosition(account, position);
     } else if (c.command === "RemoveLiquidity") {
+      await loadStrike(c.inputs.strike);
+
       const { amount0, amount1, position } = calculateRemoveLiquidity(
         c.inputs.pair,
         pairData[id]!,
@@ -114,6 +123,8 @@ export const routerRoute = async (
       updateToken(account, amount1);
       updateLiquidityPosition(account, position);
     } else if (c.command === "BorrowLiquidity") {
+      await loadStrike(c.inputs.strike);
+
       const { amount0, amount1, position } = calculateBorrowLiquidity(
         c.inputs.pair,
         pairData[id]!,
@@ -127,6 +138,8 @@ export const routerRoute = async (
       updateToken(account, amount1);
       updateLiquidityPosition(account, position);
     } else if (c.command === "RepayLiquidity") {
+      await loadStrike(c.inputs.strike);
+
       const { amount0, amount1, position } = calculateRepayLiquidity(
         c.inputs.pair,
         pairData[id]!,
