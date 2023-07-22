@@ -174,7 +174,6 @@ export const routerRoute = async (
         fractionMultiply(fractionAdd(args.slippage, 1), t.amount),
       ),
     }));
-  console.log(transferRequestsLP);
   // get datahashes
   const lpTransferDataHash = transferRequestsLP.map((t) =>
     getTransferTypedDataHashLP(walletClient.chain!.id, {

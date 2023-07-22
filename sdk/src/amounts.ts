@@ -128,7 +128,6 @@ export const calculateAddLiquidity = (
       next1To0: 0,
       activeSpread: 0,
     };
-  console.log(pairData.strikes);
 
   let balance: bigint;
   let liquidity: bigint;
