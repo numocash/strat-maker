@@ -1,5 +1,10 @@
 import { engineABI, mockErc20ABI, permit3ABI, routerABI } from "./generated.js";
-import { engineGetPair, engineGetStrike } from "./reads.js";
+import { makePosition } from "./positions.js";
+import {
+  engineGetPair,
+  engineGetPositionDebt,
+  engineGetStrike,
+} from "./reads.js";
 import { ALICE } from "./test/constants.js";
 import { publicClient, testClient, walletClient } from "./test/utils.js";
 import { routerRoute } from "./writes.js";
@@ -10,6 +15,7 @@ import Permit3 from "ilrta-evm/out/Permit3.sol/Permit3.json";
 import {
   type Token,
   currencySortsBefore,
+  fractionGreaterThan,
   makeFraction,
   readAndParse,
 } from "reverse-mirage";
@@ -333,7 +339,13 @@ describe("writes", () => {
       },
     );
     await publicClient.waitForTransactionReceipt({ hash: removeHash });
-    // const pairData = await readAndParse(engineGetPair(publicClient, { pair }));
+
+    const strikeData = await readAndParse(
+      engineGetStrike(publicClient, { pair, strike: 0 }),
+    );
+
+    expect(strikeData.liquidityBiDirectional[0]).toBe(0n);
+    expect(strikeData.totalSupply[0]).toBe(0n);
   });
 
   test("borrow liquidity", async () => {
@@ -386,7 +398,7 @@ describe("writes", () => {
     );
     await publicClient.waitForTransactionReceipt({ hash: addHash });
 
-    const { hash: removeHash } = await routerRoute(
+    const { hash: borrowHash } = await routerRoute(
       publicClient,
       walletClient,
       ALICE,
@@ -409,11 +421,153 @@ describe("writes", () => {
         slippage: makeFraction(2, 100),
       },
     );
-    await publicClient.waitForTransactionReceipt({ hash: removeHash });
-    // const pairData = await readAndParse(engineGetPair(publicClient, { pair }));
+    await publicClient.waitForTransactionReceipt({ hash: borrowHash });
+
+    const strikeData = await readAndParse(
+      engineGetStrike(publicClient, { pair, strike: 1 }),
+    );
+
+    expect(strikeData.liquidityBiDirectional[0]).toBeGreaterThan(0n);
+    expect(strikeData.liquidityBorrowed[0]).toBeGreaterThan(0n);
+    expect(strikeData.totalSupply[0]).toBe(parseEther("1"));
+
+    const positionData = await readAndParse(
+      engineGetPositionDebt(publicClient, {
+        owner: ALICE,
+        position: makePosition("Debt", {
+          token0: pair.token0,
+          token1: pair.token1,
+          scalingFactor: 0,
+          strike: 1,
+          selectorCollateral: "Token0",
+        }),
+      }),
+    );
+    expect(positionData.balance).toBe(parseEther("0.5"));
+    expect(fractionGreaterThan(positionData.data.leverageRatio, 0)).toBe(true);
   });
 
-  test.todo("repay liquidity");
+  test("repay liquidity", async () => {
+    const block = await publicClient.getBlock();
+    const pair = { token0, token1, scalingFactor: 0 } as const;
+    const { hash: createHash } = await routerRoute(
+      publicClient,
+      walletClient,
+      ALICE,
+      {
+        to: ALICE,
+        commands: [
+          {
+            command: "CreatePair",
+            inputs: {
+              pair,
+              strike: 0,
+            },
+          },
+        ],
+        nonce: 0n,
+        deadline: block.timestamp + 100n,
+        slippage: makeFraction(2, 100),
+      },
+    );
+    await publicClient.waitForTransactionReceipt({ hash: createHash });
+
+    const { hash: addHash } = await routerRoute(
+      publicClient,
+      walletClient,
+      ALICE,
+      {
+        to: ALICE,
+        commands: [
+          {
+            command: "AddLiquidity",
+            inputs: {
+              pair,
+              strike: 1,
+              spread: 1,
+              tokenSelector: "LiquidityPosition",
+              amountDesired: parseEther("1"),
+            },
+          },
+        ],
+        nonce: 1n,
+        deadline: block.timestamp + 100n,
+        slippage: makeFraction(2, 100),
+      },
+    );
+    await publicClient.waitForTransactionReceipt({ hash: addHash });
+
+    const { hash: borrowHash } = await routerRoute(
+      publicClient,
+      walletClient,
+      ALICE,
+      {
+        to: ALICE,
+        commands: [
+          {
+            command: "BorrowLiquidity",
+            inputs: {
+              pair,
+              strike: 1,
+              selectorCollateral: "Token0",
+              amountDesiredCollateral: parseEther("1.5"),
+              amountDesiredDebt: parseEther("0.5"),
+            },
+          },
+        ],
+        nonce: 2n,
+        deadline: block.timestamp + 100n,
+        slippage: makeFraction(2, 100),
+      },
+    );
+    await publicClient.waitForTransactionReceipt({ hash: borrowHash });
+
+    const positionData = await readAndParse(
+      engineGetPositionDebt(publicClient, {
+        owner: ALICE,
+        position: makePosition("Debt", {
+          token0: pair.token0,
+          token1: pair.token1,
+          scalingFactor: 0,
+          strike: 1,
+          selectorCollateral: "Token0",
+        }),
+      }),
+    );
+
+    const { hash: repayHash } = await routerRoute(
+      publicClient,
+      walletClient,
+      ALICE,
+      {
+        to: ALICE,
+        commands: [
+          {
+            command: "RepayLiquidity",
+            inputs: {
+              pair,
+              strike: 1,
+              selectorCollateral: "Token0",
+              leverageRatio: positionData.data.leverageRatio,
+              amountDesiredDebt: positionData.balance,
+            },
+          },
+        ],
+        nonce: 3n,
+        deadline: block.timestamp + 100n,
+        slippage: makeFraction(2, 100),
+      },
+    );
+    await publicClient.waitForTransactionReceipt({ hash: repayHash });
+
+    const strikeData = await readAndParse(
+      engineGetStrike(publicClient, { pair, strike: 1 }),
+    );
+
+    expect(strikeData.liquidityBiDirectional[0]).toBeGreaterThan(0n);
+    expect(strikeData.liquidityBorrowed[0]).toBe(0n);
+    expect(strikeData.totalSupply[0]).toBe(parseEther("1"));
+  });
 
   test.todo("swap");
 
