@@ -15,10 +15,10 @@ import {
 import { routerABI } from "./generated.js";
 import { addDebtPositions } from "./math.js";
 import {
-  type PositionBiDirectionalData,
-  type PositionDebtData,
+  type PositionData,
   dataID,
   getTransferTypedDataHash as getTransferTypedDataHashLP,
+  positionIsBiDirectional,
 } from "./positions.js";
 import { engineGetPair } from "./reads.js";
 import type { Command, OrderType } from "./types.js";
@@ -29,6 +29,9 @@ import {
   currencyAmountAdd,
   currencyAmountGreaterThan,
   currencyEqualTo,
+  fractionAdd,
+  fractionMultiply,
+  fractionQuotient,
   readAndParse,
 } from "reverse-mirage";
 import type {
@@ -75,7 +78,7 @@ export const routerRoute = async (
     if (c.command === "CreatePair") {
       // TODO": a pair that isn't created
     } else if (c.command === "AddLiquidity") {
-      const { amount0, amount1, positionBiDirectional } = calculateAddLiquidity(
+      const { amount0, amount1, position } = calculateAddLiquidity(
         c.inputs.pair,
         pairData,
         blockNumber,
@@ -86,23 +89,22 @@ export const routerRoute = async (
       );
       updateToken(account, amount0);
       updateToken(account, amount1);
-      updateLiquidityPosition(account, positionBiDirectional);
+      updateLiquidityPosition(account, position);
     } else if (c.command === "RemoveLiquidity") {
-      const { amount0, amount1, positionBiDirectional } =
-        calculateRemoveLiquidity(
-          c.inputs.pair,
-          pairData,
-          blockNumber,
-          c.inputs.strike,
-          c.inputs.spread,
-          c.inputs.tokenSelector,
-          c.inputs.amountDesired,
-        );
+      const { amount0, amount1, position } = calculateRemoveLiquidity(
+        c.inputs.pair,
+        pairData,
+        blockNumber,
+        c.inputs.strike,
+        c.inputs.spread,
+        c.inputs.tokenSelector,
+        c.inputs.amountDesired,
+      );
       updateToken(account, amount0);
       updateToken(account, amount1);
-      updateLiquidityPosition(account, positionBiDirectional);
+      updateLiquidityPosition(account, position);
     } else if (c.command === "BorrowLiquidity") {
-      const { amount0, amount1, positionDebt } = calculateBorrowLiquidity(
+      const { amount0, amount1, position } = calculateBorrowLiquidity(
         c.inputs.pair,
         pairData,
         c.inputs.strike,
@@ -113,9 +115,9 @@ export const routerRoute = async (
       );
       updateToken(account, amount0);
       updateToken(account, amount1);
-      updateLiquidityPosition(account, positionDebt);
+      updateLiquidityPosition(account, position);
     } else if (c.command === "RepayLiquidity") {
-      const { amount0, amount1, positionDebt } = calculateRepayLiquidity(
+      const { amount0, amount1, position } = calculateRepayLiquidity(
         c.inputs.pair,
         pairData,
         c.inputs.strike,
@@ -126,7 +128,7 @@ export const routerRoute = async (
       );
       updateToken(account, amount0);
       updateToken(account, amount1);
-      updateLiquidityPosition(account, positionDebt);
+      updateLiquidityPosition(account, position);
     } else if (c.command === "Swap") {
       const { amount0, amount1 } = calculateSwap(
         c.inputs.pair,
@@ -143,14 +145,28 @@ export const routerRoute = async (
   // filter amounts owed
   const transferRequestsLP = Object.values(account.liquidityPositions)
     .filter((lp) => lp.balance < 0n)
-    .map((lp) => ({ ...lp, balance: -lp.balance }));
-  const transferRequestsToken = Object.values(account.tokens).filter((c) =>
-    currencyAmountGreaterThan(c, 0),
-  );
-
+    .map((lp) => ({ ...lp, balance: -lp.balance }))
+    .map((lp) => ({
+      ...lp,
+      balance: fractionQuotient(
+        fractionMultiply(fractionAdd(args.slippage, 1), lp.balance),
+      ),
+    }));
+  const transferRequestsToken = Object.values(account.tokens)
+    .filter((c) => currencyAmountGreaterThan(c, 0))
+    .map((t) => ({
+      ...t,
+      amount: fractionQuotient(
+        fractionMultiply(fractionAdd(args.slippage, 1), t.amount),
+      ),
+    }));
+  console.log(transferRequestsLP);
   // get datahashes
   const lpTransferDataHash = transferRequestsLP.map((t) =>
-    getTransferTypedDataHashLP(walletClient.chain!.id, { positionData: t }),
+    getTransferTypedDataHashLP(walletClient.chain!.id, {
+      positionData: t,
+      spender: RouterAddress,
+    }),
   );
   const permitTransferDataHash = getTransferBatchTypedDataHash(
     walletClient.chain!.id,
@@ -182,7 +198,7 @@ export const routerRoute = async (
         })),
         positionTransfers: transferRequestsLP.map((t) => ({
           id: dataID(t.position),
-          orderType: OrderTypeEnum[t.orderType],
+          orderType: OrderTypeEnum[t.position.orderType],
           amount: t.balance,
         })),
         verify: {
@@ -203,10 +219,7 @@ export const routerRoute = async (
 type Account = {
   tokens: { [address: Address]: CurrencyAmount<Token> };
   liquidityPositions: {
-    [id_orderType: `${Hex}_${OrderType}`]:
-      | PositionBiDirectionalData
-      // | PositionLimitData
-      | PositionDebtData;
+    [id_orderType: `${Hex}_${OrderType}`]: PositionData<OrderType>;
   };
 };
 
@@ -214,6 +227,8 @@ const updateToken = (
   account: Account,
   currencyAmount: CurrencyAmount<Token>,
 ) => {
+  if (currencyAmount.amount === 0n) return;
+
   if (account.tokens[currencyAmount.currency.address] !== undefined) {
     account.tokens[currencyAmount.currency.address] = currencyAmountAdd(
       account.tokens[currencyAmount.currency.address]!,
@@ -226,23 +241,23 @@ const updateToken = (
 
 const updateLiquidityPosition = (
   account: Account,
-  positionData:
-    | PositionBiDirectionalData
-    // | PositionLimitData
-    | PositionDebtData,
+  positionData: PositionData<OrderType>,
 ) => {
+  if (positionData.balance === 0n) return;
+
   const id = `${dataID(positionData.position)}_${
-    positionData.orderType
+    positionData.position.orderType
   }` as const;
+
   if (account.liquidityPositions[id] === undefined) {
     account.liquidityPositions[id] = positionData;
   } else {
-    if (positionData.orderType !== "Debt") {
+    if (positionIsBiDirectional(positionData.position)) {
       account.liquidityPositions[id]!.balance += positionData.balance;
     } else {
       account.liquidityPositions[id] = addDebtPositions(
-        account.liquidityPositions[id]! as PositionDebtData,
-        positionData,
+        account.liquidityPositions[id]! as PositionData<"Debt">,
+        positionData as PositionData<"Debt">,
       );
     }
   }
@@ -267,7 +282,9 @@ const encodeInput = (command: Command): Hex =>
         command.inputs.strike,
         command.inputs.spread,
         TokenSelectorEnum[command.inputs.tokenSelector],
-        command.inputs.amountDesired,
+        command.inputs.tokenSelector === "LiquidityPosition"
+          ? -command.inputs.amountDesired
+          : command.inputs.amountDesired,
       ])
     : command.command === "BorrowLiquidity"
     ? encodeAbiParameters(BorrowLiquidityParams, [

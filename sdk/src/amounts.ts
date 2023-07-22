@@ -15,10 +15,8 @@ import {
   getLiquidityForAmount1,
   liquidityToBalance,
 } from "./math.js";
-import type {
-  PositionBiDirectionalData,
-  PositionDebtData,
-} from "./positions.js";
+import { type PositionData, makePosition } from "./positions.js";
+
 import type {
   Pair,
   PairData,
@@ -107,7 +105,7 @@ export const calculateAddLiquidity = (
 ): {
   amount0: CurrencyAmount<Pair["token0"]>;
   amount1: CurrencyAmount<Pair["token1"]>;
-  positionBiDirectional: PositionBiDirectionalData;
+  position: PositionData<"BiDirectional">;
 } => {
   invariant(pairData.initialized, "Dry Powder SDK: Pair is not initialized");
 
@@ -174,18 +172,14 @@ export const calculateAddLiquidity = (
   return {
     amount0: makeCurrencyAmountFromRaw(pair.token0, amount0),
     amount1: makeCurrencyAmountFromRaw(pair.token1, amount1),
-    positionBiDirectional: {
-      position: {
-        orderType: "BiDirectional",
-        data: {
-          token0: pair.token0,
-          token1: pair.token1,
-          scalingFactor: pair.scalingFactor,
-          strike,
-          spread,
-        },
-      },
-      orderType: "BiDirectional",
+    position: {
+      position: makePosition("BiDirectional", {
+        token0: pair.token0,
+        token1: pair.token1,
+        scalingFactor: pair.scalingFactor,
+        strike,
+        spread,
+      }),
       balance,
       data: {},
     },
@@ -203,7 +197,7 @@ export const calculateRemoveLiquidity = (
 ): {
   amount0: CurrencyAmount<Pair["token0"]>;
   amount1: CurrencyAmount<Pair["token1"]>;
-  positionBiDirectional: PositionBiDirectionalData;
+  position: PositionData<"BiDirectional">;
 } => {
   invariant(pairData.initialized, "Dry Powder SDK: Pair is not initialized");
 
@@ -253,18 +247,14 @@ export const calculateRemoveLiquidity = (
   return {
     amount0: makeCurrencyAmountFromRaw(pair.token0, -amount0),
     amount1: makeCurrencyAmountFromRaw(pair.token1, -amount1),
-    positionBiDirectional: {
-      position: {
-        orderType: "BiDirectional",
-        data: {
-          token0: pair.token0,
-          token1: pair.token1,
-          scalingFactor: pair.scalingFactor,
-          strike,
-          spread,
-        },
-      },
-      orderType: "BiDirectional",
+    position: {
+      position: makePosition("BiDirectional", {
+        token0: pair.token0,
+        token1: pair.token1,
+        scalingFactor: pair.scalingFactor,
+        strike,
+        spread,
+      }),
       balance: -balance,
       data: {},
     },
@@ -282,7 +272,7 @@ export const calculateBorrowLiquidity = (
 ): {
   amount0: CurrencyAmount<Pair["token0"]>;
   amount1: CurrencyAmount<Pair["token1"]>;
-  positionDebt: PositionDebtData;
+  position: PositionData<"Debt">;
 } => {
   invariant(pairData.initialized, "Dry Powder SDK: Pair is not initialized");
 
@@ -319,18 +309,14 @@ export const calculateBorrowLiquidity = (
   return {
     amount0: makeCurrencyAmountFromRaw(pair.token0, amount0),
     amount1: makeCurrencyAmountFromRaw(pair.token1, amount1),
-    positionDebt: {
-      position: {
-        orderType: "Debt",
-        data: {
-          token0: pair.token0,
-          token1: pair.token1,
-          scalingFactor: pair.scalingFactor,
-          strike,
-          selectorCollateral,
-        },
-      },
-      orderType: "Debt",
+    position: {
+      position: makePosition("Debt", {
+        token0: pair.token0,
+        token1: pair.token1,
+        scalingFactor: pair.scalingFactor,
+        strike,
+        selectorCollateral,
+      }),
       balance,
       data: { leverageRatio },
     },
@@ -348,7 +334,7 @@ export const calculateRepayLiquidity = (
 ): {
   amount0: CurrencyAmount<Pair["token0"]>;
   amount1: CurrencyAmount<Pair["token1"]>;
-  positionDebt: PositionDebtData;
+  position: PositionData<"Debt">;
 } => {
   invariant(pairData.initialized, "Dry Powder SDK: Pair is not initialized");
 
@@ -382,18 +368,14 @@ export const calculateRepayLiquidity = (
   return {
     amount0: makeCurrencyAmountFromRaw(pair.token0, amount0),
     amount1: makeCurrencyAmountFromRaw(pair.token1, amount1),
-    positionDebt: {
-      position: {
-        orderType: "Debt",
-        data: {
-          token0: pair.token0,
-          token1: pair.token1,
-          scalingFactor: pair.scalingFactor,
-          strike,
-          selectorCollateral,
-        },
-      },
-      orderType: "Debt",
+    position: {
+      position: makePosition("Debt", {
+        token0: pair.token0,
+        token1: pair.token1,
+        scalingFactor: pair.scalingFactor,
+        strike,
+        selectorCollateral,
+      }),
       balance: -balance,
       data: { leverageRatio },
     },

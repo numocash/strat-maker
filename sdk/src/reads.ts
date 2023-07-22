@@ -1,11 +1,6 @@
 import { EngineAddress, TokenSelectorEnum } from "./constants.js";
 import { engineABI } from "./generated.js";
-import type {
-  PositionBiDirectional,
-  PositionBiDirectionalData,
-  PositionDebt,
-  PositionDebtData,
-} from "./positions.js";
+import type { Position, PositionData } from "./positions.js";
 import type { Pair, PairData, Strike, StrikeData } from "./types.js";
 import { q128ToFraction } from "./utils.js";
 import type {
@@ -145,6 +140,7 @@ export const engineGetStrike = (
   >;
 };
 
+// TODO: just have get position and infer types
 /**
  * Read and parse biDirectional position data
  * @param publicClient f
@@ -153,7 +149,7 @@ export const engineGetStrike = (
  */
 export const engineGetPositionBiDirectional = (
   publicClient: PublicClient,
-  args: { owner: Address; positionBiDirectional: PositionBiDirectional },
+  args: { owner: Address; position: Position<"BiDirectional"> },
 ) => {
   return {
     read: () =>
@@ -163,17 +159,16 @@ export const engineGetPositionBiDirectional = (
         functionName: "getPositionBiDirectional",
         args: [
           args.owner,
-          args.positionBiDirectional.data.token0.address,
-          args.positionBiDirectional.data.token1.address,
-          args.positionBiDirectional.data.scalingFactor,
-          args.positionBiDirectional.data.strike,
-          args.positionBiDirectional.data.spread,
+          args.position.data.token0.address,
+          args.position.data.token1.address,
+          args.position.data.scalingFactor,
+          args.position.data.strike,
+          args.position.data.spread,
         ],
       }),
-    parse: (data): PositionBiDirectionalData => ({
-      position: args.positionBiDirectional,
+    parse: (data): PositionData<"BiDirectional"> => ({
+      position: args.position,
       balance: data,
-      orderType: "BiDirectional",
       data: {},
     }),
   } satisfies ReverseMirageRead<
@@ -227,7 +222,7 @@ export const engineGetPositionBiDirectional = (
  */
 export const engineGetPositionDebt = (
   publicClient: PublicClient,
-  args: { owner: Address; positionDebt: PositionDebt },
+  args: { owner: Address; position: Position<"Debt"> },
 ) => {
   return {
     read: () =>
@@ -237,17 +232,16 @@ export const engineGetPositionDebt = (
         functionName: "getPositionDebt",
         args: [
           args.owner,
-          args.positionDebt.data.token0.address,
-          args.positionDebt.data.token1.address,
-          args.positionDebt.data.scalingFactor,
-          args.positionDebt.data.strike,
-          TokenSelectorEnum[args.positionDebt.data.selectorCollateral],
+          args.position.data.token0.address,
+          args.position.data.token1.address,
+          args.position.data.scalingFactor,
+          args.position.data.strike,
+          TokenSelectorEnum[args.position.data.selectorCollateral],
         ],
       }),
-    parse: (data): PositionDebtData => ({
-      position: args.positionDebt,
+    parse: (data): PositionData<"Debt"> => ({
+      position: args.position,
       balance: data[0],
-      orderType: "Debt",
       data: { leverageRatio: q128ToFraction(data[1]) },
     }),
   } satisfies ReverseMirageRead<

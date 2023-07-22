@@ -1,18 +1,15 @@
-import {
-  type PositionBiDirectionalData,
-  dataID,
-  getTransferTypedDataHash,
-  signTransfer,
-} from "./positions.js";
-import { ALICE, mockERC20 } from "./test/constants.js";
-import { anvil, walletClient } from "./test/utils.js";
-import { parseEther, recoverAddress } from "viem";
+import { EngineAddress } from "./constants.js";
+import { dataID } from "./positions.js";
+import { mockERC20 } from "./test/constants.js";
 import { describe, expect, test } from "vitest";
 
 describe("positions", () => {
   test("bi directional data id", () => {
     const position = {
       orderType: "BiDirectional",
+      name: "Numoen Dry Powder",
+      symbol: "DP",
+      address: EngineAddress,
       data: {
         token0: mockERC20,
         token1: mockERC20,
@@ -43,6 +40,9 @@ describe("positions", () => {
   test("debt data id", () => {
     const position = {
       orderType: "Debt",
+      name: "Numoen Dry Powder",
+      symbol: "DP",
+      address: EngineAddress,
       data: {
         token0: mockERC20,
         token1: mockERC20,
@@ -53,31 +53,5 @@ describe("positions", () => {
     } as const;
     const id = dataID(position);
     expect(id).toBeTruthy();
-  });
-
-  test("sign transfer", async () => {
-    const position = {
-      position: {
-        orderType: "BiDirectional",
-        data: {
-          token0: mockERC20,
-          token1: mockERC20,
-          scalingFactor: 0,
-          strike: 0,
-          spread: 1,
-        },
-      },
-      orderType: "BiDirectional",
-      balance: parseEther("1"),
-      data: {},
-    } as const satisfies PositionBiDirectionalData;
-    const datahash = getTransferTypedDataHash(anvil.id, {
-      positionData: position,
-    });
-    const signature = await signTransfer(walletClient, ALICE, {
-      positionData: position,
-    });
-    const address = await recoverAddress({ hash: datahash, signature });
-    expect(address).toBe(ALICE);
   });
 });

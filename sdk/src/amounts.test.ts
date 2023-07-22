@@ -57,7 +57,7 @@ describe.concurrent("amounts", () => {
 
   test("calculate add liquidity", () => {
     const pairData = calculateInitialize(0);
-    const { amount0, amount1, positionBiDirectional } = calculateAddLiquidity(
+    const { amount0, amount1, position } = calculateAddLiquidity(
       pair,
       pairData,
       0n,
@@ -70,7 +70,7 @@ describe.concurrent("amounts", () => {
     // amounts
     expect(amount0.amount).toBe(oneEther - 1n);
     expect(amount1.amount).toBe(0n);
-    expect(positionBiDirectional.balance).toBe(oneEther);
+    expect(position.balance).toBe(oneEther);
     expect(currencyEqualTo(amount0.currency, token0)).toBe(true);
     expect(currencyEqualTo(amount1.currency, token1)).toBe(true);
 
@@ -104,21 +104,20 @@ describe.concurrent("amounts", () => {
       "LiquidityPosition",
       oneEther,
     );
-    const { amount0, amount1, positionBiDirectional } =
-      calculateRemoveLiquidity(
-        pair,
-        pairData,
-        0n,
-        0,
-        1,
-        "LiquidityPosition",
-        oneEther,
-      );
+    const { amount0, amount1, position } = calculateRemoveLiquidity(
+      pair,
+      pairData,
+      0n,
+      0,
+      1,
+      "LiquidityPosition",
+      oneEther,
+    );
 
     // amounts
     expect(amount0.amount).toBe(1n - oneEther);
     expect(amount1.amount).toBe(0n);
-    expect(positionBiDirectional.balance).toBe(-oneEther);
+    expect(position.balance).toBe(-oneEther);
     expect(currencyEqualTo(amount0.currency, token0)).toBe(true);
     expect(currencyEqualTo(amount1.currency, token1)).toBe(true);
 
@@ -151,7 +150,7 @@ describe.concurrent("amounts", () => {
       "LiquidityPosition",
       oneEther,
     );
-    const { amount0, amount1, positionDebt } = calculateBorrowLiquidity(
+    const { amount0, amount1, position } = calculateBorrowLiquidity(
       pair,
       pairData,
       1,
@@ -167,10 +166,10 @@ describe.concurrent("amounts", () => {
         (parseEther("0.5") * ratioAtStrikeNeg1 * Q128) / MaxUint256,
     );
     expect(amount1.amount).toBe(0n);
-    expect(positionDebt.balance).toBe(parseEther("0.5"));
+    expect(position.balance).toBe(parseEther("0.5"));
     expect(
       fractionEqualTo(
-        positionDebt.data.leverageRatio,
+        position.data.leverageRatio,
         makeFraction(
           (parseEther("1.5") * Q128) / ratioAtStrikeNeg1,
           parseEther("0.5"),
@@ -218,7 +217,7 @@ describe.concurrent("amounts", () => {
       // "LiquidityPosition",
       parseEther("0.5"),
     );
-    const { amount0, amount1, positionDebt } = calculateRepayLiquidity(
+    const { amount0, amount1, position } = calculateRepayLiquidity(
       pair,
       pairData,
       1,
@@ -238,7 +237,7 @@ describe.concurrent("amounts", () => {
         1n,
     );
     expect(amount1.amount).toBe(0n);
-    expect(positionDebt.balance).toBe(-parseEther("0.5"));
+    expect(position.balance).toBe(-parseEther("0.5"));
     expect(currencyEqualTo(amount0.currency, token0)).toBe(true);
     expect(currencyEqualTo(amount1.currency, token1)).toBe(true);
 

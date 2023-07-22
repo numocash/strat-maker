@@ -1,5 +1,5 @@
 import { Q128 } from "./constants.js";
-import type { PositionDebtData } from "./positions.js";
+import type { PositionData } from "./positions.js";
 import type { Pair, PairData, Spread, Strike } from "./types.js";
 import { fractionToQ128, q128ToFraction } from "./utils.js";
 import {
@@ -294,9 +294,9 @@ export const computeSwapStep = (
 };
 
 export const addDebtPositions = (
-  position0: PositionDebtData,
-  position1: PositionDebtData,
-): PositionDebtData => {
+  position0: PositionData<"Debt">,
+  position1: PositionData<"Debt">,
+): PositionData<"Debt"> => {
   invariant(position0.position !== position1.position);
 
   const collateral0 = fractionMultiply(
@@ -309,7 +309,6 @@ export const addDebtPositions = (
   );
 
   return {
-    orderType: "Debt",
     balance: position0.balance + position1.balance,
     position: position0.position,
     data: {

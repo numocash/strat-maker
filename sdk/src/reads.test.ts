@@ -1,5 +1,6 @@
 import { CommandEnum, TokenSelectorEnum } from "./constants.js";
 import { engineABI, mockErc20ABI, permit3ABI, routerABI } from "./generated.js";
+import { makePosition } from "./positions.js";
 import {
   engineGetPair,
   engineGetPositionBiDirectional,
@@ -333,16 +334,13 @@ describe("reads", () => {
     const positionData = await readAndParse(
       engineGetPositionBiDirectional(publicClient, {
         owner: ALICE,
-        positionBiDirectional: {
-          orderType: "BiDirectional",
-          data: {
-            token0,
-            token1,
-            scalingFactor: 0,
-            strike: 1,
-            spread: 1,
-          },
-        },
+        position: makePosition("BiDirectional", {
+          token0,
+          token1,
+          scalingFactor: 0,
+          strike: 1,
+          spread: 1,
+        }),
       }),
     );
 
@@ -354,16 +352,13 @@ describe("reads", () => {
     const positionData = await readAndParse(
       engineGetPositionDebt(publicClient, {
         owner: ALICE,
-        positionDebt: {
-          orderType: "Debt",
-          data: {
-            token0,
-            token1,
-            scalingFactor: 0,
-            strike: 1,
-            selectorCollateral: "Token0",
-          },
-        },
+        position: makePosition("Debt", {
+          token0,
+          token1,
+          scalingFactor: 0,
+          strike: 1,
+          selectorCollateral: "Token0",
+        }),
       }),
     );
 

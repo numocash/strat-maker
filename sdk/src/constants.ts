@@ -22,7 +22,7 @@ export const TokenSelectorEnum = {
 export const OrderTypeEnum = {
   BiDirectional: 0,
   // Limit: 1,
-  Debt: 2,
+  Debt: 1,
 } as const;
 
 export const CommandEnum = {

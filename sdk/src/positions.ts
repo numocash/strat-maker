@@ -4,6 +4,14 @@ import {
   TokenSelectorEnum,
 } from "./constants.js";
 import type { OrderType, Spread, Strike, TokenSelector } from "./types.js";
+import {
+  type ILRTA,
+  type ILRTARequestedTransfer,
+  type ILRTASignatureTransfer,
+  ILRTASuperSignatureTransfer,
+  ILRTATransfer,
+  type ILRTATransferDetails,
+} from "ilrta-sdk";
 import type { Fraction, Token } from "reverse-mirage";
 import invariant from "tiny-invariant";
 import {
@@ -12,66 +20,75 @@ import {
   type Hex,
   type WalletClient,
   encodeAbiParameters,
+  getAddress,
   hashTypedData,
   keccak256,
 } from "viem";
 
-type ILRTADataID<TOrderType extends OrderType, TIDData extends object> = {
+export type Position<TOrderType extends OrderType> = ILRTA & {
+  name: "Numoen Dry Powder";
+  symbol: "DP";
   orderType: TOrderType;
-  data: TIDData;
+  data: TOrderType extends "BiDirectional"
+    ? {
+        token0: Token;
+        token1: Token;
+        scalingFactor: number;
+        strike: Strike;
+        spread: Spread;
+      }
+    : {
+        token0: Token;
+        token1: Token;
+        scalingFactor: number;
+        strike: Strike;
+        selectorCollateral: Exclude<TokenSelector, "LiquidityPosition">;
+      };
 };
 
-type ILRTAData<
-  TPosition extends ILRTADataID<OrderType, object>,
-  TData extends object,
-> = {
-  position: TPosition;
+export const makePosition = <TOrderType extends OrderType>(
+  orderType: TOrderType,
+  data: Position<TOrderType>["data"],
+): Position<TOrderType> => ({
+  orderType,
+  name: "Numoen Dry Powder",
+  symbol: "DP",
+  address: EngineAddress,
+  data,
+  id: dataID({ orderType, data }),
+});
+
+export type SignatureTransfer<TOrderType extends OrderType> =
+  ILRTASignatureTransfer<Position<TOrderType>, { amount: bigint }>;
+
+export type RequestedTransfer<TOrderType extends OrderType> =
+  ILRTARequestedTransfer<Position<TOrderType>, { amount: bigint }>;
+
+export type PositionData<TOrderType extends OrderType,> = {
+  position: Position<TOrderType>;
   balance: bigint;
-  orderType: TPosition["orderType"];
-  data: TData;
+  data: TOrderType extends "BiDirectional" ? {} : { leverageRatio: Fraction };
 };
 
-export type PositionBiDirectional = ILRTADataID<
-  "BiDirectional",
-  {
-    token0: Token;
-    token1: Token;
-    scalingFactor: number;
-    strike: Strike;
-    spread: Spread;
-  }
->;
+export type PositionTransferDetails<TOrderType extends OrderType> =
+  ILRTATransferDetails<Position<TOrderType>, { amount: bigint }>;
 
-// export type PositionLimit = ILRTADataID<
-//   "Limit",
-//   {
-//     token0: Token;
-//     token1: Token;
-//     strike: Strike;
-//     zeroToOne: boolean;
-//     liquidityGrowthLast: Fraction;
-//   }
-// >;
+export const Data = [
+  { name: "balance", type: "uint128" },
+  { name: "orderType", type: "uint8" },
+  { name: "data", type: "bytes" },
+] as const;
 
-export type PositionDebt = ILRTADataID<
-  "Debt",
-  {
-    token0: Token;
-    token1: Token;
-    scalingFactor: number;
-    strike: Strike;
-    selectorCollateral: Exclude<TokenSelector, "LiquidityPosition">;
-  }
->;
+export const TransferDetails = [
+  { name: "id", type: "bytes32" },
+  { name: "orderType", type: "uint8" },
+  { name: "amount", type: "uint128" },
+] as const;
 
-export type PositionBiDirectionalData = ILRTAData<PositionBiDirectional, {}>;
+export const Transfer = ILRTATransfer(TransferDetails);
 
-// export type PositionLimitData = ILRTAData<PositionLimit, {}>;
-
-export type PositionDebtData = ILRTAData<
-  PositionDebt,
-  { leverageRatio: Fraction }
->;
+export const SuperSignatureTransfer =
+  ILRTASuperSignatureTransfer(TransferDetails);
 
 export const ILRTADataID = [
   {
@@ -101,6 +118,7 @@ export const BiDirectionalID = [
         name: "token1",
         type: "address",
       },
+      { name: "scalingFactor", type: "uint8" },
       { name: "strike", type: "int24" },
       { name: "spread", type: "uint8" },
     ],
@@ -140,6 +158,7 @@ export const DebtID = [
         name: "token1",
         type: "address",
       },
+      { name: "scalingFactor", type: "uint8" },
       { name: "strike", type: "int24" },
       { name: "selector", type: "uint8" },
     ],
@@ -148,76 +167,61 @@ export const DebtID = [
   },
 ] as const;
 
-export const dataID = (position: PositionBiDirectional | PositionDebt): Hex =>
-  position.orderType === "BiDirectional"
-    ? keccak256(
-        encodeAbiParameters(ILRTADataID, [
-          {
-            orderType: OrderTypeEnum.BiDirectional,
-            data: encodeAbiParameters(BiDirectionalID, [
-              {
-                token0: position.data.token0.address,
-                token1: position.data.token1.address,
-                strike: position.data.strike,
-                spread: position.data.spread,
-              },
-            ]),
-          },
-        ]),
-      )
-    : // : position.orderType === "Limit"
-      // ? keccak256(
-      //     encodeAbiParameters(ILRTADataID, [
-      //       {
-      //         orderType: OrderTypeEnum.Limit,
-      //         data: encodeAbiParameters(LimitID, [
-      //           {
-      //             token0: position.data.token0.address,
-      //             token1: position.data.token1.address,
-      //             strike: position.data.strike,
-      //             zeroToOne: position.data.zeroToOne,
-      //             liquidityGrowthLast: fractionToQ128(
-      //               position.data.liquidityGrowthLast,
-      //             ),
-      //           },
-      //         ]),
-      //       },
-      //     ]),
-      //   )
-      keccak256(
-        encodeAbiParameters(ILRTADataID, [
-          {
-            orderType: OrderTypeEnum.Debt,
-            data: encodeAbiParameters(DebtID, [
-              {
-                token0: position.data.token0.address,
-                token1: position.data.token1.address,
-                strike: position.data.strike,
-                selector: TokenSelectorEnum[position.data.selectorCollateral],
-              },
-            ]),
-          },
-        ]),
-      );
+export const positionIsBiDirectional = (
+  position: Pick<Position<OrderType>, "orderType">,
+): position is Position<"BiDirectional"> =>
+  position.orderType === "BiDirectional";
 
-const ILRTATransferDetails = {
-  ILRTATransferDetails: [
-    {
-      name: "id",
-      type: "bytes32",
-    },
-    { name: "amount", type: "uint256" },
-    { name: "orderType", type: "uint8" },
-  ],
-} as const;
+export const positionIsDebt = (
+  position: Pick<Position<OrderType>, "orderType">,
+): position is Position<"Debt"> => position.orderType === "Debt";
+
+export const dataID = (
+  position: Pick<Position<OrderType>, "orderType" | "data">,
+): Hex => {
+  if (positionIsBiDirectional(position))
+    return keccak256(
+      encodeAbiParameters(ILRTADataID, [
+        {
+          orderType: OrderTypeEnum.BiDirectional,
+          data: encodeAbiParameters(BiDirectionalID, [
+            {
+              token0: position.data.token0.address,
+              token1: position.data.token1.address,
+              scalingFactor: position.data.scalingFactor,
+              strike: position.data.strike,
+              spread: position.data.spread,
+            },
+          ]),
+        },
+      ]),
+    );
+  else {
+    invariant(positionIsDebt(position));
+    return keccak256(
+      encodeAbiParameters(ILRTADataID, [
+        {
+          orderType: OrderTypeEnum.Debt,
+          data: encodeAbiParameters(DebtID, [
+            {
+              token0: position.data.token0.address,
+              token1: position.data.token1.address,
+              scalingFactor: position.data.scalingFactor,
+              strike: position.data.strike,
+              selector: TokenSelectorEnum[position.data.selectorCollateral],
+            },
+          ]),
+        },
+      ]),
+    );
+  }
+};
 
 export const getTransferTypedDataHash = (
   chainID: number,
   transfer: {
-    positionData:
-      | PositionBiDirectionalData
-      // | PositionLimitData
-      | PositionDebtData;
+    positionData: PositionData<OrderType>;
+    spender: Address;
   },
 ): Hex => {
   const domain = {
@@ -231,12 +235,15 @@ export const getTransferTypedDataHash = (
 
   return hashTypedData({
     domain,
-    types: ILRTATransferDetails,
-    primaryType: "ILRTATransferDetails",
+    types: SuperSignatureTransfer,
+    primaryType: "Transfer",
     message: {
-      id,
-      orderType: OrderTypeEnum[transfer.positionData.orderType],
-      amount: transfer.positionData.balance,
+      transferDetails: {
+        id,
+        orderType: OrderTypeEnum[transfer.positionData.position.orderType],
+        amount: transfer.positionData.balance,
+      },
+      spender: getAddress(transfer.spender),
     },
   });
 };
@@ -244,12 +251,7 @@ export const getTransferTypedDataHash = (
 export const signTransfer = (
   walletClient: WalletClient,
   account: Account | Address,
-  transfer: {
-    positionData:
-      | PositionBiDirectionalData
-      // | PositionLimitData
-      | PositionDebtData;
-  },
+  transfer: SignatureTransfer<OrderType> & { spender: Address },
 ): Promise<Hex> => {
   const chainID = walletClient.chain?.id;
   invariant(chainID);
@@ -261,17 +263,22 @@ export const signTransfer = (
     verifyingContract: EngineAddress,
   } as const;
 
-  const id = dataID(transfer.positionData.position);
+  const id = dataID(transfer.transferDetails.ilrta);
 
   return walletClient.signTypedData({
     domain,
     account,
-    types: ILRTATransferDetails,
-    primaryType: "ILRTATransferDetails",
+    types: Transfer,
+    primaryType: "Transfer",
     message: {
-      id,
-      orderType: OrderTypeEnum[transfer.positionData.orderType],
-      amount: transfer.positionData.balance,
+      transferDetails: {
+        id,
+        orderType: OrderTypeEnum[transfer.transferDetails.ilrta.orderType],
+        amount: transfer.transferDetails.data.amount,
+      },
+      spender: transfer.spender,
+      nonce: transfer.nonce,
+      deadline: transfer.deadline,
     },
   });
 };

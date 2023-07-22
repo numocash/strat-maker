@@ -42,11 +42,11 @@ contract RouterTest is Test {
 
     bytes32 private constant SUPER_SIGNATURE_ILRTA_TRANSFER_TYPEHASH = keccak256(
         // solhint-disable-next-line max-line-length
-        "Transfer(TransferDetails transferDetails,address spender)TransferDetails(bytes32 id,uint8 orderType,uint256 amount)"
+        "Transfer(TransferDetails transferDetails,address spender)TransferDetails(bytes32 id,uint8 orderType,uint128 amount)"
     );
 
     bytes32 private constant ILRTA_TRANSFER_DETAILS_TYPEHASH =
-        keccak256("TransferDetails(bytes32 id,uint8 orderType,uint256 amount)");
+        keccak256("TransferDetails(bytes32 id,uint8 orderType,uint128 amount)");
 
     function permitDataHash(Permit3.TransferDetails[] memory permitTransfers) private view returns (bytes32) {
         uint256 length = permitTransfers.length;
