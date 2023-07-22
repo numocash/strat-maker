@@ -21,7 +21,7 @@ import {
   positionIsBiDirectional,
 } from "./positions.js";
 import { engineGetPair } from "./reads.js";
-import type { Command, OrderType } from "./types.js";
+import type { Command, OrderType, PairData } from "./types.js";
 import { fractionToQ128 } from "./utils.js";
 import { signSuperSignature } from "ilrta-sdk";
 import { getTransferBatchTypedDataHash } from "ilrta-sdk";
@@ -66,21 +66,31 @@ export const routerRoute = async (
   const blockNumber = await publicClient.getBlockNumber();
   const account: Account = { tokens: {}, liquidityPositions: {} };
 
+  const pairData: Record<string, PairData> = {};
+
   // calculate amounts
   for (const c of args.commands) {
-    // TODO: save pairData between loops
-    const pairData = await readAndParse(
-      engineGetPair(publicClient, {
-        pair: c.inputs.pair,
-      }),
-    );
+    const id = `${c.inputs.pair.token0.address}_${c.inputs.pair.token1.address}_${c.inputs.pair.scalingFactor}`;
+    if (pairData[id] === undefined) {
+      pairData[id] = await readAndParse(
+        engineGetPair(publicClient, {
+          pair: c.inputs.pair,
+        }),
+      );
+    }
+    //   const pairData = await readAndParse(
+    //   engineGetPair(publicClient, {
+    //     pair: c.inputs.pair,
+    //   }),
+    // );
 
     if (c.command === "CreatePair") {
       // TODO": a pair that isn't created
     } else if (c.command === "AddLiquidity") {
+      // TODO: load strike data
       const { amount0, amount1, position } = calculateAddLiquidity(
         c.inputs.pair,
-        pairData,
+        pairData[id]!,
         blockNumber,
         c.inputs.strike,
         c.inputs.spread,
@@ -93,7 +103,7 @@ export const routerRoute = async (
     } else if (c.command === "RemoveLiquidity") {
       const { amount0, amount1, position } = calculateRemoveLiquidity(
         c.inputs.pair,
-        pairData,
+        pairData[id]!,
         blockNumber,
         c.inputs.strike,
         c.inputs.spread,
@@ -106,7 +116,7 @@ export const routerRoute = async (
     } else if (c.command === "BorrowLiquidity") {
       const { amount0, amount1, position } = calculateBorrowLiquidity(
         c.inputs.pair,
-        pairData,
+        pairData[id]!,
         c.inputs.strike,
         c.inputs.selectorCollateral,
         c.inputs.amountDesiredCollateral,
@@ -119,7 +129,7 @@ export const routerRoute = async (
     } else if (c.command === "RepayLiquidity") {
       const { amount0, amount1, position } = calculateRepayLiquidity(
         c.inputs.pair,
-        pairData,
+        pairData[id]!,
         c.inputs.strike,
         c.inputs.selectorCollateral,
         c.inputs.leverageRatio,
@@ -132,13 +142,17 @@ export const routerRoute = async (
     } else if (c.command === "Swap") {
       const { amount0, amount1 } = calculateSwap(
         c.inputs.pair,
-        pairData,
+        pairData[id]!,
         c.inputs.amountDesired,
       );
       updateToken(account, amount0);
       updateToken(account, amount1);
     } else if (c.command === "Accrue") {
-      calculateAccrue(pairData, pairData.cachedStrikeCurrent, blockNumber);
+      calculateAccrue(
+        pairData[id]!,
+        pairData[id]!.cachedStrikeCurrent,
+        blockNumber,
+      );
     }
   }
 

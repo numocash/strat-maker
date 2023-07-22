@@ -336,7 +336,82 @@ describe("writes", () => {
     // const pairData = await readAndParse(engineGetPair(publicClient, { pair }));
   });
 
-  test.todo("borrow liquidity");
+  test("borrow liquidity", async () => {
+    const block = await publicClient.getBlock();
+    const pair = { token0, token1, scalingFactor: 0 } as const;
+    const { hash: createHash } = await routerRoute(
+      publicClient,
+      walletClient,
+      ALICE,
+      {
+        to: ALICE,
+        commands: [
+          {
+            command: "CreatePair",
+            inputs: {
+              pair,
+              strike: 0,
+            },
+          },
+        ],
+        nonce: 0n,
+        deadline: block.timestamp + 100n,
+        slippage: makeFraction(2, 100),
+      },
+    );
+    await publicClient.waitForTransactionReceipt({ hash: createHash });
+
+    const { hash: addHash } = await routerRoute(
+      publicClient,
+      walletClient,
+      ALICE,
+      {
+        to: ALICE,
+        commands: [
+          {
+            command: "AddLiquidity",
+            inputs: {
+              pair,
+              strike: 1,
+              spread: 1,
+              tokenSelector: "LiquidityPosition",
+              amountDesired: parseEther("1"),
+            },
+          },
+        ],
+        nonce: 1n,
+        deadline: block.timestamp + 100n,
+        slippage: makeFraction(2, 100),
+      },
+    );
+    await publicClient.waitForTransactionReceipt({ hash: addHash });
+
+    const { hash: removeHash } = await routerRoute(
+      publicClient,
+      walletClient,
+      ALICE,
+      {
+        to: ALICE,
+        commands: [
+          {
+            command: "BorrowLiquidity",
+            inputs: {
+              pair,
+              strike: 1,
+              selectorCollateral: "Token0",
+              amountDesiredCollateral: parseEther("1.5"),
+              amountDesiredDebt: parseEther("0.5"),
+            },
+          },
+        ],
+        nonce: 2n,
+        deadline: block.timestamp + 100n,
+        slippage: makeFraction(2, 100),
+      },
+    );
+    await publicClient.waitForTransactionReceipt({ hash: removeHash });
+    // const pairData = await readAndParse(engineGetPair(publicClient, { pair }));
+  });
 
   test.todo("repay liquidity");
 
