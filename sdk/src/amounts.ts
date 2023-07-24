@@ -491,7 +491,10 @@ export const calculateSwap = (
       for (let i = 1; i <= NUM_SPREADS; i++) {
         const activeStrike = pairData.cachedStrikeCurrent + i;
 
-        if (pairData.strikeCurrent[i - 1]! > activeStrike) {
+        if (
+          pairData.strikeCurrent[i - 1]! > activeStrike &&
+          pairData.strikes[i - 1] !== undefined
+        ) {
           pairData.strikeCurrent[i - 1] = activeStrike;
           const liquidity =
             pairData.strikes[activeStrike]!.liquidityBiDirectional[i - 1]!;
@@ -500,7 +503,10 @@ export const calculateSwap = (
           swapState.liquidityTotal = liquidity;
           swapState.liquiditySwapSpread[i - 1] = liquidity;
           swapState.liquidityTotalSpread[i - 1] = liquidity;
-        } else if (pairData.strikeCurrent[i - 1]! === activeStrike) {
+        } else if (
+          pairData.strikeCurrent[i - 1]! === activeStrike &&
+          pairData.strikes[i - 1] !== undefined
+        ) {
           const liquidity =
             pairData.strikes[activeStrike]!.liquidityBiDirectional[i - 1]!;
           const composition = pairData.composition[i - 1]!;
@@ -524,7 +530,10 @@ export const calculateSwap = (
       for (let i = 1; i <= NUM_SPREADS; i++) {
         const activeStrike = pairData.cachedStrikeCurrent - i;
 
-        if (pairData.strikeCurrent[i - 1]! > activeStrike) {
+        if (
+          pairData.strikeCurrent[i - 1]! > activeStrike &&
+          pairData.strikes[i - 1] !== undefined
+        ) {
           pairData.strikeCurrent[i - 1] = activeStrike;
           const liquidity =
             pairData.strikes[activeStrike]!.liquidityBiDirectional[i - 1]!;
@@ -533,7 +542,10 @@ export const calculateSwap = (
           swapState.liquidityTotal = liquidity;
           swapState.liquiditySwapSpread[i - 1] = liquidity;
           swapState.liquidityTotalSpread[i - 1] = liquidity;
-        } else if (pairData.strikeCurrent[i - 1]! === activeStrike) {
+        } else if (
+          pairData.strikeCurrent[i - 1]! === activeStrike &&
+          pairData.strikes[i - 1] !== undefined
+        ) {
           const liquidity =
             pairData.strikes[activeStrike]!.liquidityBiDirectional[i - 1]!;
           const composition = pairData.composition[i - 1]!;

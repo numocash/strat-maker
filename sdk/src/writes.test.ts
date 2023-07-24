@@ -15,6 +15,7 @@ import Permit3 from "ilrta-evm/out/Permit3.sol/Permit3.json";
 import {
   type ERC20,
   fractionGreaterThan,
+  makeAmountFromString,
   makeFraction,
   readAndParse,
 } from "reverse-mirage";
@@ -421,8 +422,9 @@ describe("writes", () => {
         slippage: makeFraction(2, 100),
       },
     );
-    await publicClient.waitForTransactionReceipt({ hash: borrowHash });
-
+    await publicClient.waitForTransactionReceipt({
+      hash: borrowHash,
+    });
     const strikeData = await readAndParse(
       engineGetStrike(publicClient, { pair, strike: 1 }),
     );
@@ -577,7 +579,82 @@ describe("writes", () => {
     expect(strikeData.totalSupply[0]).toBe(parseEther("1"));
   });
 
-  test.todo("swap");
+  test("swap", async () => {
+    const block = await publicClient.getBlock();
+    const pair = { token0, token1, scalingFactor: 0 } as const;
+    const { hash: createHash } = await routerRoute(
+      publicClient,
+      walletClient,
+      ALICE,
+      {
+        to: ALICE,
+        commands: [
+          {
+            command: "CreatePair",
+            inputs: {
+              pair,
+              strike: 0,
+            },
+          },
+        ],
+        nonce: 0n,
+        deadline: block.timestamp + 100n,
+        slippage: makeFraction(2, 100),
+      },
+    );
+    await publicClient.waitForTransactionReceipt({ hash: createHash });
+
+    const { hash: addHash } = await routerRoute(
+      publicClient,
+      walletClient,
+      ALICE,
+      {
+        to: ALICE,
+        commands: [
+          {
+            command: "AddLiquidity",
+            inputs: {
+              pair,
+              strike: 0,
+              spread: 1,
+              tokenSelector: "LiquidityPosition",
+              amountDesired: parseEther("1"),
+            },
+          },
+        ],
+        nonce: 1n,
+        deadline: block.timestamp + 100n,
+        slippage: makeFraction(2, 100),
+      },
+    );
+    await publicClient.waitForTransactionReceipt({ hash: addHash });
+
+    const { hash: swapHash } = await routerRoute(
+      publicClient,
+      walletClient,
+      ALICE,
+      {
+        to: ALICE,
+        commands: [
+          {
+            command: "Swap",
+            inputs: {
+              pair,
+              amountDesired: makeAmountFromString(pair.token1, "0.5"),
+            },
+          },
+        ],
+        nonce: 2n,
+        deadline: block.timestamp + 100n,
+        slippage: makeFraction(2, 100),
+      },
+    );
+    await publicClient.waitForTransactionReceipt({ hash: swapHash });
+
+    const pairData = await readAndParse(engineGetPair(publicClient, { pair }));
+
+    expect(fractionGreaterThan(pairData.composition[0], 0)).toBe(true);
+  });
 
   test.todo("accrue");
 });
