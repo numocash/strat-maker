@@ -25,11 +25,10 @@ import type {
   Tuple,
 } from "./types.js";
 import {
-  type CurrencyAmount,
+  type ERC20Amount,
   type Fraction,
   MaxUint128,
-  currencyEqualTo,
-  makeCurrencyAmountFromRaw,
+  makeAmountFromRaw,
   makeFraction,
 } from "reverse-mirage";
 import invariant from "tiny-invariant";
@@ -102,8 +101,8 @@ export const calculateAddLiquidity = (
   tokenSelector: TokenSelector,
   amountDesired: bigint,
 ): {
-  amount0: CurrencyAmount<Pair["token0"]>;
-  amount1: CurrencyAmount<Pair["token1"]>;
+  amount0: ERC20Amount<Pair["token0"]>;
+  amount1: ERC20Amount<Pair["token1"]>;
   position: PositionData<"BiDirectional">;
 } => {
   invariant(pairData.initialized, "Dry Powder SDK: Pair is not initialized");
@@ -169,16 +168,21 @@ export const calculateAddLiquidity = (
   updateStrike(pairData, strike, spread, balance, liquidity);
 
   return {
-    amount0: makeCurrencyAmountFromRaw(pair.token0, amount0),
-    amount1: makeCurrencyAmountFromRaw(pair.token1, amount1),
+    amount0: makeAmountFromRaw(pair.token0, amount0),
+    amount1: makeAmountFromRaw(pair.token1, amount1),
     position: {
-      position: makePosition("BiDirectional", {
-        token0: pair.token0,
-        token1: pair.token1,
-        scalingFactor: pair.scalingFactor,
-        strike,
-        spread,
-      }),
+      type: "positionData",
+      token: makePosition(
+        "BiDirectional",
+        {
+          token0: pair.token0,
+          token1: pair.token1,
+          scalingFactor: pair.scalingFactor,
+          strike,
+          spread,
+        },
+        1,
+      ),
       balance,
       data: {},
     },
@@ -194,8 +198,8 @@ export const calculateRemoveLiquidity = (
   tokenSelector: TokenSelector,
   amountDesired: bigint,
 ): {
-  amount0: CurrencyAmount<Pair["token0"]>;
-  amount1: CurrencyAmount<Pair["token1"]>;
+  amount0: ERC20Amount<Pair["token0"]>;
+  amount1: ERC20Amount<Pair["token1"]>;
   position: PositionData<"BiDirectional">;
 } => {
   invariant(pairData.initialized, "Dry Powder SDK: Pair is not initialized");
@@ -244,16 +248,21 @@ export const calculateRemoveLiquidity = (
   updateStrike(pairData, strike, spread, -balance, -liquidity);
 
   return {
-    amount0: makeCurrencyAmountFromRaw(pair.token0, -amount0),
-    amount1: makeCurrencyAmountFromRaw(pair.token1, -amount1),
+    amount0: makeAmountFromRaw(pair.token0, -amount0),
+    amount1: makeAmountFromRaw(pair.token1, -amount1),
     position: {
-      position: makePosition("BiDirectional", {
-        token0: pair.token0,
-        token1: pair.token1,
-        scalingFactor: pair.scalingFactor,
-        strike,
-        spread,
-      }),
+      type: "positionData",
+      token: makePosition(
+        "BiDirectional",
+        {
+          token0: pair.token0,
+          token1: pair.token1,
+          scalingFactor: pair.scalingFactor,
+          strike,
+          spread,
+        },
+        1,
+      ),
       balance: -balance,
       data: {},
     },
@@ -269,8 +278,8 @@ export const calculateBorrowLiquidity = (
   // selectorDebt: TokenSelector,
   amountDesiredDebt: bigint,
 ): {
-  amount0: CurrencyAmount<Pair["token0"]>;
-  amount1: CurrencyAmount<Pair["token1"]>;
+  amount0: ERC20Amount<Pair["token0"]>;
+  amount1: ERC20Amount<Pair["token1"]>;
   position: PositionData<"Debt">;
 } => {
   invariant(pairData.initialized, "Dry Powder SDK: Pair is not initialized");
@@ -305,16 +314,21 @@ export const calculateBorrowLiquidity = (
   const leverageRatio = makeFraction(liquidityCollateral, balance);
 
   return {
-    amount0: makeCurrencyAmountFromRaw(pair.token0, amount0),
-    amount1: makeCurrencyAmountFromRaw(pair.token1, amount1),
+    amount0: makeAmountFromRaw(pair.token0, amount0),
+    amount1: makeAmountFromRaw(pair.token1, amount1),
     position: {
-      position: makePosition("Debt", {
-        token0: pair.token0,
-        token1: pair.token1,
-        scalingFactor: pair.scalingFactor,
-        strike,
-        selectorCollateral,
-      }),
+      type: "positionData",
+      token: makePosition(
+        "Debt",
+        {
+          token0: pair.token0,
+          token1: pair.token1,
+          scalingFactor: pair.scalingFactor,
+          strike,
+          selectorCollateral,
+        },
+        1,
+      ),
       balance,
       data: { leverageRatio },
     },
@@ -330,8 +344,8 @@ export const calculateRepayLiquidity = (
   // selectorDebt: TokenSelector,
   amountDesiredDebt: bigint,
 ): {
-  amount0: CurrencyAmount<Pair["token0"]>;
-  amount1: CurrencyAmount<Pair["token1"]>;
+  amount0: ERC20Amount<Pair["token0"]>;
+  amount1: ERC20Amount<Pair["token1"]>;
   position: PositionData<"Debt">;
 } => {
   invariant(pairData.initialized, "Dry Powder SDK: Pair is not initialized");
@@ -364,16 +378,21 @@ export const calculateRepayLiquidity = (
   }
 
   return {
-    amount0: makeCurrencyAmountFromRaw(pair.token0, amount0),
-    amount1: makeCurrencyAmountFromRaw(pair.token1, amount1),
+    amount0: makeAmountFromRaw(pair.token0, amount0),
+    amount1: makeAmountFromRaw(pair.token1, amount1),
     position: {
-      position: makePosition("Debt", {
-        token0: pair.token0,
-        token1: pair.token1,
-        scalingFactor: pair.scalingFactor,
-        strike,
-        selectorCollateral,
-      }),
+      type: "positionData",
+      token: makePosition(
+        "Debt",
+        {
+          token0: pair.token0,
+          token1: pair.token1,
+          scalingFactor: pair.scalingFactor,
+          strike,
+          selectorCollateral,
+        },
+        1,
+      ),
       balance: -balance,
       data: { leverageRatio },
     },
@@ -384,16 +403,15 @@ export const calculateRepayLiquidity = (
 export const calculateSwap = (
   pair: Pair,
   pairData: PairData,
-  amountDesired: CurrencyAmount<Pair["token0"] | Pair["token1"]>,
+  amountDesired: ERC20Amount<Pair["token0"] | Pair["token1"]>,
 ): {
-  amount0: CurrencyAmount<Pair["token0"]>;
-  amount1: CurrencyAmount<Pair["token1"]>;
+  amount0: ERC20Amount<Pair["token0"]>;
+  amount1: ERC20Amount<Pair["token1"]>;
 } => {
   invariant(pairData.initialized, "Dry Powder SDK: Pair is not initialized");
 
   const isSwap0To1 =
-    amountDesired.amount > 0 ===
-    currencyEqualTo(amountDesired.currency, pair.token0);
+    amountDesired.amount > 0 === (amountDesired.token === pair.token0);
 
   const swapState: {
     liquiditySwap: bigint;
@@ -402,7 +420,7 @@ export const calculateSwap = (
     liquidityTotalSpread: Tuple<bigint, typeof NUM_SPREADS>;
     amountA: bigint;
     amountB: bigint;
-    amountDesired: CurrencyAmount<Pair["token0"] | Pair["token1"]>;
+    amountDesired: ERC20Amount<Pair["token0"] | Pair["token1"]>;
   } = {
     liquiditySwap: 0n,
     liquidityTotal: 0n,
@@ -410,10 +428,7 @@ export const calculateSwap = (
     liquidityTotalSpread: [0n, 0n, 0n, 0n, 0n],
     amountA: 0n,
     amountB: 0n,
-    amountDesired: makeCurrencyAmountFromRaw(
-      amountDesired.currency,
-      amountDesired.amount,
-    ),
+    amountDesired: makeAmountFromRaw(amountDesired.token, amountDesired.amount),
   };
 
   for (let i = 1; i <= NUM_SPREADS; i++) {
@@ -537,15 +552,15 @@ export const calculateSwap = (
     }
   }
 
-  if (currencyEqualTo(amountDesired.currency, pair.token0)) {
+  if (amountDesired.token === pair.token0) {
     return {
-      amount0: makeCurrencyAmountFromRaw(pair.token0, swapState.amountA),
-      amount1: makeCurrencyAmountFromRaw(pair.token1, swapState.amountB),
+      amount0: makeAmountFromRaw(pair.token0, swapState.amountA),
+      amount1: makeAmountFromRaw(pair.token1, swapState.amountB),
     };
   } else {
     return {
-      amount0: makeCurrencyAmountFromRaw(pair.token0, swapState.amountB),
-      amount1: makeCurrencyAmountFromRaw(pair.token1, swapState.amountA),
+      amount0: makeAmountFromRaw(pair.token0, swapState.amountB),
+      amount1: makeAmountFromRaw(pair.token1, swapState.amountA),
     };
   }
 };

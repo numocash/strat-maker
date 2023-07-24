@@ -5,7 +5,7 @@ import {
   TokenSelectorEnum,
 } from "./constants.js";
 import type { AbiTypeToPrimitiveType } from "abitype";
-import type { CurrencyAmount, Fraction, Token } from "reverse-mirage";
+import type { ERC20, ERC20Amount, Fraction } from "reverse-mirage";
 
 /**
  * A tuple of length `N` with elements of type `T`.
@@ -20,7 +20,7 @@ type _TupleOf<T, N extends number, R extends T[]> = R["length"] extends N
   ? R
   : _TupleOf<T, N, [T, ...R]>;
 
-export type Pair = { token0: Token; token1: Token; scalingFactor: number };
+export type Pair = { token0: ERC20; token1: ERC20; scalingFactor: number };
 
 export type Strike = AbiTypeToPrimitiveType<"int24">;
 
@@ -127,7 +127,7 @@ export type SwapCommand = CommandType<
   "Swap",
   {
     pair: Pair;
-    amountDesired: CurrencyAmount<Pair["token0"] | Pair["token1"]>;
+    amountDesired: ERC20Amount<Pair["token0"] | Pair["token1"]>;
   }
 >;
 

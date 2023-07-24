@@ -39,6 +39,8 @@ describe("positions", () => {
 
   test("debt data id", () => {
     const position = {
+      type: "position",
+      chainID: 1,
       orderType: "Debt",
       name: "Numoen Dry Powder",
       symbol: "DP",

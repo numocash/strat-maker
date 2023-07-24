@@ -19,12 +19,7 @@ import MockERC20 from "dry-powder/out/MockERC20.sol/MockERC20.json";
 import Router from "dry-powder/out/Router.sol/Router.json";
 import Permit3 from "ilrta-evm/out/Permit3.sol/Permit3.json";
 import { getTransferBatchTypedDataHash, signSuperSignature } from "ilrta-sdk";
-import {
-  type Token,
-  currencySortsBefore,
-  makeCurrencyAmountFromString,
-  readAndParse,
-} from "reverse-mirage";
+import { type ERC20, makeAmountFromString, readAndParse } from "reverse-mirage";
 import invariant from "tiny-invariant";
 import {
   type Hex,
@@ -35,8 +30,8 @@ import {
 } from "viem";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
-let token0: Token;
-let token1: Token;
+let token0: ERC20;
+let token1: ERC20;
 
 beforeAll(async () => {
   // deploy permit3
@@ -107,26 +102,27 @@ beforeAll(async () => {
   invariant(tokenBAddress);
 
   const tokenA = {
-    type: "token",
+    type: "erc20",
     symbol: "TEST",
     name: "Test ERC20",
     decimals: 18,
     address: getAddress(tokenAAddress),
     chainID: 1,
-  } as const satisfies Token;
+  } as const satisfies ERC20;
 
   const tokenB = {
-    type: "token",
+    type: "erc20",
     symbol: "TEST",
     name: "Test ERC20",
     decimals: 18,
     address: getAddress(tokenBAddress),
     chainID: 1,
-  } as const satisfies Token;
+  } as const satisfies ERC20;
 
-  [token0, token1] = currencySortsBefore(tokenA, tokenB)
-    ? [tokenA, tokenB]
-    : [tokenB, tokenA];
+  [token0, token1] =
+    tokenA.address.toLowerCase() < tokenB.address.toLowerCase()
+      ? [tokenA, tokenB]
+      : [tokenB, tokenA];
 
   // mint tokens
   const { request: mintRequest1 } = await publicClient.simulateContract({
@@ -205,7 +201,7 @@ beforeAll(async () => {
   // add liquidity
   const block = await publicClient.getBlock();
   let dataHash = getTransferBatchTypedDataHash(1, {
-    transferDetails: [makeCurrencyAmountFromString(token0, "1")],
+    transferDetails: [makeAmountFromString(token0, "1")],
     spender: RouterAddress,
   });
 
@@ -252,7 +248,7 @@ beforeAll(async () => {
 
   // borrow liquidity
   dataHash = getTransferBatchTypedDataHash(1, {
-    transferDetails: [makeCurrencyAmountFromString(token0, "1.5")],
+    transferDetails: [makeAmountFromString(token0, "1.5")],
     spender: RouterAddress,
   });
 
@@ -334,13 +330,17 @@ describe("reads", () => {
     const positionData = await readAndParse(
       engineGetPositionBiDirectional(publicClient, {
         owner: ALICE,
-        position: makePosition("BiDirectional", {
-          token0,
-          token1,
-          scalingFactor: 0,
-          strike: 1,
-          spread: 1,
-        }),
+        position: makePosition(
+          "BiDirectional",
+          {
+            token0,
+            token1,
+            scalingFactor: 0,
+            strike: 1,
+            spread: 1,
+          },
+          1,
+        ),
       }),
     );
 
@@ -352,13 +352,17 @@ describe("reads", () => {
     const positionData = await readAndParse(
       engineGetPositionDebt(publicClient, {
         owner: ALICE,
-        position: makePosition("Debt", {
-          token0,
-          token1,
-          scalingFactor: 0,
-          strike: 1,
-          selectorCollateral: "Token0",
-        }),
+        position: makePosition(
+          "Debt",
+          {
+            token0,
+            token1,
+            scalingFactor: 0,
+            strike: 1,
+            selectorCollateral: "Token0",
+          },
+          1,
+        ),
       }),
     );
 

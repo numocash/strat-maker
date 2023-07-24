@@ -9,33 +9,32 @@ import {
 import { Q128 } from "./constants.js";
 import type { Pair } from "./types.js";
 import {
+  type ERC20,
   MaxUint256,
-  type Token,
-  currencyEqualTo,
   fractionEqualTo,
-  makeCurrencyAmountFromRaw,
+  makeAmountFromRaw,
   makeFraction,
 } from "reverse-mirage";
 import { parseEther } from "viem";
 import { describe, expect, test } from "vitest";
 
 const token0 = {
-  type: "token",
+  type: "erc20",
   chainID: 1,
   address: "0x0000000000000000000000000000000000000001",
   decimals: 18,
   name: "Token 0",
   symbol: "TOKEN0",
-} as const satisfies Token;
+} as const satisfies ERC20;
 
 const token1 = {
-  type: "token",
+  type: "erc20",
   chainID: 1,
   address: "0x0000000000000000000000000000000000000002",
   decimals: 18,
   name: "Token 1",
   symbol: "TOKEN1",
-} as const satisfies Token;
+} as const satisfies ERC20;
 
 const pair = { token0, token1, scalingFactor: 0 } as const satisfies Pair;
 
@@ -71,8 +70,8 @@ describe.concurrent("amounts", () => {
     expect(amount0.amount).toBe(oneEther - 1n);
     expect(amount1.amount).toBe(0n);
     expect(position.balance).toBe(oneEther);
-    expect(currencyEqualTo(amount0.currency, token0)).toBe(true);
-    expect(currencyEqualTo(amount1.currency, token1)).toBe(true);
+    expect(amount0.token === token0).toBe(true);
+    expect(amount1.token === token1).toBe(true);
 
     // pair data
     expect(pairData.strikes[0]).toBeTruthy();
@@ -118,8 +117,8 @@ describe.concurrent("amounts", () => {
     expect(amount0.amount).toBe(1n - oneEther);
     expect(amount1.amount).toBe(0n);
     expect(position.balance).toBe(-oneEther);
-    expect(currencyEqualTo(amount0.currency, token0)).toBe(true);
-    expect(currencyEqualTo(amount1.currency, token1)).toBe(true);
+    expect(amount0.token === token0).toBe(true);
+    expect(amount1.token === token1).toBe(true);
 
     // pair data
     expect(pairData.strikes[0]).toBeTruthy();
@@ -176,8 +175,8 @@ describe.concurrent("amounts", () => {
         ),
       ),
     ).toBe(true);
-    expect(currencyEqualTo(amount0.currency, token0)).toBe(true);
-    expect(currencyEqualTo(amount1.currency, token1)).toBe(true);
+    expect(amount0.token === token0).toBe(true);
+    expect(amount1.token === token1).toBe(true);
 
     // pair data
     expect(pairData.strikes[1]).toBeTruthy();
@@ -238,8 +237,8 @@ describe.concurrent("amounts", () => {
     );
     expect(amount1.amount).toBe(0n);
     expect(position.balance).toBe(-parseEther("0.5"));
-    expect(currencyEqualTo(amount0.currency, token0)).toBe(true);
-    expect(currencyEqualTo(amount1.currency, token1)).toBe(true);
+    expect(amount0.token === token0).toBe(true);
+    expect(amount1.token === token1).toBe(true);
 
     // pair data
     expect(pairData.strikes[1]).toBeTruthy();
@@ -273,12 +272,12 @@ describe.concurrent("amounts", () => {
     const { amount0, amount1 } = calculateSwap(
       pair,
       pairData,
-      makeCurrencyAmountFromRaw(token1, oneEther - 1n),
+      makeAmountFromRaw(token1, oneEther - 1n),
     );
     expect(amount0.amount).toBe(oneEther - 1n);
     expect(amount1.amount).toBe(oneEther - 1n);
-    expect(currencyEqualTo(amount0.currency, token0)).toBe(true);
-    expect(currencyEqualTo(amount1.currency, token1)).toBe(true);
+    expect(amount0.token === token0).toBe(true);
+    expect(amount1.token === token1).toBe(true);
   });
 
   test.todo("calculate accrue", () => {});

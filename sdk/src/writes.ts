@@ -26,19 +26,18 @@ import { fractionToQ128 } from "./utils.js";
 import { signSuperSignature } from "ilrta-sdk";
 import { getTransferBatchTypedDataHash } from "ilrta-sdk";
 import {
-  currencyAmountAdd,
-  currencyAmountGreaterThan,
-  currencyEqualTo,
+  amountAdd,
+  amountGreaterThan,
   fractionAdd,
   fractionMultiply,
   fractionQuotient,
   readAndParse,
 } from "reverse-mirage";
 import type {
-  CurrencyAmount,
+  ERC20,
+  ERC20Amount,
   Fraction,
   ReverseMirageWrite,
-  Token,
 } from "reverse-mirage";
 import {
   type Account as ViemAccount,
@@ -180,7 +179,7 @@ export const routerRoute = async (
       ),
     }));
   const transferRequestsToken = Object.values(account.tokens)
-    .filter((c) => currencyAmountGreaterThan(c, 0))
+    .filter((c) => amountGreaterThan(c, 0))
     .map((t) => ({
       ...t,
       amount: fractionQuotient(
@@ -219,12 +218,12 @@ export const routerRoute = async (
         numTokens: BigInt(Object.values(account.tokens).length),
         numLPs: BigInt(Object.values(account.liquidityPositions).length),
         permitTransfers: transferRequestsToken.map((t) => ({
-          token: t.currency.address,
+          token: t.token.address,
           amount: t.amount,
         })),
         positionTransfers: transferRequestsLP.map((t) => ({
-          id: dataID(t.position),
-          orderType: OrderTypeEnum[t.position.orderType],
+          id: dataID(t.token),
+          orderType: OrderTypeEnum[t.token.orderType],
           amount: t.balance,
         })),
         verify: {
@@ -243,25 +242,22 @@ export const routerRoute = async (
 };
 
 type Account = {
-  tokens: { [address: Address]: CurrencyAmount<Token> };
+  tokens: { [address: Address]: ERC20Amount<ERC20> };
   liquidityPositions: {
     [id_orderType: `${Hex}_${OrderType}`]: PositionData<OrderType>;
   };
 };
 
-const updateToken = (
-  account: Account,
-  currencyAmount: CurrencyAmount<Token>,
-) => {
+const updateToken = (account: Account, currencyAmount: ERC20Amount<ERC20>) => {
   if (currencyAmount.amount === 0n) return;
 
-  if (account.tokens[currencyAmount.currency.address] !== undefined) {
-    account.tokens[currencyAmount.currency.address] = currencyAmountAdd(
-      account.tokens[currencyAmount.currency.address]!,
+  if (account.tokens[currencyAmount.token.address] !== undefined) {
+    account.tokens[currencyAmount.token.address] = amountAdd(
+      account.tokens[currencyAmount.token.address]!,
       currencyAmount.amount,
     );
   } else {
-    account.tokens[currencyAmount.currency.address] = currencyAmount;
+    account.tokens[currencyAmount.token.address] = currencyAmount;
   }
 };
 
@@ -271,14 +267,14 @@ const updateLiquidityPosition = (
 ) => {
   if (positionData.balance === 0n) return;
 
-  const id = `${dataID(positionData.position)}_${
-    positionData.position.orderType
+  const id = `${dataID(positionData.token)}_${
+    positionData.token.orderType
   }` as const;
 
   if (account.liquidityPositions[id] === undefined) {
     account.liquidityPositions[id] = positionData;
   } else {
-    if (positionIsBiDirectional(positionData.position)) {
+    if (positionIsBiDirectional(positionData.token)) {
       account.liquidityPositions[id]!.balance += positionData.balance;
     } else {
       account.liquidityPositions[id] = addDebtPositions(
@@ -339,10 +335,7 @@ const encodeInput = (command: Command): Hex =>
         command.inputs.pair.token0.address,
         command.inputs.pair.token1.address,
         command.inputs.pair.scalingFactor,
-        currencyEqualTo(
-          command.inputs.amountDesired.currency,
-          command.inputs.pair.token0,
-        )
+        command.inputs.amountDesired.token === command.inputs.pair.token0
           ? TokenSelectorEnum.Token0
           : TokenSelectorEnum.Token1,
         command.inputs.amountDesired.amount,

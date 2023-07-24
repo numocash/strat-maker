@@ -167,7 +167,8 @@ export const engineGetPositionBiDirectional = (
         ],
       }),
     parse: (data): PositionData<"BiDirectional"> => ({
-      position: args.position,
+      type: "positionData",
+      token: args.position,
       balance: data,
       data: {},
     }),
@@ -240,7 +241,8 @@ export const engineGetPositionDebt = (
         ],
       }),
     parse: (data): PositionData<"Debt"> => ({
-      position: args.position,
+      type: "positionData",
+      token: args.position,
       balance: data[0],
       data: { leverageRatio: q128ToFraction(data[1]) },
     }),

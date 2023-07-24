@@ -3,12 +3,11 @@ import type { PositionData } from "./positions.js";
 import type { Pair, PairData, Spread, Strike } from "./types.js";
 import { fractionToQ128, q128ToFraction } from "./utils.js";
 import {
-  type CurrencyAmount,
+  type ERC20,
+  type ERC20Amount,
   type Fraction,
   MaxUint128,
   MaxUint256,
-  type Token,
-  currencyEqualTo,
   fractionAdd,
   fractionDivide,
   fractionMultiply,
@@ -252,10 +251,10 @@ export const computeSwapStep = (
   pair: Pair,
   strike: Strike,
   liquidity: bigint,
-  amountDesired: CurrencyAmount<Token>,
+  amountDesired: ERC20Amount<ERC20>,
 ): { amountIn: bigint; amountOut: bigint; liquidityRemaining: bigint } => {
   const isExactIn = amountDesired.amount > 0;
-  const isToken0 = currencyEqualTo(pair.token0, amountDesired.currency);
+  const isToken0 = pair.token0 === amountDesired.token;
   const ratio = getRatioAtStrike(strike);
 
   if (isExactIn) {
@@ -301,7 +300,7 @@ export const addDebtPositions = (
   position0: PositionData<"Debt">,
   position1: PositionData<"Debt">,
 ): PositionData<"Debt"> => {
-  invariant(position0.position !== position1.position);
+  invariant(position0.token !== position1.token);
 
   const collateral0 = fractionMultiply(
     position0.data.leverageRatio,
@@ -313,8 +312,9 @@ export const addDebtPositions = (
   );
 
   return {
+    type: "positionData",
     balance: position0.balance + position1.balance,
-    position: position0.position,
+    token: position0.token,
     data: {
       leverageRatio: fractionDivide(
         fractionAdd(collateral0, collateral1),

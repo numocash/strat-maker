@@ -13,8 +13,7 @@ import MockERC20 from "dry-powder/out/MockERC20.sol/MockERC20.json";
 import Router from "dry-powder/out/Router.sol/Router.json";
 import Permit3 from "ilrta-evm/out/Permit3.sol/Permit3.json";
 import {
-  type Token,
-  currencySortsBefore,
+  type ERC20,
   fractionGreaterThan,
   makeFraction,
   readAndParse,
@@ -31,8 +30,8 @@ import {
 } from "vitest";
 
 let id: Hex;
-let token0: Token;
-let token1: Token;
+let token0: ERC20;
+let token1: ERC20;
 
 beforeAll(async () => {
   // deploy permit3
@@ -103,26 +102,27 @@ beforeAll(async () => {
   invariant(tokenBAddress);
 
   const tokenA = {
-    type: "token",
+    type: "erc20",
     symbol: "TEST",
     name: "Test ERC20",
     decimals: 18,
     address: getAddress(tokenAAddress),
     chainID: 1,
-  } as const satisfies Token;
+  } as const satisfies ERC20;
 
   const tokenB = {
-    type: "token",
+    type: "erc20",
     symbol: "TEST",
     name: "Test ERC20",
     decimals: 18,
     address: getAddress(tokenBAddress),
     chainID: 1,
-  } as const satisfies Token;
+  } as const satisfies ERC20;
 
-  [token0, token1] = currencySortsBefore(tokenA, tokenB)
-    ? [tokenA, tokenB]
-    : [tokenB, tokenA];
+  [token0, token1] =
+    tokenA.address.toLowerCase() < tokenB.address.toLowerCase()
+      ? [tokenA, tokenB]
+      : [tokenB, tokenA];
 
   // mint tokens
   const { request: mintRequest1 } = await publicClient.simulateContract({
@@ -434,13 +434,17 @@ describe("writes", () => {
     const positionData = await readAndParse(
       engineGetPositionDebt(publicClient, {
         owner: ALICE,
-        position: makePosition("Debt", {
-          token0: pair.token0,
-          token1: pair.token1,
-          scalingFactor: 0,
-          strike: 1,
-          selectorCollateral: "Token0",
-        }),
+        position: makePosition(
+          "Debt",
+          {
+            token0: pair.token0,
+            token1: pair.token1,
+            scalingFactor: 0,
+            strike: 1,
+            selectorCollateral: "Token0",
+          },
+          1,
+        ),
       }),
     );
     expect(positionData.balance).toBe(parseEther("0.5"));
@@ -525,13 +529,17 @@ describe("writes", () => {
     const positionData = await readAndParse(
       engineGetPositionDebt(publicClient, {
         owner: ALICE,
-        position: makePosition("Debt", {
-          token0: pair.token0,
-          token1: pair.token1,
-          scalingFactor: 0,
-          strike: 1,
-          selectorCollateral: "Token0",
-        }),
+        position: makePosition(
+          "Debt",
+          {
+            token0: pair.token0,
+            token1: pair.token1,
+            scalingFactor: 0,
+            strike: 1,
+            selectorCollateral: "Token0",
+          },
+          1,
+        ),
       }),
     );
 
