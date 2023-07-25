@@ -144,11 +144,7 @@ contract RouterTest is Test {
         commands[0] = Engine.Commands.AddLiquidity;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(
-            Engine.AddLiquidityParams(
-                address(token0), address(token1), 0, 0, 1, Engine.TokenSelector.LiquidityPosition, 1e18
-            )
-        );
+        inputs[0] = abi.encode(Engine.AddLiquidityParams(address(token0), address(token1), 0, 0, 1, 1e18));
 
         Permit3.TransferDetails[] memory permitTransferDetails = new Permit3.TransferDetails[](1);
         permitTransferDetails[0] = Permit3.TransferDetails({token: address(token0), amount: 1e18});
@@ -189,7 +185,7 @@ contract RouterTest is Test {
         bytes[] memory inputs = createInputs();
 
         (Engine.Commands addCommand, bytes memory addInput) =
-            addLiquidityCommand(address(token0), address(token1), 0, 0, 1, Engine.TokenSelector.LiquidityPosition, 1e18);
+            addLiquidityCommand(address(token0), address(token1), 0, 0, 1, 1e18);
 
         commands = pushCommands(commands, addCommand);
         inputs = pushInputs(inputs, addInput);
@@ -221,9 +217,8 @@ contract RouterTest is Test {
 
         // REMOVE LIQUIDITY
 
-        (Engine.Commands removeCommand, bytes memory removeInput) = removeLiquidityCommand(
-            address(token0), address(token1), 0, 0, 1, Engine.TokenSelector.LiquidityPosition, -1e18
-        );
+        (Engine.Commands removeCommand, bytes memory removeInput) =
+            removeLiquidityCommand(address(token0), address(token1), 0, 0, 1, 1e18);
 
         commands[0] = removeCommand;
         inputs[0] = removeInput;
@@ -268,7 +263,7 @@ contract RouterTest is Test {
         bytes[] memory inputs = createInputs();
 
         (Engine.Commands addCommand, bytes memory addInput) =
-            addLiquidityCommand(address(token0), address(token1), 0, 0, 1, Engine.TokenSelector.LiquidityPosition, 1e18);
+            addLiquidityCommand(address(token0), address(token1), 0, 0, 1, 1e18);
 
         commands = pushCommands(commands, addCommand);
         inputs = pushInputs(inputs, addInput);
@@ -347,7 +342,7 @@ contract RouterTest is Test {
         bytes[] memory inputs = createInputs();
 
         (Engine.Commands addCommand, bytes memory addInput) =
-            addLiquidityCommand(address(token0), address(token1), 0, 1, 1, Engine.TokenSelector.LiquidityPosition, 1e18);
+            addLiquidityCommand(address(token0), address(token1), 0, 1, 1, 1e18);
 
         commands = pushCommands(commands, addCommand);
         inputs = pushInputs(inputs, addInput);
@@ -423,7 +418,7 @@ contract RouterTest is Test {
         bytes[] memory inputs = createInputs();
 
         (Engine.Commands addCommand, bytes memory addInput) =
-            addLiquidityCommand(address(token0), address(token1), 0, 1, 1, Engine.TokenSelector.LiquidityPosition, 1e18);
+            addLiquidityCommand(address(token0), address(token1), 0, 1, 1, 1e18);
 
         commands = pushCommands(commands, addCommand);
         inputs = pushInputs(inputs, addInput);

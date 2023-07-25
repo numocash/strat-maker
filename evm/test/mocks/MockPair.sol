@@ -15,7 +15,12 @@ import {
     getAmountsForLiquidity,
     toInt256
 } from "src/core/math/LiquidityMath.sol";
-import {balanceToLiquidity, debtBalanceToLiquidity, debtLiquidityToBalance} from "src/core/math/PositionMath.sol";
+import {
+    balanceToLiquidity,
+    liquidityToBalance,
+    debtBalanceToLiquidity,
+    debtLiquidityToBalance
+} from "src/core/math/PositionMath.sol";
 import {Q128} from "src/core/math/StrikeMath.sol";
 
 import {IExecuteCallback} from "src/core/interfaces/IExecuteCallback.sol";
@@ -168,13 +173,13 @@ contract MockPair is Positions {
     function addLiquidity(
         int24 strike,
         uint8 spread,
-        uint128 balance
+        uint128 liquidity
     )
         public
         returns (uint256 amount0, uint256 amount1)
     {
         if (pair.cachedStrikeCurrent == strike) pair._accrue(strike);
-        uint128 liquidity = balanceToLiquidity(pair, strike, spread, balance, true);
+        uint128 balance = liquidityToBalance(pair, strike, spread, liquidity, true);
         (amount0, amount1) = getAmountsForLiquidity(pair, strike, spread, uint256(liquidity), true);
 
         pair.updateStrike(strike, spread, int128(balance), int128(liquidity));

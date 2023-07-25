@@ -83,8 +83,7 @@ contract Engine is Positions {
 
     enum TokenSelector {
         Token0,
-        Token1,
-        LiquidityPosition
+        Token1
     }
 
     enum SwapTokenSelector {
@@ -113,8 +112,7 @@ contract Engine is Positions {
         uint8 scalingFactor;
         int24 strike;
         uint8 spread;
-        TokenSelector selector;
-        int256 amountDesired;
+        uint128 amountDesired;
     }
 
     struct BorrowLiquidityParams {
@@ -143,8 +141,7 @@ contract Engine is Positions {
         uint8 scalingFactor;
         int24 strike;
         uint8 spread;
-        TokenSelector selector;
-        int256 amountDesired;
+        uint128 amountDesired;
     }
 
     struct AccrueParams {
@@ -349,57 +346,13 @@ contract Engine is Positions {
         if (pair.cachedStrikeCurrent == params.strike) pair._accrue(params.strike);
 
         // calculate how much to add
-        int128 balance;
-        int128 liquidity;
-        int256 amount0;
-        int256 amount1;
-        if (params.selector == TokenSelector.LiquidityPosition) {
-            if (params.amountDesired < 0) revert InvalidAmountDesired();
-
-            balance = int128(params.amountDesired);
-            liquidity = toInt128(balanceToLiquidity(pair, params.strike, params.spread, uint128(balance), true));
-            (uint256 _amount0, uint256 _amount1) = getAmountsForLiquidity(
-                pair, params.strike, params.spread, scaleLiquidityUp(uint128(liquidity), params.scalingFactor), true
-            );
-            amount0 = int256(_amount0);
-            amount1 = int256(_amount1);
-        } else if (params.selector == TokenSelector.Token0) {
-            if (params.amountDesired < 0) revert InvalidAmountDesired();
-
-            liquidity = toInt128(
-                scaleLiquidityDown(
-                    getLiquidityForAmount0(pair, params.strike, params.spread, uint256(params.amountDesired), true),
-                    params.scalingFactor
-                )
-            );
-            amount0 = params.amountDesired;
-            amount1 = toInt256(
-                getAmount1ForLiquidity(
-                    pair, params.strike, params.spread, scaleLiquidityUp(uint128(liquidity), params.scalingFactor), true
-                )
-            );
-        } else if (params.selector == TokenSelector.Token1) {
-            if (params.amountDesired < 0) revert InvalidAmountDesired();
-
-            liquidity = toInt128(
-                scaleLiquidityDown(
-                    getLiquidityForAmount1(pair, params.strike, params.spread, uint256(params.amountDesired), true),
-                    params.scalingFactor
-                )
-            );
-            amount0 = toInt256(
-                getAmount0ForLiquidity(
-                    pair, params.strike, params.spread, scaleLiquidityUp(uint128(liquidity), params.scalingFactor), true
-                )
-            );
-            amount1 = params.amountDesired;
-        } else {
-            revert InvalidSelector();
-        }
-
-        if (params.selector == TokenSelector.Token0 || params.selector == TokenSelector.Token1) {
-            balance = toInt128(liquidityToBalance(pair, params.strike, params.spread, uint128(liquidity), false));
-        }
+        int128 liquidity = toInt128(params.amountDesired);
+        int128 balance = toInt128(liquidityToBalance(pair, params.strike, params.spread, params.amountDesired, true));
+        (uint256 _amount0, uint256 _amount1) = getAmountsForLiquidity(
+            pair, params.strike, params.spread, scaleLiquidityUp(params.amountDesired, params.scalingFactor), true
+        );
+        int256 amount0 = int256(_amount0);
+        int256 amount1 = int256(_amount1);
 
         // add to pair
         pair.updateStrike(params.strike, params.spread, balance, liquidity);
@@ -530,65 +483,14 @@ contract Engine is Positions {
         if (pair.cachedStrikeCurrent == params.strike) pair._accrue(params.strike);
 
         // calculate how much to remove
-        int128 balance;
-        int128 liquidity;
-        int256 amount0;
-        int256 amount1;
-        if (params.selector == TokenSelector.LiquidityPosition) {
-            if (params.amountDesired > 0) revert InvalidAmountDesired();
-
-            balance = int128(params.amountDesired);
-            liquidity = -toInt128(balanceToLiquidity(pair, params.strike, params.spread, uint128(-balance), false));
-            (uint256 _amount0, uint256 _amount1) = getAmountsForLiquidity(
-                pair, params.strike, params.spread, scaleLiquidityUp(uint128(-liquidity), params.scalingFactor), false
-            );
-            amount0 = -int256(_amount0);
-            amount1 = -int256(_amount1);
-        } else if (params.selector == TokenSelector.Token0) {
-            if (params.amountDesired > 0) revert InvalidAmountDesired();
-
-            liquidity = -toInt128(
-                scaleLiquidityDown(
-                    getLiquidityForAmount0(pair, params.strike, params.spread, uint256(-params.amountDesired), false),
-                    params.scalingFactor
-                )
-            );
-            amount0 = params.amountDesired;
-            amount1 = -toInt256(
-                getAmount1ForLiquidity(
-                    pair,
-                    params.strike,
-                    params.spread,
-                    scaleLiquidityUp(uint128(-liquidity), params.scalingFactor),
-                    false
-                )
-            );
-        } else if (params.selector == TokenSelector.Token1) {
-            if (params.amountDesired > 0) revert InvalidAmountDesired();
-
-            liquidity = -toInt128(
-                scaleLiquidityDown(
-                    getLiquidityForAmount1(pair, params.strike, params.spread, uint256(-params.amountDesired), false),
-                    params.scalingFactor
-                )
-            );
-            amount0 = -toInt256(
-                getAmount0ForLiquidity(
-                    pair,
-                    params.strike,
-                    params.spread,
-                    scaleLiquidityUp(uint128(-liquidity), params.scalingFactor),
-                    false
-                )
-            );
-            amount1 = params.amountDesired;
-        } else {
-            revert InvalidSelector();
-        }
-
-        if (params.selector == TokenSelector.Token0 || params.selector == TokenSelector.Token1) {
-            balance = -toInt128(liquidityToBalance(pair, params.strike, params.spread, uint128(-liquidity), true));
-        }
+        int128 balance = -toInt128(params.amountDesired);
+        int128 liquidity =
+            -toInt128(balanceToLiquidity(pair, params.strike, params.spread, uint128(params.amountDesired), false));
+        (uint256 _amount0, uint256 _amount1) = getAmountsForLiquidity(
+            pair, params.strike, params.spread, scaleLiquidityUp(uint128(-liquidity), params.scalingFactor), false
+        );
+        int256 amount0 = -int256(_amount0);
+        int256 amount1 = -int256(_amount1);
 
         // remove from pair
         pair.updateStrike(params.strike, params.spread, balance, liquidity);
