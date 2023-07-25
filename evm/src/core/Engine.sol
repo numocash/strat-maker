@@ -7,15 +7,11 @@ import {Pairs, NUM_SPREADS} from "./Pairs.sol";
 import {Positions} from "./Positions.sol";
 import {mulDiv} from "./math/FullMath.sol";
 import {
-    getLiquidityForAmount0,
-    getLiquidityForAmount1,
     getAmountsForLiquidity,
     getAmount0Delta,
     getAmount1Delta,
     getLiquidityDeltaAmount0,
     getLiquidityDeltaAmount1,
-    getAmount0ForLiquidity,
-    getAmount1ForLiquidity,
     scaleLiquidityUp,
     scaleLiquidityDown
 } from "./math/LiquidityMath.sol";
@@ -83,13 +79,18 @@ contract Engine is Positions {
 
     enum TokenSelector {
         Token0,
+        Token1
+    }
+
+    enum SwapTokenSelector {
+        Token0,
         Token1,
-        LiquidityPosition
+        Token0Account,
+        Token1Account
     }
 
     enum OrderType {
         BiDirectional,
-        // Limit,
         Debt
     }
 
@@ -97,7 +98,7 @@ contract Engine is Positions {
         address token0;
         address token1;
         uint8 scalingFactor;
-        TokenSelector selector;
+        SwapTokenSelector selector;
         int256 amountDesired;
     }
 
@@ -107,8 +108,7 @@ contract Engine is Positions {
         uint8 scalingFactor;
         int24 strike;
         uint8 spread;
-        TokenSelector selector;
-        int256 amountDesired;
+        uint128 amountDesired;
     }
 
     struct BorrowLiquidityParams {
@@ -118,7 +118,6 @@ contract Engine is Positions {
         int24 strike;
         TokenSelector selectorCollateral;
         uint256 amountDesiredCollateral;
-        // TokenSelector selectorDebt;
         uint128 amountDesiredDebt;
     }
 
@@ -129,7 +128,6 @@ contract Engine is Positions {
         int24 strike;
         TokenSelector selectorCollateral;
         uint256 leverageRatioX128;
-        // TokenSelector selectorDebt;
         uint128 amountDesiredDebt;
     }
 
@@ -139,8 +137,7 @@ contract Engine is Positions {
         uint8 scalingFactor;
         int24 strike;
         uint8 spread;
-        TokenSelector selector;
-        int256 amountDesired;
+        uint128 amountDesired;
     }
 
     struct AccrueParams {
@@ -214,14 +211,12 @@ contract Engine is Positions {
                     if (commands[i] == Commands.Swap) {
                         _swap(abi.decode(inputs[i], (SwapParams)), account);
                     } else {
-                        // command must be 1, which is add liquidity
                         _addLiquidity(to, abi.decode(inputs[i], (AddLiquidityParams)), account);
                     }
                 } else {
                     if (commands[i] == Commands.BorrowLiquidity) {
                         _borrowLiquidity(to, abi.decode(inputs[i], (BorrowLiquidityParams)), account);
                     } else {
-                        // must be _repayLiquidity
                         _repayLiquidity(abi.decode(inputs[i], (RepayLiquidityParams)), account);
                     }
                 }
@@ -230,12 +225,10 @@ contract Engine is Positions {
                     if (commands[i] == Commands.RemoveLiquidity) {
                         _removeLiquidity(abi.decode(inputs[i], (RemoveLiquidityParams)), account);
                     } else {
-                        // accrue
                         _accrue(abi.decode(inputs[i], (AccrueParams)));
                     }
                 } else {
                     if (commands[i] == Commands.CreatePair) {
-                        // create pair
                         _createPair(abi.decode(inputs[i], (CreatePairParams)));
                     } else {
                         revert InvalidCommand();
@@ -256,6 +249,7 @@ contract Engine is Positions {
             // token is zero, so skip it.
             if (token == address(0)) {
                 i++;
+                // TODO: when would this occur
             } else {
                 // if delta is negative, transfer token to recipient address
                 if (delta < 0) {
@@ -284,7 +278,6 @@ contract Engine is Positions {
             address token = account.tokens[i];
 
             if (token == address(0)) break;
-
             if (delta > 0) {
                 uint256 balance = BalanceLib.getBalance(token);
                 if (balance < account.balances[i] + uint256(delta)) revert InsufficientInput();
@@ -301,7 +294,6 @@ contract Engine is Positions {
             bytes32 id = account.lpIDs[i];
 
             if (id == bytes32(0)) break;
-
             if (delta < 0) {
                 _burn(address(this), id, delta, account.orderTypes[i]);
             }
@@ -320,12 +312,22 @@ contract Engine is Positions {
         (bytes32 pairID, Pairs.Pair storage pair) =
             pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
 
-        if (params.selector != TokenSelector.Token0 && params.selector != TokenSelector.Token1) {
+        int256 amount0;
+        int256 amount1;
+        if (params.selector < SwapTokenSelector.Token0Account) {
+            (amount0, amount1) =
+                pair.swap(params.scalingFactor, params.selector == SwapTokenSelector.Token0, params.amountDesired);
+        } else if (params.selector == SwapTokenSelector.Token0Account) {
+            assert(account.tokens[uint256(params.amountDesired)] == params.token0);
+            (amount0, amount1) =
+                pair.swap(params.scalingFactor, true, -account.tokenDeltas[uint256(params.amountDesired)]);
+        } else if (params.selector == SwapTokenSelector.Token1Account) {
+            assert(account.tokens[uint256(params.amountDesired)] == params.token1);
+            (amount0, amount1) =
+                pair.swap(params.scalingFactor, false, -account.tokenDeltas[uint256(params.amountDesired)]);
+        } else {
             revert InvalidSelector();
         }
-
-        (int256 amount0, int256 amount1) =
-            pair.swap(params.scalingFactor, params.selector == TokenSelector.Token0, params.amountDesired);
         account.updateToken(params.token0, amount0);
         account.updateToken(params.token1, amount1);
 
@@ -338,57 +340,13 @@ contract Engine is Positions {
         if (pair.cachedStrikeCurrent == params.strike) pair._accrue(params.strike);
 
         // calculate how much to add
-        int128 balance;
-        int128 liquidity;
-        int256 amount0;
-        int256 amount1;
-        if (params.selector == TokenSelector.LiquidityPosition) {
-            if (params.amountDesired < 0) revert InvalidAmountDesired();
-
-            balance = int128(params.amountDesired);
-            liquidity = toInt128(balanceToLiquidity(pair, params.strike, params.spread, uint128(balance), true));
-            (uint256 _amount0, uint256 _amount1) = getAmountsForLiquidity(
-                pair, params.strike, params.spread, scaleLiquidityUp(uint128(liquidity), params.scalingFactor), true
-            );
-            amount0 = int256(_amount0);
-            amount1 = int256(_amount1);
-        } else if (params.selector == TokenSelector.Token0) {
-            if (params.amountDesired < 0) revert InvalidAmountDesired();
-
-            liquidity = toInt128(
-                scaleLiquidityDown(
-                    getLiquidityForAmount0(pair, params.strike, params.spread, uint256(params.amountDesired), true),
-                    params.scalingFactor
-                )
-            );
-            amount0 = params.amountDesired;
-            amount1 = toInt256(
-                getAmount1ForLiquidity(
-                    pair, params.strike, params.spread, scaleLiquidityUp(uint128(liquidity), params.scalingFactor), true
-                )
-            );
-        } else if (params.selector == TokenSelector.Token1) {
-            if (params.amountDesired < 0) revert InvalidAmountDesired();
-
-            liquidity = toInt128(
-                scaleLiquidityDown(
-                    getLiquidityForAmount1(pair, params.strike, params.spread, uint256(params.amountDesired), true),
-                    params.scalingFactor
-                )
-            );
-            amount0 = toInt256(
-                getAmount0ForLiquidity(
-                    pair, params.strike, params.spread, scaleLiquidityUp(uint128(liquidity), params.scalingFactor), true
-                )
-            );
-            amount1 = params.amountDesired;
-        } else {
-            revert InvalidSelector();
-        }
-
-        if (params.selector == TokenSelector.Token0 || params.selector == TokenSelector.Token1) {
-            balance = toInt128(liquidityToBalance(pair, params.strike, params.spread, uint128(liquidity), false));
-        }
+        int128 liquidity = toInt128(params.amountDesired);
+        int128 balance = toInt128(liquidityToBalance(pair, params.strike, params.spread, params.amountDesired, true));
+        (uint256 _amount0, uint256 _amount1) = getAmountsForLiquidity(
+            pair, params.strike, params.spread, scaleLiquidityUp(params.amountDesired, params.scalingFactor), true
+        );
+        int256 amount0 = int256(_amount0);
+        int256 amount1 = int256(_amount1);
 
         // add to pair
         pair.updateStrike(params.strike, params.spread, balance, liquidity);
@@ -415,27 +373,24 @@ contract Engine is Positions {
         (bytes32 pairID, Pairs.Pair storage pair) =
             pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
 
-        pair.borrowLiquidity(params.strike, params.amountDesiredDebt);
+        uint128 liquidityToken1 = pair.borrowLiquidity(params.strike, params.amountDesiredDebt);
 
         // calculate the the tokens that are borrowed
-        if (params.strike > pair.cachedStrikeCurrent) {
-            account.updateToken(
-                params.token0,
-                -toInt256(
-                    getAmount0Delta(
-                        scaleLiquidityUp(params.amountDesiredDebt, params.scalingFactor), params.strike, false
-                    )
+        account.updateToken(
+            params.token0,
+            -toInt256(
+                getAmount0Delta(
+                    scaleLiquidityUp(params.amountDesiredDebt - liquidityToken1, params.scalingFactor),
+                    params.strike,
+                    false
                 )
-            );
-        } else {
-            account.updateToken(
-                params.token1,
-                -toInt256(getAmount1Delta(scaleLiquidityUp(params.amountDesiredDebt, params.scalingFactor)))
-            );
-        }
+            )
+        );
+        account.updateToken(
+            params.token1, -toInt256(getAmount1Delta(scaleLiquidityUp(liquidityToken1, params.scalingFactor)))
+        );
 
         // add collateral to account
-        // TODO: check borrowing current strikes
         uint256 liquidityCollateral;
         if (params.selectorCollateral == TokenSelector.Token0) {
             account.updateToken(params.token0, toInt256(params.amountDesiredCollateral));
@@ -519,65 +474,14 @@ contract Engine is Positions {
         if (pair.cachedStrikeCurrent == params.strike) pair._accrue(params.strike);
 
         // calculate how much to remove
-        int128 balance;
-        int128 liquidity;
-        int256 amount0;
-        int256 amount1;
-        if (params.selector == TokenSelector.LiquidityPosition) {
-            if (params.amountDesired > 0) revert InvalidAmountDesired();
-
-            balance = int128(params.amountDesired);
-            liquidity = -toInt128(balanceToLiquidity(pair, params.strike, params.spread, uint128(-balance), false));
-            (uint256 _amount0, uint256 _amount1) = getAmountsForLiquidity(
-                pair, params.strike, params.spread, scaleLiquidityUp(uint128(-liquidity), params.scalingFactor), false
-            );
-            amount0 = -int256(_amount0);
-            amount1 = -int256(_amount1);
-        } else if (params.selector == TokenSelector.Token0) {
-            if (params.amountDesired > 0) revert InvalidAmountDesired();
-
-            liquidity = -toInt128(
-                scaleLiquidityDown(
-                    getLiquidityForAmount0(pair, params.strike, params.spread, uint256(-params.amountDesired), false),
-                    params.scalingFactor
-                )
-            );
-            amount0 = params.amountDesired;
-            amount1 = -toInt256(
-                getAmount1ForLiquidity(
-                    pair,
-                    params.strike,
-                    params.spread,
-                    scaleLiquidityUp(uint128(-liquidity), params.scalingFactor),
-                    false
-                )
-            );
-        } else if (params.selector == TokenSelector.Token1) {
-            if (params.amountDesired > 0) revert InvalidAmountDesired();
-
-            liquidity = -toInt128(
-                scaleLiquidityDown(
-                    getLiquidityForAmount1(pair, params.strike, params.spread, uint256(-params.amountDesired), false),
-                    params.scalingFactor
-                )
-            );
-            amount0 = -toInt256(
-                getAmount0ForLiquidity(
-                    pair,
-                    params.strike,
-                    params.spread,
-                    scaleLiquidityUp(uint128(-liquidity), params.scalingFactor),
-                    false
-                )
-            );
-            amount1 = params.amountDesired;
-        } else {
-            revert InvalidSelector();
-        }
-
-        if (params.selector == TokenSelector.Token0 || params.selector == TokenSelector.Token1) {
-            balance = -toInt128(liquidityToBalance(pair, params.strike, params.spread, uint128(-liquidity), true));
-        }
+        int128 balance = -toInt128(params.amountDesired);
+        int128 liquidity =
+            -toInt128(balanceToLiquidity(pair, params.strike, params.spread, uint128(params.amountDesired), false));
+        (uint256 _amount0, uint256 _amount1) = getAmountsForLiquidity(
+            pair, params.strike, params.spread, scaleLiquidityUp(uint128(-liquidity), params.scalingFactor), false
+        );
+        int256 amount0 = -int256(_amount0);
+        int256 amount1 = -int256(_amount1);
 
         // remove from pair
         pair.updateStrike(params.strike, params.spread, balance, liquidity);
@@ -661,25 +565,10 @@ contract Engine is Positions {
     )
         external
         view
-        returns (uint256 balance)
+        returns (uint128 balance)
     {
         return _dataOf[owner][_biDirectionalID(token0, token1, scalingFactor, strike, spread)].balance;
     }
-
-    // function getPositionLimit(
-    //     address owner,
-    //     address token0,
-    //     address token1,
-    //     int24 strike,
-    //     bool zeroToOne,
-    //     uint256 liquidityGrowthLast
-    // )
-    //     external
-    //     view
-    //     returns (uint256 balance)
-    // {
-    //     return _dataOf[owner][_limitID(token0, token1, strike, zeroToOne, liquidityGrowthLast)].balance;
-    // }
 
     function getPositionDebt(
         address owner,
@@ -691,7 +580,7 @@ contract Engine is Positions {
     )
         external
         view
-        returns (uint256 balance, uint256 leverageRatioX128)
+        returns (uint128 balance, uint256 leverageRatioX128)
     {
         balance = _dataOf[owner][_debtID(token0, token1, scalingFactor, strike, selector)].balance;
         Positions.DebtData memory debtData = _dataOfDebt(owner, token0, token1, scalingFactor, strike, selector);

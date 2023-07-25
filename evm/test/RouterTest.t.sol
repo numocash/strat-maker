@@ -144,11 +144,7 @@ contract RouterTest is Test {
         commands[0] = Engine.Commands.AddLiquidity;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(
-            Engine.AddLiquidityParams(
-                address(token0), address(token1), 0, 0, 1, Engine.TokenSelector.LiquidityPosition, 1e18
-            )
-        );
+        inputs[0] = abi.encode(Engine.AddLiquidityParams(address(token0), address(token1), 0, 0, 1, 1e18));
 
         Permit3.TransferDetails[] memory permitTransferDetails = new Permit3.TransferDetails[](1);
         permitTransferDetails[0] = Permit3.TransferDetails({token: address(token0), amount: 1e18});
@@ -189,7 +185,7 @@ contract RouterTest is Test {
         bytes[] memory inputs = createInputs();
 
         (Engine.Commands addCommand, bytes memory addInput) =
-            addLiquidityCommand(address(token0), address(token1), 0, 0, 1, Engine.TokenSelector.LiquidityPosition, 1e18);
+            addLiquidityCommand(address(token0), address(token1), 0, 0, 1, 1e18);
 
         commands = pushCommands(commands, addCommand);
         inputs = pushInputs(inputs, addInput);
@@ -221,9 +217,8 @@ contract RouterTest is Test {
 
         // REMOVE LIQUIDITY
 
-        (Engine.Commands removeCommand, bytes memory removeInput) = removeLiquidityCommand(
-            address(token0), address(token1), 0, 0, 1, Engine.TokenSelector.LiquidityPosition, -1e18
-        );
+        (Engine.Commands removeCommand, bytes memory removeInput) =
+            removeLiquidityCommand(address(token0), address(token1), 0, 0, 1, 1e18);
 
         commands[0] = removeCommand;
         inputs[0] = removeInput;
@@ -268,7 +263,7 @@ contract RouterTest is Test {
         bytes[] memory inputs = createInputs();
 
         (Engine.Commands addCommand, bytes memory addInput) =
-            addLiquidityCommand(address(token0), address(token1), 0, 0, 1, Engine.TokenSelector.LiquidityPosition, 1e18);
+            addLiquidityCommand(address(token0), address(token1), 0, 0, 1, 1e18);
 
         commands = pushCommands(commands, addCommand);
         inputs = pushInputs(inputs, addInput);
@@ -305,7 +300,7 @@ contract RouterTest is Test {
         token1.approve(address(permit3), 1e18);
 
         (Engine.Commands _swapCommand, bytes memory swapInput) =
-            swapCommand(address(token0), address(token1), 0, Engine.TokenSelector.Token1, 1e18 - 1);
+            swapCommand(address(token0), address(token1), 0, Engine.SwapTokenSelector.Token1, 1e18 - 1);
 
         commands[0] = _swapCommand;
         inputs[0] = swapInput;
@@ -347,7 +342,7 @@ contract RouterTest is Test {
         bytes[] memory inputs = createInputs();
 
         (Engine.Commands addCommand, bytes memory addInput) =
-            addLiquidityCommand(address(token0), address(token1), 0, 1, 1, Engine.TokenSelector.LiquidityPosition, 1e18);
+            addLiquidityCommand(address(token0), address(token1), 0, 0, 1, 1e18);
 
         commands = pushCommands(commands, addCommand);
         inputs = pushInputs(inputs, addInput);
@@ -380,7 +375,7 @@ contract RouterTest is Test {
         // BORROW LIQUIDITY
 
         (Engine.Commands borrowCommand, bytes memory borrowInput) =
-            borrowLiquidityCommand(address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0, 1e18, 0.5e18);
+            borrowLiquidityCommand(address(token0), address(token1), 0, 0, Engine.TokenSelector.Token0, 1e18, 0.5e18);
 
         commands[0] = borrowCommand;
         inputs[0] = borrowInput;
@@ -423,7 +418,7 @@ contract RouterTest is Test {
         bytes[] memory inputs = createInputs();
 
         (Engine.Commands addCommand, bytes memory addInput) =
-            addLiquidityCommand(address(token0), address(token1), 0, 1, 1, Engine.TokenSelector.LiquidityPosition, 1e18);
+            addLiquidityCommand(address(token0), address(token1), 0, 0, 1, 1e18);
 
         commands = pushCommands(commands, addCommand);
         inputs = pushInputs(inputs, addInput);
@@ -456,7 +451,7 @@ contract RouterTest is Test {
         // BORROW LIQUIDITY
 
         (Engine.Commands borrowCommand, bytes memory borrowInput) =
-            borrowLiquidityCommand(address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0, 1e18, 0.5e18);
+            borrowLiquidityCommand(address(token0), address(token1), 0, 0, Engine.TokenSelector.Token0, 1e18, 0.5e18);
 
         commands[0] = borrowCommand;
         inputs[0] = borrowInput;
@@ -488,10 +483,10 @@ contract RouterTest is Test {
 
         {
             (, uint256 leverageRatioX128) =
-                engine.getPositionDebt(owner, address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0);
+                engine.getPositionDebt(owner, address(token0), address(token1), 0, 0, Engine.TokenSelector.Token0);
 
             (Engine.Commands repayCommand, bytes memory repayInput) = repayLiquidityCommand(
-                address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0, leverageRatioX128, 0.5e18
+                address(token0), address(token1), 0, 0, Engine.TokenSelector.Token0, leverageRatioX128, 0.5e18
             );
 
             commands[0] = repayCommand;
@@ -503,7 +498,7 @@ contract RouterTest is Test {
             engine.dataID(
                 Positions.ILRTADataID(
                     Engine.OrderType.Debt,
-                    abi.encode(Positions.DebtID(address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0))
+                    abi.encode(Positions.DebtID(address(token0), address(token1), 0, 0, Engine.TokenSelector.Token0))
                 )
             ),
             Engine.OrderType.Debt,

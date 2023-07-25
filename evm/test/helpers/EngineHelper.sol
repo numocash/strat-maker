@@ -68,11 +68,7 @@ contract EngineHelper is IExecuteCallback {
         commands[0] = Engine.Commands.AddLiquidity;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(
-            Engine.AddLiquidityParams(
-                address(token0), address(token1), 0, 0, 1, Engine.TokenSelector.LiquidityPosition, 1e18
-            )
-        );
+        inputs[0] = abi.encode(Engine.AddLiquidityParams(address(token0), address(token1), 0, 0, 1, 1e18));
 
         engine.execute(address(this), commands, inputs, 1, 1, bytes(""));
     }
@@ -82,11 +78,7 @@ contract EngineHelper is IExecuteCallback {
         commands[0] = Engine.Commands.RemoveLiquidity;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(
-            Engine.RemoveLiquidityParams(
-                address(token0), address(token1), 0, 0, 1, Engine.TokenSelector.LiquidityPosition, -1e18
-            )
-        );
+        inputs[0] = abi.encode(Engine.RemoveLiquidityParams(address(token0), address(token1), 0, 0, 1, 1e18));
 
         engine.execute(address(this), commands, inputs, 1, 1, bytes(""));
     }

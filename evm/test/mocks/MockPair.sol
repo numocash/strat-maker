@@ -15,7 +15,12 @@ import {
     getAmountsForLiquidity,
     toInt256
 } from "src/core/math/LiquidityMath.sol";
-import {balanceToLiquidity, debtBalanceToLiquidity, debtLiquidityToBalance} from "src/core/math/PositionMath.sol";
+import {
+    balanceToLiquidity,
+    liquidityToBalance,
+    debtBalanceToLiquidity,
+    debtLiquidityToBalance
+} from "src/core/math/PositionMath.sol";
 import {Q128} from "src/core/math/StrikeMath.sol";
 
 import {IExecuteCallback} from "src/core/interfaces/IExecuteCallback.sol";
@@ -54,14 +59,11 @@ contract MockPair is Positions {
         returns (int256 amount0, int256 amount1)
     {
         if (pair.cachedStrikeCurrent == strike) pair._accrue(strike);
-        pair.borrowLiquidity(strike, liquidityDebt);
+        uint128 token1Liquidity = pair.borrowLiquidity(strike, liquidityDebt);
 
         // calculate the the tokens that are borrowed
-        if (strike > pair.cachedStrikeCurrent) {
-            amount0 = -toInt256(getAmount0Delta(liquidityDebt, strike, false));
-        } else {
-            amount1 = -toInt256(getAmount1Delta(liquidityDebt));
-        }
+        amount0 = -toInt256(getAmount0Delta(liquidityDebt - token1Liquidity, strike, false));
+        amount1 = -toInt256(getAmount1Delta(token1Liquidity));
 
         // add collateral to account
         uint256 liquidityCollateral;
@@ -168,13 +170,13 @@ contract MockPair is Positions {
     function addLiquidity(
         int24 strike,
         uint8 spread,
-        uint128 balance
+        uint128 liquidity
     )
         public
         returns (uint256 amount0, uint256 amount1)
     {
         if (pair.cachedStrikeCurrent == strike) pair._accrue(strike);
-        uint128 liquidity = balanceToLiquidity(pair, strike, spread, balance, true);
+        uint128 balance = liquidityToBalance(pair, strike, spread, liquidity, true);
         (amount0, amount1) = getAmountsForLiquidity(pair, strike, spread, uint256(liquidity), true);
 
         pair.updateStrike(strike, spread, int128(balance), int128(liquidity));
@@ -287,19 +289,6 @@ contract MockPair is Positions {
     {
         return _dataOf[owner][_biDirectionalID(token0, token1, scalingFactor, strike, spread)].balance;
     }
-
-    // function getPositionLimit(
-    //     address owner,
-    //     int24 strike,
-    //     bool zeroToOne,
-    //     uint256 liquidityGrowthLast
-    // )
-    //     external
-    //     view
-    //     returns (uint256 balance)
-    // {
-    //     return _dataOf[owner][_limitID(token0, token1, strike, zeroToOne, liquidityGrowthLast)].balance;
-    // }
 
     function getPositionDebt(
         address owner,

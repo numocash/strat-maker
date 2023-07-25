@@ -65,15 +65,14 @@ function addLiquidityCommand(
     uint8 scalingFactor,
     int24 strike,
     uint8 spread,
-    Engine.TokenSelector selector,
-    int256 amountDesired
+    uint128 amountDesired
 )
     pure
     returns (Engine.Commands command, bytes memory input)
 {
     return (
         Engine.Commands.AddLiquidity,
-        abi.encode(Engine.AddLiquidityParams(token0, token1, scalingFactor, strike, spread, selector, amountDesired))
+        abi.encode(Engine.AddLiquidityParams(token0, token1, scalingFactor, strike, spread, amountDesired))
     );
 }
 
@@ -83,15 +82,14 @@ function removeLiquidityCommand(
     uint8 scalingFactor,
     int24 strike,
     uint8 spread,
-    Engine.TokenSelector selector,
-    int256 amountDesired
+    uint128 amountDesired
 )
     pure
     returns (Engine.Commands command, bytes memory input)
 {
     return (
         Engine.Commands.RemoveLiquidity,
-        abi.encode(Engine.RemoveLiquidityParams(token0, token1, scalingFactor, strike, spread, selector, amountDesired))
+        abi.encode(Engine.RemoveLiquidityParams(token0, token1, scalingFactor, strike, spread, amountDesired))
     );
 }
 
@@ -99,7 +97,7 @@ function swapCommand(
     address token0,
     address token1,
     uint8 scalingFactor,
-    Engine.TokenSelector selector,
+    Engine.SwapTokenSelector selector,
     int256 amountDesired
 )
     pure

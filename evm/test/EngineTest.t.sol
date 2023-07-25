@@ -136,11 +136,7 @@ contract EngineTest is Test, EngineHelper {
         commands[0] = Engine.Commands.AddLiquidity;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(
-            Engine.AddLiquidityParams(
-                address(token0), address(token1), 0, 1, 1, Engine.TokenSelector.LiquidityPosition, 1e18
-            )
-        );
+        inputs[0] = abi.encode(Engine.AddLiquidityParams(address(token0), address(token1), 0, 1, 1, 1e18));
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
 
@@ -166,11 +162,7 @@ contract EngineTest is Test, EngineHelper {
         commands[0] = Engine.Commands.AddLiquidity;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(
-            Engine.AddLiquidityParams(
-                address(token0), address(token1), 0, 1, 1, Engine.TokenSelector.LiquidityPosition, 1e18
-            )
-        );
+        inputs[0] = abi.encode(Engine.AddLiquidityParams(address(token0), address(token1), 0, 1, 1, 1e18));
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
 
@@ -204,8 +196,9 @@ contract EngineTest is Test, EngineHelper {
         commands[0] = Engine.Commands.Swap;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] =
-            abi.encode(Engine.SwapParams(address(token0), address(token1), 0, Engine.TokenSelector.Token1, 1e18 - 1));
+        inputs[0] = abi.encode(
+            Engine.SwapParams(address(token0), address(token1), 0, Engine.SwapTokenSelector.Token1, 1e18 - 1)
+        );
 
         engine.execute(address(this), commands, inputs, 2, 0, bytes(""));
 
@@ -226,11 +219,7 @@ contract EngineTest is Test, EngineHelper {
         commands[0] = Engine.Commands.AddLiquidity;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(
-            Engine.AddLiquidityParams(
-                address(token0), address(token1), 0, 0, 1, Engine.TokenSelector.LiquidityPosition, 1e18
-            )
-        );
+        inputs[0] = abi.encode(Engine.AddLiquidityParams(address(token0), address(token1), 0, 0, 1, 1e18));
 
         vm.resumeGasMetering();
 
@@ -245,16 +234,15 @@ contract EngineTest is Test, EngineHelper {
         bytes[] memory inputs = createInputs();
 
         (Engine.Commands addCommand, bytes memory addInput) =
-            addLiquidityCommand(address(token0), address(token1), 0, 0, 1, Engine.TokenSelector.LiquidityPosition, 1e18);
+            addLiquidityCommand(address(token0), address(token1), 0, 0, 1, 1e18);
 
         commands = pushCommands(commands, addCommand);
         inputs = pushInputs(inputs, addInput);
 
         engine.execute(address(this), commands, inputs, 1, 1, bytes(""));
 
-        (Engine.Commands removeCommand, bytes memory removeInput) = removeLiquidityCommand(
-            address(token0), address(token1), 0, 0, 1, Engine.TokenSelector.LiquidityPosition, -1e18
-        );
+        (Engine.Commands removeCommand, bytes memory removeInput) =
+            removeLiquidityCommand(address(token0), address(token1), 0, 0, 1, 1e18);
 
         commands[0] = removeCommand;
         inputs[0] = removeInput;
@@ -272,16 +260,12 @@ contract EngineTest is Test, EngineHelper {
         bytes[] memory inputs = new bytes[](1);
 
         commands[0] = Engine.Commands.AddLiquidity;
-        inputs[0] = abi.encode(
-            Engine.AddLiquidityParams(
-                address(token0), address(token1), 0, 1, 1, Engine.TokenSelector.LiquidityPosition, 1e18
-            )
-        );
+        inputs[0] = abi.encode(Engine.AddLiquidityParams(address(token0), address(token1), 0, 0, 1, 1e18));
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
 
         (commands[0], inputs[0]) =
-            borrowLiquidityCommand(address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
+            borrowLiquidityCommand(address(token0), address(token1), 0, 0, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
 
         vm.resumeGasMetering();
 
@@ -296,24 +280,20 @@ contract EngineTest is Test, EngineHelper {
         commands[0] = Engine.Commands.AddLiquidity;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(
-            Engine.AddLiquidityParams(
-                address(token0), address(token1), 0, 1, 1, Engine.TokenSelector.LiquidityPosition, 1e18
-            )
-        );
+        inputs[0] = abi.encode(Engine.AddLiquidityParams(address(token0), address(token1), 0, 0, 1, 1e18));
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
 
         (commands[0], inputs[0]) =
-            borrowLiquidityCommand(address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
+            borrowLiquidityCommand(address(token0), address(token1), 0, 0, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
 
         engine.execute(address(this), commands, inputs, 1, 0, bytes(""));
 
         (, uint256 leverageRatioX128) =
-            engine.getPositionDebt(address(this), address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0);
+            engine.getPositionDebt(address(this), address(token0), address(token1), 0, 0, Engine.TokenSelector.Token0);
 
         (commands[0], inputs[0]) = repayLiquidityCommand(
-            address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0, leverageRatioX128, 0.5e18
+            address(token0), address(token1), 0, 0, Engine.TokenSelector.Token0, leverageRatioX128, 0.5e18
         );
 
         vm.resumeGasMetering();
@@ -330,8 +310,9 @@ contract EngineTest is Test, EngineHelper {
         commands[0] = Engine.Commands.Swap;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] =
-            abi.encode(Engine.SwapParams(address(token0), address(token1), 0, Engine.TokenSelector.Token1, 1e18 - 1));
+        inputs[0] = abi.encode(
+            Engine.SwapParams(address(token0), address(token1), 0, Engine.SwapTokenSelector.Token1, 1e18 - 1)
+        );
 
         vm.resumeGasMetering();
 
@@ -346,17 +327,17 @@ contract EngineTest is Test, EngineHelper {
         Engine.Commands[] memory commands = createCommands();
         bytes[] memory inputs = createInputs();
 
-        (Engine.Commands _swapCommand, bytes memory swapInput) =
-            swapCommand(address(token0), address(token1), 0, Engine.TokenSelector.Token0, -0.2e18);
-
-        commands = pushCommands(commands, _swapCommand);
-        inputs = pushInputs(inputs, swapInput);
-
         (Engine.Commands addCommand, bytes memory addInput) =
-            addLiquidityCommand(address(token0), address(token1), 0, 0, 1, Engine.TokenSelector.Token0, 0.2e18);
+            addLiquidityCommand(address(token0), address(token1), 0, 0, 1, 0.2e18);
 
         commands = pushCommands(commands, addCommand);
         inputs = pushInputs(inputs, addInput);
+
+        (Engine.Commands _swapCommand, bytes memory swapInput) =
+            swapCommand(address(token0), address(token1), 0, Engine.SwapTokenSelector.Token0Account, 0);
+
+        commands = pushCommands(commands, _swapCommand);
+        inputs = pushInputs(inputs, swapInput);
 
         vm.resumeGasMetering();
 
@@ -376,9 +357,8 @@ contract EngineTest is Test, EngineHelper {
         Engine.Commands[] memory commands = createCommands();
         bytes[] memory inputs = createInputs();
 
-        (Engine.Commands addCommand, bytes memory addInput) = addLiquidityCommand(
-            address(token0), address(token1), 0, -1, 1, Engine.TokenSelector.LiquidityPosition, 1e18
-        );
+        (Engine.Commands addCommand, bytes memory addInput) =
+            addLiquidityCommand(address(token0), address(token1), 0, -1, 1, 1e18);
 
         commands = pushCommands(commands, addCommand);
         inputs = pushInputs(inputs, addInput);
@@ -386,13 +366,13 @@ contract EngineTest is Test, EngineHelper {
         engine.execute(address(this), commands, inputs, 1, 1, bytes(""));
 
         (Engine.Commands removeCommand, bytes memory removeInput) =
-            removeLiquidityCommand(address(token0), address(token1), 0, 0, 1, Engine.TokenSelector.Token0, -0.2e18);
+            removeLiquidityCommand(address(token0), address(token1), 0, 0, 1, 0.2e18);
 
         commands[0] = removeCommand;
         inputs[0] = removeInput;
 
         (Engine.Commands _swapCommand, bytes memory swapInput) =
-            swapCommand(address(token0), address(token1), 0, Engine.TokenSelector.Token0, 0.2e18);
+            swapCommand(address(token0), address(token1), 0, Engine.SwapTokenSelector.Token0Account, 0);
 
         commands = pushCommands(commands, _swapCommand);
         inputs = pushInputs(inputs, swapInput);
@@ -403,6 +383,92 @@ contract EngineTest is Test, EngineHelper {
 
         vm.pauseGasMetering();
         assertEq(token0.balanceOf(address(this)), 0);
+        vm.resumeGasMetering();
+    }
+
+    function testGasBorrowAndSwap() external {
+        vm.pauseGasMetering();
+        basicCreate();
+        basicAddLiquidity();
+
+        Engine.Commands[] memory commands = createCommands();
+        bytes[] memory inputs = createInputs();
+
+        (Engine.Commands addCommand, bytes memory addInput) =
+            addLiquidityCommand(address(token0), address(token1), 0, -1, 1, 1e18);
+
+        commands = pushCommands(commands, addCommand);
+        inputs = pushInputs(inputs, addInput);
+
+        engine.execute(address(this), commands, inputs, 1, 1, bytes(""));
+
+        (Engine.Commands borrowCommand, bytes memory borrowInput) =
+            borrowLiquidityCommand(address(token0), address(token1), 0, 0, Engine.TokenSelector.Token1, 1e18, 0.2e18);
+
+        commands[0] = borrowCommand;
+        inputs[0] = borrowInput;
+
+        (Engine.Commands _swapCommand, bytes memory swapInput) =
+            swapCommand(address(token0), address(token1), 0, Engine.SwapTokenSelector.Token0Account, 0);
+
+        commands = pushCommands(commands, _swapCommand);
+        inputs = pushInputs(inputs, swapInput);
+
+        vm.resumeGasMetering();
+
+        engine.execute(address(this), commands, inputs, 2, 1, bytes(""));
+
+        vm.pauseGasMetering();
+        assertEq(token0.balanceOf(address(this)), 0);
+        assertEq(token1.balanceOf(address(this)), 0);
+        vm.resumeGasMetering();
+    }
+
+    function testGasSwapAndRepay() external {
+        vm.pauseGasMetering();
+        basicCreate();
+        basicAddLiquidity();
+
+        Engine.Commands[] memory commands = createCommands();
+        bytes[] memory inputs = createInputs();
+
+        (Engine.Commands borrowCommand, bytes memory borrowInput) =
+            borrowLiquidityCommand(address(token0), address(token1), 0, 0, Engine.TokenSelector.Token1, 1e18, 0.2e18);
+
+        commands = pushCommands(commands, borrowCommand);
+        inputs = pushInputs(inputs, borrowInput);
+
+        (Engine.Commands addCommand, bytes memory addInput) =
+            addLiquidityCommand(address(token0), address(token1), 0, -1, 1, 1e18);
+
+        commands = pushCommands(commands, addCommand);
+        inputs = pushInputs(inputs, addInput);
+
+        engine.execute(address(this), commands, inputs, 2, 1, bytes(""));
+
+        (uint128 balance, uint256 leverageRatioX128) =
+            engine.getPositionDebt(address(this), address(token0), address(token1), 0, 0, Engine.TokenSelector.Token1);
+
+        (Engine.Commands repayCommand, bytes memory repayInput) = repayLiquidityCommand(
+            address(token0), address(token1), 0, 0, Engine.TokenSelector.Token1, leverageRatioX128, balance
+        );
+
+        commands[0] = repayCommand;
+        inputs[0] = repayInput;
+
+        (Engine.Commands _swapCommand, bytes memory swapInput) =
+            swapCommand(address(token0), address(token1), 0, Engine.SwapTokenSelector.Token0Account, 0);
+
+        commands[1] = _swapCommand;
+        inputs[1] = swapInput;
+
+        vm.resumeGasMetering();
+
+        engine.execute(address(this), commands, inputs, 2, 1, bytes(""));
+
+        vm.pauseGasMetering();
+        assertEq(token0.balanceOf(address(this)), 0.2e18);
+        assertGe(token1.balanceOf(address(this)), 0);
         vm.resumeGasMetering();
     }
 }
