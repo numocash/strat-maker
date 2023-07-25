@@ -17,9 +17,7 @@ uint8 constant NUM_SPREADS = 5;
 int8 constant MAX_CONSECUTIVE = int8(NUM_SPREADS);
 
 /// @author Robert Leifke and Kyle Scott
-/// @custom:team should we allow for borrowing the current strike
-/// @custom:team should we charge a fee on borrow origination
-/// @custom:team should we use exp instead of supply
+/// @custom:team change what strikeCurrentCached represents to better handle flip flop trades
 library Pairs {
     using BitMaps for BitMaps.BitMap;
 
