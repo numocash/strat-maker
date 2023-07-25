@@ -531,14 +531,14 @@ contract Engine is Positions {
         view
         returns (
             uint128[NUM_SPREADS] memory composition,
-            int24[NUM_SPREADS] memory strikeCurrent,
+            int24[NUM_SPREADS] memory strikeCurrentCached,
             int24 cachedStrikeCurrent,
             uint8 initialized
         )
     {
         (, Pairs.Pair storage pair) = pairs.getPairAndID(token0, token1, scalingFactor);
-        (composition, strikeCurrent, cachedStrikeCurrent, initialized) =
-            (pair.composition, pair.strikeCurrent, pair.cachedStrikeCurrent, pair.initialized);
+        (composition, strikeCurrentCached, cachedStrikeCurrent, initialized) =
+            (pair.composition, pair.strikeCurrent, pair.strikeCurrentCached, pair.initialized);
     }
 
     function getStrike(
