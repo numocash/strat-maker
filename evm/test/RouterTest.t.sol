@@ -305,7 +305,7 @@ contract RouterTest is Test {
         token1.approve(address(permit3), 1e18);
 
         (Engine.Commands _swapCommand, bytes memory swapInput) =
-            swapCommand(address(token0), address(token1), 0, Engine.TokenSelector.Token1, 1e18 - 1);
+            swapCommand(address(token0), address(token1), 0, Engine.SwapTokenSelector.Token1, 1e18 - 1);
 
         commands[0] = _swapCommand;
         inputs[0] = swapInput;

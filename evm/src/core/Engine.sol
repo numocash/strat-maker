@@ -87,9 +87,15 @@ contract Engine is Positions {
         LiquidityPosition
     }
 
+    enum SwapTokenSelector {
+        Token0,
+        Token1,
+        Token0Account,
+        Token1Account
+    }
+
     enum OrderType {
         BiDirectional,
-        // Limit,
         Debt
     }
 
@@ -97,7 +103,7 @@ contract Engine is Positions {
         address token0;
         address token1;
         uint8 scalingFactor;
-        TokenSelector selector;
+        SwapTokenSelector selector;
         int256 amountDesired;
     }
 
@@ -118,7 +124,6 @@ contract Engine is Positions {
         int24 strike;
         TokenSelector selectorCollateral;
         uint256 amountDesiredCollateral;
-        // TokenSelector selectorDebt;
         uint128 amountDesiredDebt;
     }
 
@@ -129,7 +134,6 @@ contract Engine is Positions {
         int24 strike;
         TokenSelector selectorCollateral;
         uint256 leverageRatioX128;
-        // TokenSelector selectorDebt;
         uint128 amountDesiredDebt;
     }
 
@@ -214,14 +218,12 @@ contract Engine is Positions {
                     if (commands[i] == Commands.Swap) {
                         _swap(abi.decode(inputs[i], (SwapParams)), account);
                     } else {
-                        // command must be 1, which is add liquidity
                         _addLiquidity(to, abi.decode(inputs[i], (AddLiquidityParams)), account);
                     }
                 } else {
                     if (commands[i] == Commands.BorrowLiquidity) {
                         _borrowLiquidity(to, abi.decode(inputs[i], (BorrowLiquidityParams)), account);
                     } else {
-                        // must be _repayLiquidity
                         _repayLiquidity(abi.decode(inputs[i], (RepayLiquidityParams)), account);
                     }
                 }
@@ -230,12 +232,10 @@ contract Engine is Positions {
                     if (commands[i] == Commands.RemoveLiquidity) {
                         _removeLiquidity(abi.decode(inputs[i], (RemoveLiquidityParams)), account);
                     } else {
-                        // accrue
                         _accrue(abi.decode(inputs[i], (AccrueParams)));
                     }
                 } else {
                     if (commands[i] == Commands.CreatePair) {
-                        // create pair
                         _createPair(abi.decode(inputs[i], (CreatePairParams)));
                     } else {
                         revert InvalidCommand();
@@ -256,6 +256,7 @@ contract Engine is Positions {
             // token is zero, so skip it.
             if (token == address(0)) {
                 i++;
+                // TODO: when would this occur
             } else {
                 // if delta is negative, transfer token to recipient address
                 if (delta < 0) {
@@ -320,12 +321,22 @@ contract Engine is Positions {
         (bytes32 pairID, Pairs.Pair storage pair) =
             pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
 
-        if (params.selector != TokenSelector.Token0 && params.selector != TokenSelector.Token1) {
+        int256 amount0;
+        int256 amount1;
+        if (params.selector < SwapTokenSelector.Token0Account) {
+            (amount0, amount1) =
+                pair.swap(params.scalingFactor, params.selector == SwapTokenSelector.Token0, params.amountDesired);
+        } else if (params.selector == SwapTokenSelector.Token0Account) {
+            assert(account.tokens[uint256(params.amountDesired)] == params.token0);
+            (amount0, amount1) =
+                pair.swap(params.scalingFactor, true, -account.tokenDeltas[uint256(params.amountDesired)]);
+        } else if (params.selector == SwapTokenSelector.Token1Account) {
+            assert(account.tokens[uint256(params.amountDesired)] == params.token1);
+            (amount0, amount1) =
+                pair.swap(params.scalingFactor, false, -account.tokenDeltas[uint256(params.amountDesired)]);
+        } else {
             revert InvalidSelector();
         }
-
-        (int256 amount0, int256 amount1) =
-            pair.swap(params.scalingFactor, params.selector == TokenSelector.Token0, params.amountDesired);
         account.updateToken(params.token0, amount0);
         account.updateToken(params.token1, amount1);
 
@@ -665,21 +676,6 @@ contract Engine is Positions {
     {
         return _dataOf[owner][_biDirectionalID(token0, token1, scalingFactor, strike, spread)].balance;
     }
-
-    // function getPositionLimit(
-    //     address owner,
-    //     address token0,
-    //     address token1,
-    //     int24 strike,
-    //     bool zeroToOne,
-    //     uint256 liquidityGrowthLast
-    // )
-    //     external
-    //     view
-    //     returns (uint256 balance)
-    // {
-    //     return _dataOf[owner][_limitID(token0, token1, strike, zeroToOne, liquidityGrowthLast)].balance;
-    // }
 
     function getPositionDebt(
         address owner,

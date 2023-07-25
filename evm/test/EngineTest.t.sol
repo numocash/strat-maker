@@ -204,8 +204,9 @@ contract EngineTest is Test, EngineHelper {
         commands[0] = Engine.Commands.Swap;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] =
-            abi.encode(Engine.SwapParams(address(token0), address(token1), 0, Engine.TokenSelector.Token1, 1e18 - 1));
+        inputs[0] = abi.encode(
+            Engine.SwapParams(address(token0), address(token1), 0, Engine.SwapTokenSelector.Token1, 1e18 - 1)
+        );
 
         engine.execute(address(this), commands, inputs, 2, 0, bytes(""));
 
@@ -330,8 +331,9 @@ contract EngineTest is Test, EngineHelper {
         commands[0] = Engine.Commands.Swap;
 
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] =
-            abi.encode(Engine.SwapParams(address(token0), address(token1), 0, Engine.TokenSelector.Token1, 1e18 - 1));
+        inputs[0] = abi.encode(
+            Engine.SwapParams(address(token0), address(token1), 0, Engine.SwapTokenSelector.Token1, 1e18 - 1)
+        );
 
         vm.resumeGasMetering();
 
@@ -347,7 +349,7 @@ contract EngineTest is Test, EngineHelper {
         bytes[] memory inputs = createInputs();
 
         (Engine.Commands _swapCommand, bytes memory swapInput) =
-            swapCommand(address(token0), address(token1), 0, Engine.TokenSelector.Token0, -0.2e18);
+            swapCommand(address(token0), address(token1), 0, Engine.SwapTokenSelector.Token0, -0.2e18);
 
         commands = pushCommands(commands, _swapCommand);
         inputs = pushInputs(inputs, swapInput);
@@ -392,7 +394,7 @@ contract EngineTest is Test, EngineHelper {
         inputs[0] = removeInput;
 
         (Engine.Commands _swapCommand, bytes memory swapInput) =
-            swapCommand(address(token0), address(token1), 0, Engine.TokenSelector.Token0, 0.2e18);
+            swapCommand(address(token0), address(token1), 0, Engine.SwapTokenSelector.Token0, 0.2e18);
 
         commands = pushCommands(commands, _swapCommand);
         inputs = pushInputs(inputs, swapInput);

@@ -99,7 +99,7 @@ function swapCommand(
     address token0,
     address token1,
     uint8 scalingFactor,
-    Engine.TokenSelector selector,
+    Engine.SwapTokenSelector selector,
     int256 amountDesired
 )
     pure
