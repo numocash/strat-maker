@@ -65,12 +65,18 @@ contract AddLiquidityTest is Test, PairHelper {
         Pairs.Strike memory strike = pair.getStrike(0);
         assertEq(strike.next0To1, -1, "initial strike 0 to 1");
         assertEq(strike.next1To0, 1, "initial strike 1 to 0");
+        assertEq(strike.reference0To1, 1);
+        assertEq(strike.reference1To0, 1);
 
         strike = pair.getStrike(-1);
         assertEq(strike.next0To1, MIN_STRIKE, "0 to 1");
+        assertEq(strike.reference0To1, 1);
+        assertEq(strike.reference1To0, 0);
 
         strike = pair.getStrike(1);
         assertEq(strike.next1To0, MAX_STRIKE, "1 to 0");
+        assertEq(strike.reference0To1, 0);
+        assertEq(strike.reference1To0, 1);
     }
 
     function testGasAddLiquidityFreshStrikes() external {
@@ -139,6 +145,27 @@ contract RemoveLiquidityTest is Test, PairHelper {
         basicRemoveLiquidity();
         Pairs.Strike memory strike = pair.getStrike(0);
         assertEq(strike.liquidityBiDirectional[0], 0);
+    }
+
+    function testAddLiquidityStrikeMapBasic() external {
+        basicAddLiquidity();
+        basicRemoveLiquidity();
+
+        Pairs.Strike memory strike = pair.getStrike(0);
+        assertEq(strike.next0To1, MIN_STRIKE, "initial strike 0 to 1");
+        assertEq(strike.next1To0, MAX_STRIKE, "initial strike 1 to 0");
+        assertEq(strike.reference0To1, 1);
+        assertEq(strike.reference1To0, 1);
+
+        strike = pair.getStrike(-1);
+        assertEq(strike.next0To1, 0, "0 to 1");
+        assertEq(strike.reference0To1, 0);
+        assertEq(strike.reference1To0, 0);
+
+        strike = pair.getStrike(1);
+        assertEq(strike.next1To0, 0, "1 to 0");
+        assertEq(strike.reference0To1, 0);
+        assertEq(strike.reference1To0, 0);
     }
 
     function testRemoveLiquidityPosition() external {
@@ -344,6 +371,66 @@ contract SwapTest is Test, PairHelper {
         assertEq(composition[0], 0);
         assertEq(strikeCurrent[0], -1);
         assertEq(cachedStrikeCurrent, -2);
+    }
+
+    function testSwap0To1CleanupStrikeMap() external {
+        pair.addLiquidity(-1, 1, 1e18);
+        // 0->1
+        pair.swap(false, -1e18);
+
+        Pairs.Strike memory strike = pair.getStrike(0);
+        assertEq(strike.next0To1, 0, "initial strike 0 to 1");
+        assertEq(strike.next1To0, MAX_STRIKE, "initial strike 1 to 0");
+        assertEq(strike.reference0To1, 0);
+        assertEq(strike.reference1To0, 2);
+
+        strike = pair.getStrike(-2);
+        assertEq(strike.next0To1, MIN_STRIKE, "0 to 1");
+        assertEq(strike.next1To0, 0, "1 to 0");
+        assertEq(strike.reference0To1, 1);
+        assertEq(strike.reference1To0, 0);
+
+        strike = pair.getStrike(-1);
+        assertEq(strike.next0To1, 0, "0 to 1");
+        assertEq(strike.next1To0, 0, " 1 to 0");
+        assertEq(strike.reference0To1, 0);
+        assertEq(strike.reference1To0, 0);
+
+        strike = pair.getStrike(1);
+        assertEq(strike.next1To0, 0, "1 to 0");
+        assertEq(strike.next1To0, 0, "1 to 0");
+        assertEq(strike.reference0To1, 0);
+        assertEq(strike.reference1To0, 0);
+    }
+
+    function testSwap1To0CleanupStrikeMap() external {
+        basicAddLiquidity();
+        // 1->0
+        pair.swap(false, 1e18 - 1);
+
+        Pairs.Strike memory strike = pair.getStrike(0);
+        assertEq(strike.next0To1, -1, "initial strike 0 to 1");
+        assertEq(strike.next1To0, 0, "initial strike 1 to 0");
+        assertEq(strike.reference0To1, 1);
+        assertEq(strike.reference1To0, 0);
+
+        strike = pair.getStrike(-2);
+        assertEq(strike.next0To1, 0, "0 to 1");
+        assertEq(strike.next1To0, 0, "1 to 0");
+        assertEq(strike.reference0To1, 0);
+        assertEq(strike.reference1To0, 0);
+
+        strike = pair.getStrike(-1);
+        assertEq(strike.next0To1, MIN_STRIKE, "0 to 1");
+        assertEq(strike.next1To0, 0, "1 to 0");
+        assertEq(strike.reference0To1, 1);
+        assertEq(strike.reference1To0, 0);
+
+        strike = pair.getStrike(1);
+        assertEq(strike.next0To1, 0, "1 to 0");
+        assertEq(strike.next1To0, MAX_STRIKE, "1 to 0");
+        assertEq(strike.reference0To1, 0);
+        assertEq(strike.reference1To0, 1);
     }
 
     // function testSwapPartial0To1() external {
