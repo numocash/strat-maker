@@ -439,20 +439,34 @@ library Pairs {
         }
     }
 
-    function borrowLiquidity(Pair storage pair, int24 strike, uint128 liquidity) internal {
+    function borrowLiquidity(
+        Pair storage pair,
+        int24 strike,
+        uint128 liquidity
+    )
+        internal
+        returns (uint128 liquidityToken1)
+    {
         if (pair.initialized != 1) revert Initialized();
 
         Strike storage strikeObj = pair.strikes[strike];
         uint8 _activeSpread = strikeObj.activeSpread;
 
         while (true) {
-            // don't allow for borrowing the current strike
-            if (pair.strikeCurrent[_activeSpread] == strike) revert();
             uint128 availableLiquidity = strikeObj.liquidityBiDirectional[_activeSpread];
 
+            // remove liquidity from pair
             if (availableLiquidity >= liquidity) {
                 strikeObj.liquidityBiDirectional[_activeSpread] = availableLiquidity - liquidity;
                 strikeObj.liquidityBorrowed[_activeSpread] += liquidity;
+
+                // determine what token the liquidity was borrowed
+                if (pair.strikeCurrent[_activeSpread] > strike) {
+                    liquidityToken1 += liquidity;
+                } else if (pair.strikeCurrent[_activeSpread] == strike) {
+                    liquidityToken1 += uint128((liquidity * pair.composition[_activeSpread]) / Q128);
+                }
+
                 break;
             } else {
                 _removeStrike0To1(pair, strike - int8(_activeSpread));
@@ -461,6 +475,14 @@ library Pairs {
                 strikeObj.liquidityBiDirectional[_activeSpread] = 0;
                 strikeObj.liquidityBorrowed[_activeSpread] += availableLiquidity;
                 liquidity -= availableLiquidity;
+
+                // determine what token the liquidity was borrowed
+                if (pair.strikeCurrent[_activeSpread] < strike) {
+                    liquidityToken1 += availableLiquidity;
+                } else if (pair.strikeCurrent[_activeSpread] == strike) {
+                    liquidityToken1 += uint128((availableLiquidity * pair.composition[_activeSpread]) / Q128);
+                }
+
                 _activeSpread++;
             }
         }

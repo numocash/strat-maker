@@ -342,7 +342,7 @@ contract RouterTest is Test {
         bytes[] memory inputs = createInputs();
 
         (Engine.Commands addCommand, bytes memory addInput) =
-            addLiquidityCommand(address(token0), address(token1), 0, 1, 1, 1e18);
+            addLiquidityCommand(address(token0), address(token1), 0, 0, 1, 1e18);
 
         commands = pushCommands(commands, addCommand);
         inputs = pushInputs(inputs, addInput);
@@ -375,7 +375,7 @@ contract RouterTest is Test {
         // BORROW LIQUIDITY
 
         (Engine.Commands borrowCommand, bytes memory borrowInput) =
-            borrowLiquidityCommand(address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0, 1e18, 0.5e18);
+            borrowLiquidityCommand(address(token0), address(token1), 0, 0, Engine.TokenSelector.Token0, 1e18, 0.5e18);
 
         commands[0] = borrowCommand;
         inputs[0] = borrowInput;
@@ -418,7 +418,7 @@ contract RouterTest is Test {
         bytes[] memory inputs = createInputs();
 
         (Engine.Commands addCommand, bytes memory addInput) =
-            addLiquidityCommand(address(token0), address(token1), 0, 1, 1, 1e18);
+            addLiquidityCommand(address(token0), address(token1), 0, 0, 1, 1e18);
 
         commands = pushCommands(commands, addCommand);
         inputs = pushInputs(inputs, addInput);
@@ -451,7 +451,7 @@ contract RouterTest is Test {
         // BORROW LIQUIDITY
 
         (Engine.Commands borrowCommand, bytes memory borrowInput) =
-            borrowLiquidityCommand(address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0, 1e18, 0.5e18);
+            borrowLiquidityCommand(address(token0), address(token1), 0, 0, Engine.TokenSelector.Token0, 1e18, 0.5e18);
 
         commands[0] = borrowCommand;
         inputs[0] = borrowInput;
@@ -483,10 +483,10 @@ contract RouterTest is Test {
 
         {
             (, uint256 leverageRatioX128) =
-                engine.getPositionDebt(owner, address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0);
+                engine.getPositionDebt(owner, address(token0), address(token1), 0, 0, Engine.TokenSelector.Token0);
 
             (Engine.Commands repayCommand, bytes memory repayInput) = repayLiquidityCommand(
-                address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0, leverageRatioX128, 0.5e18
+                address(token0), address(token1), 0, 0, Engine.TokenSelector.Token0, leverageRatioX128, 0.5e18
             );
 
             commands[0] = repayCommand;
@@ -498,7 +498,7 @@ contract RouterTest is Test {
             engine.dataID(
                 Positions.ILRTADataID(
                     Engine.OrderType.Debt,
-                    abi.encode(Positions.DebtID(address(token0), address(token1), 0, 1, Engine.TokenSelector.Token0))
+                    abi.encode(Positions.DebtID(address(token0), address(token1), 0, 0, Engine.TokenSelector.Token0))
                 )
             ),
             Engine.OrderType.Debt,

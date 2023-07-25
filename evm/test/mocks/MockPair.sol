@@ -59,14 +59,11 @@ contract MockPair is Positions {
         returns (int256 amount0, int256 amount1)
     {
         if (pair.cachedStrikeCurrent == strike) pair._accrue(strike);
-        pair.borrowLiquidity(strike, liquidityDebt);
+        uint128 token1Liquidity = pair.borrowLiquidity(strike, liquidityDebt);
 
         // calculate the the tokens that are borrowed
-        if (strike > pair.cachedStrikeCurrent) {
-            amount0 = -toInt256(getAmount0Delta(liquidityDebt, strike, false));
-        } else {
-            amount1 = -toInt256(getAmount1Delta(liquidityDebt));
-        }
+        amount0 = -toInt256(getAmount0Delta(liquidityDebt - token1Liquidity, strike, false));
+        amount1 = -toInt256(getAmount1Delta(token1Liquidity));
 
         // add collateral to account
         uint256 liquidityCollateral;
@@ -292,19 +289,6 @@ contract MockPair is Positions {
     {
         return _dataOf[owner][_biDirectionalID(token0, token1, scalingFactor, strike, spread)].balance;
     }
-
-    // function getPositionLimit(
-    //     address owner,
-    //     int24 strike,
-    //     bool zeroToOne,
-    //     uint256 liquidityGrowthLast
-    // )
-    //     external
-    //     view
-    //     returns (uint256 balance)
-    // {
-    //     return _dataOf[owner][_limitID(token0, token1, strike, zeroToOne, liquidityGrowthLast)].balance;
-    // }
 
     function getPositionDebt(
         address owner,

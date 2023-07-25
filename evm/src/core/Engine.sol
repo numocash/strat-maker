@@ -7,15 +7,11 @@ import {Pairs, NUM_SPREADS} from "./Pairs.sol";
 import {Positions} from "./Positions.sol";
 import {mulDiv} from "./math/FullMath.sol";
 import {
-    getLiquidityForAmount0,
-    getLiquidityForAmount1,
     getAmountsForLiquidity,
     getAmount0Delta,
     getAmount1Delta,
     getLiquidityDeltaAmount0,
     getLiquidityDeltaAmount1,
-    getAmount0ForLiquidity,
-    getAmount1ForLiquidity,
     scaleLiquidityUp,
     scaleLiquidityDown
 } from "./math/LiquidityMath.sol";
@@ -282,7 +278,6 @@ contract Engine is Positions {
             address token = account.tokens[i];
 
             if (token == address(0)) break;
-
             if (delta > 0) {
                 uint256 balance = BalanceLib.getBalance(token);
                 if (balance < account.balances[i] + uint256(delta)) revert InsufficientInput();
@@ -299,7 +294,6 @@ contract Engine is Positions {
             bytes32 id = account.lpIDs[i];
 
             if (id == bytes32(0)) break;
-
             if (delta < 0) {
                 _burn(address(this), id, delta, account.orderTypes[i]);
             }
@@ -379,27 +373,24 @@ contract Engine is Positions {
         (bytes32 pairID, Pairs.Pair storage pair) =
             pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
 
-        pair.borrowLiquidity(params.strike, params.amountDesiredDebt);
+        uint128 liquidityToken1 = pair.borrowLiquidity(params.strike, params.amountDesiredDebt);
 
         // calculate the the tokens that are borrowed
-        if (params.strike > pair.cachedStrikeCurrent) {
-            account.updateToken(
-                params.token0,
-                -toInt256(
-                    getAmount0Delta(
-                        scaleLiquidityUp(params.amountDesiredDebt, params.scalingFactor), params.strike, false
-                    )
+        account.updateToken(
+            params.token0,
+            -toInt256(
+                getAmount0Delta(
+                    scaleLiquidityUp(params.amountDesiredDebt - liquidityToken1, params.scalingFactor),
+                    params.strike,
+                    false
                 )
-            );
-        } else {
-            account.updateToken(
-                params.token1,
-                -toInt256(getAmount1Delta(scaleLiquidityUp(params.amountDesiredDebt, params.scalingFactor)))
-            );
-        }
+            )
+        );
+        account.updateToken(
+            params.token1, -toInt256(getAmount1Delta(scaleLiquidityUp(liquidityToken1, params.scalingFactor)))
+        );
 
         // add collateral to account
-        // TODO: check borrowing current strikes
         uint256 liquidityCollateral;
         if (params.selectorCollateral == TokenSelector.Token0) {
             account.updateToken(params.token0, toInt256(params.amountDesiredCollateral));
@@ -574,7 +565,7 @@ contract Engine is Positions {
     )
         external
         view
-        returns (uint256 balance)
+        returns (uint128 balance)
     {
         return _dataOf[owner][_biDirectionalID(token0, token1, scalingFactor, strike, spread)].balance;
     }
@@ -589,7 +580,7 @@ contract Engine is Positions {
     )
         external
         view
-        returns (uint256 balance, uint256 leverageRatioX128)
+        returns (uint128 balance, uint256 leverageRatioX128)
     {
         balance = _dataOf[owner][_debtID(token0, token1, scalingFactor, strike, selector)].balance;
         Positions.DebtData memory debtData = _dataOfDebt(owner, token0, token1, scalingFactor, strike, selector);
