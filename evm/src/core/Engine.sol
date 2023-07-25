@@ -144,6 +144,7 @@ contract Engine is Positions {
         address token0;
         address token1;
         uint8 scalingFactor;
+        int24 strike;
     }
 
     struct CreatePairParams {
@@ -337,7 +338,7 @@ contract Engine is Positions {
     function _addLiquidity(address to, AddLiquidityParams memory params, Accounts.Account memory account) private {
         (bytes32 pairID, Pairs.Pair storage pair) =
             pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
-        if (pair.cachedStrikeCurrent == params.strike) pair._accrue(params.strike);
+        pair.accrue(params.strike);
 
         // calculate how much to add
         int128 liquidity = toInt128(params.amountDesired);
@@ -372,6 +373,7 @@ contract Engine is Positions {
     {
         (bytes32 pairID, Pairs.Pair storage pair) =
             pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
+        pair.accrue(params.strike);
 
         uint128 liquidityToken1 = pair.borrowLiquidity(params.strike, params.amountDesiredDebt);
 
@@ -425,7 +427,7 @@ contract Engine is Positions {
     function _repayLiquidity(RepayLiquidityParams memory params, Accounts.Account memory account) private {
         (bytes32 pairID, Pairs.Pair storage pair) =
             pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
-        if (pair.cachedStrikeCurrent == params.strike) pair._accrue(params.strike);
+        pair.accrue(params.strike);
 
         uint256 _liquidityGrowthX128 = pair.strikes[params.strike].liquidityGrowthX128;
 
@@ -471,7 +473,7 @@ contract Engine is Positions {
     function _removeLiquidity(RemoveLiquidityParams memory params, Accounts.Account memory account) private {
         (bytes32 pairID, Pairs.Pair storage pair) =
             pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
-        if (pair.cachedStrikeCurrent == params.strike) pair._accrue(params.strike);
+        pair.accrue(params.strike);
 
         // calculate how much to remove
         int128 balance = -toInt128(params.amountDesired);
@@ -502,7 +504,7 @@ contract Engine is Positions {
         (bytes32 pairID, Pairs.Pair storage pair) =
             pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
 
-        pair.accrue();
+        pair.accrue(params.strike);
 
         emit Accrue(pairID);
     }
@@ -528,7 +530,6 @@ contract Engine is Positions {
         external
         view
         returns (
-            uint256 cachedBlock,
             uint128[NUM_SPREADS] memory composition,
             int24[NUM_SPREADS] memory strikeCurrent,
             int24 cachedStrikeCurrent,
@@ -536,8 +537,8 @@ contract Engine is Positions {
         )
     {
         (, Pairs.Pair storage pair) = pairs.getPairAndID(token0, token1, scalingFactor);
-        (cachedBlock, composition, strikeCurrent, cachedStrikeCurrent, initialized) =
-            (pair.cachedBlock, pair.composition, pair.strikeCurrent, pair.cachedStrikeCurrent, pair.initialized);
+        (composition, strikeCurrent, cachedStrikeCurrent, initialized) =
+            (pair.composition, pair.strikeCurrent, pair.cachedStrikeCurrent, pair.initialized);
     }
 
     function getStrike(

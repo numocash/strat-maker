@@ -46,10 +46,11 @@ library Pairs {
     /// @custom:team could we make reference a bitmap
     struct Strike {
         // Limit limit;
+        uint256 liquidityGrowthX128;
+        uint256 blockLast;
         uint128[NUM_SPREADS] totalSupply;
         uint128[NUM_SPREADS] liquidityBiDirectional;
         uint128[NUM_SPREADS] liquidityBorrowed;
-        uint256 liquidityGrowthX128;
         int24 next0To1;
         int24 next1To0;
         uint8 reference0To1;
@@ -63,7 +64,6 @@ library Pairs {
         mapping(int24 => Strike) strikes;
         BitMaps.BitMap bitMap0To1;
         BitMaps.BitMap bitMap1To0;
-        uint256 cachedBlock;
         uint128[NUM_SPREADS] composition;
         int24[NUM_SPREADS] strikeCurrent;
         int24 cachedStrikeCurrent;
@@ -306,7 +306,6 @@ library Pairs {
             if (isSwap0To1) {
                 int24 strikePrev = state.cachedStrikeCurrent;
                 if (strikePrev == MIN_STRIKE) revert OutOfBounds();
-                _accrue(pair, strikePrev);
 
                 // Remove strike from linked list and bit map if it has no liquidity
                 // Only happens when initialized or all liquidity is removed from current strike
@@ -347,7 +346,6 @@ library Pairs {
             } else {
                 int24 strikePrev = state.cachedStrikeCurrent;
                 if (strikePrev == MAX_STRIKE) revert OutOfBounds();
-                _accrue(pair, strikePrev);
 
                 // Remove strike from linked list and bit map if it has no liquidity
                 // Only happens when initialized or all liquidity is removed from current strike
@@ -516,18 +514,9 @@ library Pairs {
         strikeObj.activeSpread = _activeSpread;
     }
 
-    /// @notice accrue interest to the current strike
-    function accrue(Pair storage pair) internal {
-        _accrue(pair, pair.cachedStrikeCurrent);
-    }
-
-    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
-                             INTERNAL LOGIC
-    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
-
-    function _accrue(Pair storage pair, int24 strike) internal {
-        uint256 _cachedBlock = pair.cachedBlock;
-        uint256 blocks = block.number - _cachedBlock;
+    function accrue(Pair storage pair, int24 strike) internal {
+        uint256 _blockLast = pair.strikes[strike].blockLast;
+        uint256 blocks = block.number - _blockLast;
         if (blocks == 0) return;
 
         uint128 liquidityRepaid;
@@ -552,8 +541,12 @@ library Pairs {
         ) - Q128;
 
         repayLiquidity(pair, strike, liquidityRepaid);
-        pair.cachedBlock = block.number;
+        pair.strikes[strike].blockLast = block.number;
     }
+
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                             INTERNAL LOGIC
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     /// @notice Check the validiity of strikes
     function _checkStrike(int24 strike) private pure {
