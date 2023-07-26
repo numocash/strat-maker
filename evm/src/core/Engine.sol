@@ -441,8 +441,10 @@ contract Engine is Positions {
             - 2 * (params.amountDesiredDebt - liquidityDebt);
         if (params.selectorCollateral == TokenSelector.Token0) {
             account.updateToken(params.token0, -toInt256(getAmount0Delta(liquidityCollateral, params.strike, false)));
-        } else {
+        } else if (params.selectorCollateral == TokenSelector.Token1) {
             account.updateToken(params.token0, -toInt256(getAmount1Delta(liquidityCollateral)));
+        } else {
+            revert InvalidSelector();
         }
 
         // add burned position to account

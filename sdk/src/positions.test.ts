@@ -22,21 +22,6 @@ describe("positions", () => {
     expect(id).toBeTruthy();
   });
 
-  // test("limit data id", () => {
-  //   const position = {
-  //     orderType: "Limit",
-  //     data: {
-  //       token0: mockERC20,
-  //       token1: mockERC20,
-  //       strike: 0,
-  //       zeroToOne: false,
-  //       liquidityGrowthLast: makeFraction(0),
-  //     },
-  //   } as const;
-  //   const id = dataID(position);
-  //   expect(id).toBeTruthy();
-  // });
-
   test("debt data id", () => {
     const position = {
       type: "position",

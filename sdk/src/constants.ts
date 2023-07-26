@@ -16,12 +16,17 @@ export const RouterAddress = getAddress(
 export const TokenSelectorEnum = {
   Token0: 0,
   Token1: 1,
-  LiquidityPosition: 2,
+} as const;
+
+export const SwapTokenSelectorEnum = {
+  Token0: 0,
+  Token1: 1,
+  Token0Account: 2,
+  Token1Account: 3,
 } as const;
 
 export const OrderTypeEnum = {
   BiDirectional: 0,
-  // Limit: 1,
   Debt: 1,
 } as const;
 

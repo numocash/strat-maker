@@ -177,6 +177,8 @@ export const liquidityToBalance = (
     pairData.strikes[strike]!.liquidityBorrowed[spread - 1]! +
     pairData.strikes[strike]!.liquidityBiDirectional[spread - 1]!;
 
+  if (totalLiquidity === 0n) return liquidity;
+
   return (liquidity * totalSupply) / totalLiquidity;
 };
 

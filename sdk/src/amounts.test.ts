@@ -50,7 +50,7 @@ describe.concurrent("amounts", () => {
     expect(pairData.bitMap0To1.centerStrike).toBe(1);
     expect(pairData.bitMap1To0.centerStrike).toBe(1);
     expect(pairData.strikeCurrent).toStrictEqual([1, 1, 1, 1, 1]);
-    expect(pairData.cachedStrikeCurrent).toBe(1);
+    expect(pairData.strikeCurrentCached).toBe(1);
     expect(pairData.initialized).toBe(true);
   });
 
@@ -62,7 +62,6 @@ describe.concurrent("amounts", () => {
       0n,
       0,
       1,
-      "LiquidityPosition",
       oneEther,
     );
 
@@ -94,22 +93,13 @@ describe.concurrent("amounts", () => {
   test("calculate remove liquidity", () => {
     const pairData = calculateInitialize(0);
 
-    calculateAddLiquidity(
-      pair,
-      pairData,
-      0n,
-      0,
-      1,
-      "LiquidityPosition",
-      oneEther,
-    );
+    calculateAddLiquidity(pair, pairData, 0n, 0, 1, oneEther);
     const { amount0, amount1, position } = calculateRemoveLiquidity(
       pair,
       pairData,
       0n,
       0,
       1,
-      "LiquidityPosition",
       oneEther,
     );
 
@@ -140,22 +130,14 @@ describe.concurrent("amounts", () => {
 
   test("calculate borrow liquidity", () => {
     const pairData = calculateInitialize(0);
-    calculateAddLiquidity(
+    calculateAddLiquidity(pair, pairData, 0n, 1, 1, oneEther);
+    const { amount0, amount1, position } = calculateBorrowLiquidity(
       pair,
       pairData,
       0n,
       1,
-      1,
-      "LiquidityPosition",
-      oneEther,
-    );
-    const { amount0, amount1, position } = calculateBorrowLiquidity(
-      pair,
-      pairData,
-      1,
       "Token0",
       parseEther("1.5"),
-      // "LiquidityPosition",
       parseEther("0.5"),
     );
 
@@ -198,34 +180,26 @@ describe.concurrent("amounts", () => {
 
   test("calculate repay liquidity", () => {
     const pairData = calculateInitialize(0);
-    calculateAddLiquidity(
+    calculateAddLiquidity(pair, pairData, 0n, 1, 1, oneEther);
+    calculateBorrowLiquidity(
       pair,
       pairData,
       0n,
       1,
-      1,
-      "LiquidityPosition",
-      oneEther,
-    );
-    calculateBorrowLiquidity(
-      pair,
-      pairData,
-      1,
       "Token0",
       parseEther("1.5"),
-      // "LiquidityPosition",
       parseEther("0.5"),
     );
     const { amount0, amount1, position } = calculateRepayLiquidity(
       pair,
       pairData,
+      0n,
       1,
       "Token0",
       makeFraction(
         (parseEther("1.5") * Q128) / ratioAtStrikeNeg1,
         parseEther("0.5"),
       ),
-      // "LiquidityPosition",
       parseEther("0.5"),
     );
 
@@ -260,15 +234,7 @@ describe.concurrent("amounts", () => {
 
   test.todo("calculate swap token 1 exact in", () => {
     const pairData = calculateInitialize(0);
-    calculateAddLiquidity(
-      pair,
-      pairData,
-      0n,
-      0,
-      1,
-      "LiquidityPosition",
-      oneEther,
-    );
+    calculateAddLiquidity(pair, pairData, 0n, 0, 1, oneEther);
     const { amount0, amount1 } = calculateSwap(
       pair,
       pairData,

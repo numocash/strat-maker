@@ -5,14 +5,10 @@ import {
   debtBalanceToLiquidity,
   debtLiquidityToBalance,
   getAmount0Delta,
-  getAmount0ForLiquidity,
   getAmount1Delta,
-  getAmount1ForLiquidity,
   getAmountsForLiquidity,
   getLiquidityDeltaAmount0,
   getLiquidityDeltaAmount1,
-  getLiquidityForAmount0,
-  getLiquidityForAmount1,
   liquidityToBalance,
 } from "./math.js";
 import { type PositionData, makePosition } from "./positions.js";
@@ -28,6 +24,8 @@ import {
   type ERC20Amount,
   type Fraction,
   MaxUint128,
+  fractionMultiply,
+  fractionQuotient,
   makeAmountFromRaw,
   makeFraction,
 } from "reverse-mirage";
@@ -44,16 +42,11 @@ export const calculateInitialize = (strike: Strike): PairData => {
   return {
     strikes: {
       [strike]: {
-        // limitData: {
-        //   liquidity0To1: 0n,
-        //   liquidity1To0: 0n,
-        //   liquidity0InPerLiquidity: makeFraction(0n),
-        //   liquidity1InPerLiquidity: makeFraction(0n),
-        // },
+        liquidityGrowth: makeFraction(0n),
+        blockLast: 0n,
         totalSupply: [0n, 0n, 0n, 0n, 0n],
         liquidityBiDirectional: [0n, 0n, 0n, 0n, 0n],
         liquidityBorrowed: [0n, 0n, 0n, 0n, 0n],
-        liquidityGrowth: makeFraction(0n),
         next0To1: 0,
         next1To0: 0,
         activeSpread: 0,
@@ -75,8 +68,7 @@ export const calculateInitialize = (strike: Strike): PairData => {
       makeFraction(0n),
     ],
     strikeCurrent: [strike, strike, strike, strike, strike],
-    cachedStrikeCurrent: strike,
-    cachedBlock: 0n,
+    strikeCurrentCached: strike,
     initialized: true,
   };
 };
@@ -98,7 +90,6 @@ export const calculateAddLiquidity = (
   block: bigint,
   strike: Strike,
   spread: Spread,
-  tokenSelector: TokenSelector,
   amountDesired: bigint,
 ): {
   amount0: ERC20Amount<Pair["token0"]>;
@@ -107,63 +98,28 @@ export const calculateAddLiquidity = (
 } => {
   invariant(pairData.initialized, "Dry Powder SDK: Pair is not initialized");
 
-  pairData.cachedStrikeCurrent === strike &&
-    calculateAccrue(pairData, strike, block);
-
   if (pairData.strikes[strike] === undefined)
     pairData.strikes[strike] = {
-      // limitData: {
-      //   liquidity0To1: 0n,
-      //   liquidity1To0: 0n,
-      //   liquidity0InPerLiquidity: makeFraction(0n),
-      //   liquidity1InPerLiquidity: makeFraction(0n),
-      // },
+      liquidityGrowth: makeFraction(0n),
+      blockLast: 0n,
       totalSupply: [0n, 0n, 0n, 0n, 0n],
       liquidityBiDirectional: [0n, 0n, 0n, 0n, 0n],
       liquidityBorrowed: [0n, 0n, 0n, 0n, 0n],
-      liquidityGrowth: makeFraction(0n),
       next0To1: 0,
       next1To0: 0,
       activeSpread: 0,
     };
 
-  let balance: bigint;
-  let liquidity: bigint;
-  let amount0: bigint;
-  let amount1: bigint;
+  calculateAccrue(pairData, strike, block);
 
-  if (tokenSelector === "LiquidityPosition") {
-    balance = amountDesired;
-    liquidity = balanceToLiquidity(pairData, strike, spread, balance);
-    [amount0, amount1] = getAmountsForLiquidity(
-      pairData,
-      strike,
-      spread,
-      liquidity,
-    );
-  } else {
-    if (tokenSelector === "Token0") {
-      liquidity = getLiquidityForAmount0(
-        pairData,
-        strike,
-        spread,
-        amountDesired,
-      );
-      amount0 = amountDesired;
-      amount1 = getAmount1ForLiquidity(pairData, strike, spread, liquidity);
-    } else {
-      liquidity = getLiquidityForAmount1(
-        pairData,
-        strike,
-        spread,
-        amountDesired,
-      );
-      amount0 = getAmount0ForLiquidity(pairData, strike, spread, liquidity);
-      amount1 = amountDesired;
-    }
-
-    balance = liquidityToBalance(pairData, strike, spread, liquidity);
-  }
+  const liquidity = amountDesired;
+  const balance = liquidityToBalance(pairData, strike, spread, liquidity);
+  const [amount0, amount1] = getAmountsForLiquidity(
+    pairData,
+    strike,
+    spread,
+    liquidity,
+  );
 
   updateStrike(pairData, strike, spread, balance, liquidity);
 
@@ -195,7 +151,6 @@ export const calculateRemoveLiquidity = (
   block: bigint,
   strike: Strike,
   spread: Spread,
-  tokenSelector: TokenSelector,
   amountDesired: bigint,
 ): {
   amount0: ERC20Amount<Pair["token0"]>;
@@ -204,46 +159,17 @@ export const calculateRemoveLiquidity = (
 } => {
   invariant(pairData.initialized, "Dry Powder SDK: Pair is not initialized");
 
-  pairData.cachedStrikeCurrent === strike &&
-    calculateAccrue(pairData, strike, block);
+  calculateAccrue(pairData, strike, block);
 
-  let balance: bigint;
-  let liquidity: bigint;
-  let amount0: bigint;
-  let amount1: bigint;
+  const balance = amountDesired;
+  const liquidity = balanceToLiquidity(pairData, strike, spread, balance);
 
-  if (tokenSelector === "LiquidityPosition") {
-    balance = amountDesired;
-    liquidity = balanceToLiquidity(pairData, strike, spread, balance);
-    [amount0, amount1] = getAmountsForLiquidity(
-      pairData,
-      strike,
-      spread,
-      liquidity,
-    );
-  } else {
-    if (tokenSelector === "Token0") {
-      liquidity = getLiquidityForAmount0(
-        pairData,
-        strike,
-        spread,
-        amountDesired,
-      );
-      amount0 = amountDesired;
-      amount1 = getAmount1ForLiquidity(pairData, strike, spread, liquidity);
-    } else {
-      liquidity = getLiquidityForAmount1(
-        pairData,
-        strike,
-        spread,
-        amountDesired,
-      );
-      amount0 = getAmount0ForLiquidity(pairData, strike, spread, liquidity);
-      amount1 = amountDesired;
-    }
-
-    balance = liquidityToBalance(pairData, strike, spread, liquidity);
-  }
+  const [amount0, amount1] = getAmountsForLiquidity(
+    pairData,
+    strike,
+    spread,
+    liquidity,
+  );
 
   updateStrike(pairData, strike, spread, -balance, -liquidity);
 
@@ -272,10 +198,10 @@ export const calculateRemoveLiquidity = (
 export const calculateBorrowLiquidity = (
   pair: Pair,
   pairData: PairData,
+  block: bigint,
   strike: Strike,
-  selectorCollateral: Exclude<TokenSelector, "LiquidityPosition">,
+  selectorCollateral: TokenSelector,
   amountDesiredCollateral: bigint,
-  // selectorDebt: TokenSelector,
   amountDesiredDebt: bigint,
 ): {
   amount0: ERC20Amount<Pair["token0"]>;
@@ -283,18 +209,16 @@ export const calculateBorrowLiquidity = (
   position: PositionData<"Debt">;
 } => {
   invariant(pairData.initialized, "Dry Powder SDK: Pair is not initialized");
+  calculateAccrue(pairData, strike, block);
 
   const liquidity = amountDesiredDebt;
-  let amount0 = 0n;
-  let amount1 = 0n;
+  const liquidityToken1 = borrowLiquidity(pairData, strike, liquidity);
 
-  if (strike > pairData.cachedStrikeCurrent) {
-    amount0 = -getAmount0Delta(liquidity, strike);
-  } else {
-    amount1 = -getAmount1Delta(liquidity);
-  }
+  let amount0: bigint;
+  let amount1: bigint;
+  amount0 = -getAmount0Delta(liquidity - liquidityToken1, strike);
+  amount1 = -getAmount1Delta(liquidityToken1);
 
-  borrowLiquidity(pairData, strike, liquidity);
   let liquidityCollateral: bigint;
   if (selectorCollateral === "Token0") {
     amount0 += amountDesiredCollateral;
@@ -306,11 +230,13 @@ export const calculateBorrowLiquidity = (
     amount1 += amountDesiredCollateral;
     liquidityCollateral = getLiquidityDeltaAmount1(amountDesiredCollateral);
   }
+
+  invariant(amountDesiredDebt < liquidityCollateral, "overcollateralization");
+
   const balance = debtLiquidityToBalance(
     liquidity,
     pairData.strikes[strike]!.liquidityGrowth,
   );
-  // TODO: is this right
   const leverageRatio = makeFraction(liquidityCollateral, balance);
 
   return {
@@ -338,10 +264,10 @@ export const calculateBorrowLiquidity = (
 export const calculateRepayLiquidity = (
   pair: Pair,
   pairData: PairData,
+  block: bigint,
   strike: Strike,
-  selectorCollateral: Exclude<TokenSelector, "LiquidityPosition">,
+  selectorCollateral: TokenSelector,
   leverageRatio: Fraction,
-  // selectorDebt: TokenSelector,
   amountDesiredDebt: bigint,
 ): {
   amount0: ERC20Amount<Pair["token0"]>;
@@ -349,6 +275,7 @@ export const calculateRepayLiquidity = (
   position: PositionData<"Debt">;
 } => {
   invariant(pairData.initialized, "Dry Powder SDK: Pair is not initialized");
+  calculateAccrue(pairData, strike, block);
 
   const balance = amountDesiredDebt;
   const liquidity = debtBalanceToLiquidity(
@@ -433,8 +360,8 @@ export const calculateSwap = (
 
   for (let i = 1; i <= NUM_SPREADS; i++) {
     const activeStrike = isSwap0To1
-      ? pairData.cachedStrikeCurrent + i
-      : pairData.cachedStrikeCurrent - i;
+      ? pairData.strikeCurrentCached + i
+      : pairData.strikeCurrentCached - i;
     const spreadStrikeCurrent = pairData.strikeCurrent[i]!;
 
     if (activeStrike === spreadStrikeCurrent) {
@@ -459,7 +386,7 @@ export const calculateSwap = (
   while (true) {
     const { amountIn, amountOut } = computeSwapStep(
       pair,
-      pairData.cachedStrikeCurrent,
+      pairData.strikeCurrentCached,
       swapState.liquiditySwap,
       swapState.amountDesired,
     );
@@ -483,13 +410,13 @@ export const calculateSwap = (
 
     // move to next strike
     if (isSwap0To1) {
-      pairData.cachedStrikeCurrent =
-        pairData.strikes[pairData.cachedStrikeCurrent]!.next0To1;
+      pairData.strikeCurrentCached =
+        pairData.strikes[pairData.strikeCurrentCached]!.next0To1;
       swapState.liquiditySwap = 0n;
       swapState.liquidityTotal = 0n;
 
       for (let i = 1; i <= NUM_SPREADS; i++) {
-        const activeStrike = pairData.cachedStrikeCurrent + i;
+        const activeStrike = pairData.strikeCurrentCached + i;
 
         if (
           pairData.strikeCurrent[i - 1]! > activeStrike &&
@@ -522,13 +449,13 @@ export const calculateSwap = (
         }
       }
     } else {
-      pairData.cachedStrikeCurrent =
-        pairData.strikes[pairData.cachedStrikeCurrent]!.next1To0;
+      pairData.strikeCurrentCached =
+        pairData.strikes[pairData.strikeCurrentCached]!.next1To0;
       swapState.liquiditySwap = 0n;
       swapState.liquidityTotal = 0n;
 
       for (let i = 1; i <= NUM_SPREADS; i++) {
-        const activeStrike = pairData.cachedStrikeCurrent - i;
+        const activeStrike = pairData.strikeCurrentCached - i;
 
         if (
           pairData.strikeCurrent[i - 1]! > activeStrike &&
@@ -584,7 +511,7 @@ export const calculateAccrue = (
 ) => {
   invariant(pairData.initialized, "Dry Powder SDK: Pair is not initialized");
 
-  const blocks = blockCurrent - pairData.cachedBlock;
+  const blocks = blockCurrent - pairData.strikes[strike]!.blockLast;
   if (blocks === 0n) return;
 
   let liquidityRepaid = 0n;
@@ -613,7 +540,7 @@ export const calculateAccrue = (
 
   repayLiquidity(pairData, strike, liquidityRepaid);
 
-  pairData.cachedBlock = blockCurrent;
+  pairData.strikes[strike]!.blockLast = blockCurrent;
 };
 
 // collateral and debt amount
@@ -638,12 +565,11 @@ const borrowLiquidity = (
   pairData: PairData,
   strike: Strike,
   liquidity: bigint,
-) => {
+): bigint => {
   let activeSpread = pairData.strikes[strike]!.activeSpread;
   let remainingLiquidity = liquidity;
+  let liquidityToken1 = 0n;
   while (true) {
-    invariant(pairData.strikeCurrent[activeSpread] !== strike);
-
     if (
       pairData.strikes[strike]!.liquidityBiDirectional[activeSpread] >=
       remainingLiquidity
@@ -652,6 +578,19 @@ const borrowLiquidity = (
         remainingLiquidity;
       pairData.strikes[strike]!.liquidityBorrowed[activeSpread] +=
         remainingLiquidity;
+
+      // determine what token the liqudity was borrowed
+      if (pairData.strikeCurrent[activeSpread] > strike) {
+        liquidityToken1 += remainingLiquidity;
+      } else {
+        liquidityToken1 += fractionQuotient(
+          fractionMultiply(
+            pairData.composition[activeSpread],
+            remainingLiquidity,
+          ),
+        );
+      }
+
       break;
     } else {
       pairData.strikes[strike]!.liquidityBorrowed[activeSpread] +=
@@ -660,10 +599,24 @@ const borrowLiquidity = (
 
       remainingLiquidity -=
         pairData.strikes[strike]!.liquidityBiDirectional[activeSpread];
+
+      // determine what token the liqudity was borrowed
+      if (pairData.strikeCurrent[activeSpread] > strike) {
+        liquidityToken1 += remainingLiquidity;
+      } else {
+        liquidityToken1 += fractionQuotient(
+          fractionMultiply(
+            pairData.composition[activeSpread],
+            remainingLiquidity,
+          ),
+        );
+      }
+
       activeSpread++;
     }
   }
   pairData.strikes[strike]!.activeSpread = activeSpread;
+  return liquidityToken1;
 };
 
 const repayLiquidity = (
@@ -674,8 +627,6 @@ const repayLiquidity = (
   let activeSpread = pairData.strikes[strike]!.activeSpread;
   let remainingLiquidity = liquidity;
   while (true) {
-    invariant(pairData.strikeCurrent[activeSpread] !== strike);
-
     if (
       pairData.strikes[strike]!.liquidityBorrowed[activeSpread] >=
       remainingLiquidity

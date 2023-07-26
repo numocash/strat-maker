@@ -10,6 +10,7 @@ import {
   CommandEnum,
   OrderTypeEnum,
   RouterAddress,
+  SwapTokenSelectorEnum,
   TokenSelectorEnum,
 } from "./constants.js";
 import { routerABI } from "./generated.js";
@@ -31,6 +32,7 @@ import {
   fractionAdd,
   fractionMultiply,
   fractionQuotient,
+  makeAmountFromRaw,
   readAndParse,
 } from "reverse-mirage";
 import type {
@@ -88,7 +90,6 @@ export const routerRoute = async (
       );
       pairData[id]!.strikes[strike] = strikeData;
     };
-
     if (c.command === "CreatePair") {
       // TODO": a pair that isn't created
     } else if (c.command === "AddLiquidity") {
@@ -100,7 +101,6 @@ export const routerRoute = async (
         blockNumber,
         c.inputs.strike,
         c.inputs.spread,
-        c.inputs.tokenSelector,
         c.inputs.amountDesired,
       );
       updateToken(account, amount0);
@@ -115,7 +115,6 @@ export const routerRoute = async (
         blockNumber,
         c.inputs.strike,
         c.inputs.spread,
-        c.inputs.tokenSelector,
         c.inputs.amountDesired,
       );
       updateToken(account, amount0);
@@ -127,10 +126,10 @@ export const routerRoute = async (
       const { amount0, amount1, position } = calculateBorrowLiquidity(
         c.inputs.pair,
         pairData[id]!,
+        blockNumber,
         c.inputs.strike,
         c.inputs.selectorCollateral,
         c.inputs.amountDesiredCollateral,
-        // c.inputs.selectorDebt,
         c.inputs.amountDesiredDebt,
       );
       updateToken(account, amount0);
@@ -138,14 +137,13 @@ export const routerRoute = async (
       updateLiquidityPosition(account, position);
     } else if (c.command === "RepayLiquidity") {
       await loadStrike(c.inputs.strike);
-
       const { amount0, amount1, position } = calculateRepayLiquidity(
         c.inputs.pair,
         pairData[id]!,
+        blockNumber,
         c.inputs.strike,
         c.inputs.selectorCollateral,
         c.inputs.leverageRatio,
-        // c.inputs.selectorDebt,
         c.inputs.amountDesiredDebt,
       );
       updateToken(account, amount0);
@@ -155,14 +153,26 @@ export const routerRoute = async (
       const { amount0, amount1 } = calculateSwap(
         c.inputs.pair,
         pairData[id]!,
-        c.inputs.amountDesired,
+        c.inputs.selector === "Token0"
+          ? makeAmountFromRaw(c.inputs.pair.token0, c.inputs.amountDesired)
+          : c.inputs.selector === "Token1"
+          ? makeAmountFromRaw(c.inputs.pair.token1, c.inputs.amountDesired)
+          : c.inputs.selector === "Token0Account"
+          ? makeAmountFromRaw(
+              c.inputs.pair.token0,
+              account.tokens[c.inputs.pair.token0.address]!.amount,
+            )
+          : makeAmountFromRaw(
+              c.inputs.pair.token1,
+              account.tokens[c.inputs.pair.token1.address]!.amount,
+            ),
       );
       updateToken(account, amount0);
       updateToken(account, amount1);
     } else if (c.command === "Accrue") {
       calculateAccrue(
         pairData[id]!,
-        pairData[id]!.cachedStrikeCurrent,
+        pairData[id]!.strikeCurrentCached,
         blockNumber,
       );
     }
@@ -186,6 +196,7 @@ export const routerRoute = async (
         fractionMultiply(fractionAdd(args.slippage, 1), t.amount),
       ),
     }));
+
   // get datahashes
   const lpTransferDataHash = transferRequestsLP.map((t) =>
     getTransferTypedDataHashLP(walletClient.chain!.id, {
@@ -293,7 +304,6 @@ const encodeInput = (command: Command): Hex =>
         command.inputs.pair.scalingFactor,
         command.inputs.strike,
         command.inputs.spread,
-        TokenSelectorEnum[command.inputs.tokenSelector],
         command.inputs.amountDesired,
       ])
     : command.command === "RemoveLiquidity"
@@ -303,10 +313,7 @@ const encodeInput = (command: Command): Hex =>
         command.inputs.pair.scalingFactor,
         command.inputs.strike,
         command.inputs.spread,
-        TokenSelectorEnum[command.inputs.tokenSelector],
-        command.inputs.tokenSelector === "LiquidityPosition"
-          ? -command.inputs.amountDesired
-          : command.inputs.amountDesired,
+        command.inputs.amountDesired,
       ])
     : command.command === "BorrowLiquidity"
     ? encodeAbiParameters(BorrowLiquidityParams, [
@@ -316,7 +323,6 @@ const encodeInput = (command: Command): Hex =>
         command.inputs.strike,
         TokenSelectorEnum[command.inputs.selectorCollateral],
         command.inputs.amountDesiredCollateral,
-        // TokenSelectorEnum[command.inputs.selectorDebt],
         command.inputs.amountDesiredDebt,
       ])
     : command.command === "RepayLiquidity"
@@ -327,7 +333,6 @@ const encodeInput = (command: Command): Hex =>
         command.inputs.strike,
         TokenSelectorEnum[command.inputs.selectorCollateral],
         fractionToQ128(command.inputs.leverageRatio),
-        // TokenSelectorEnum[command.inputs.selectorDebt],
         command.inputs.amountDesiredDebt,
       ])
     : command.command === "Swap"
@@ -335,16 +340,15 @@ const encodeInput = (command: Command): Hex =>
         command.inputs.pair.token0.address,
         command.inputs.pair.token1.address,
         command.inputs.pair.scalingFactor,
-        command.inputs.amountDesired.token === command.inputs.pair.token0
-          ? TokenSelectorEnum.Token0
-          : TokenSelectorEnum.Token1,
-        command.inputs.amountDesired.amount,
+        SwapTokenSelectorEnum[command.inputs.selector],
+        command.inputs.amountDesired,
       ])
     : command.command === "Accrue"
     ? encodeAbiParameters(AccrueParams, [
         command.inputs.pair.token0.address,
         command.inputs.pair.token1.address,
         command.inputs.pair.scalingFactor,
+        command.inputs.strike,
       ])
     : encodeAbiParameters(CreatePairParams, [
         command.inputs.pair.token0.address,
@@ -367,8 +371,7 @@ export const AddLiquidityParams = [
   { name: "scalingFactor", type: "uint8" },
   { name: "strike", type: "int24" },
   { name: "spread", type: "uint8" },
-  { name: "selector", type: "uint8" },
-  { name: "amountDesired", type: "int256" },
+  { name: "amountDesired", type: "uint128" },
 ] as const;
 
 export const BorrowLiquidityParams = [
@@ -378,8 +381,7 @@ export const BorrowLiquidityParams = [
   { name: "strike", type: "int24" },
   { name: "selectorCollateral", type: "uint8" },
   { name: "amountDesiredCollateral", type: "int256" },
-  // { name: "selectorDebt", type: "uint8" },
-  { name: "amountDesiredDebt", type: "uint256" },
+  { name: "amountDesiredDebt", type: "uint128" },
 ] as const;
 
 export const RepayLiquidityParams = [
@@ -389,8 +391,7 @@ export const RepayLiquidityParams = [
   { name: "strike", type: "int24" },
   { name: "selectorCollateral", type: "uint8" },
   { name: "leverageRatioX128", type: "uint256" },
-  // { name: "selectorDebt", type: "uint8" },
-  { name: "amountDesiredDebt", type: "uint256" },
+  { name: "amountDesiredDebt", type: "uint128" },
 ] as const;
 
 export const RemoveLiquidityParams = [
@@ -399,14 +400,14 @@ export const RemoveLiquidityParams = [
   { name: "scalingFactor", type: "uint8" },
   { name: "strike", type: "int24" },
   { name: "spread", type: "uint8" },
-  { name: "selector", type: "uint8" },
-  { name: "amountDesired", type: "int256" },
+  { name: "amountDesired", type: "uint128" },
 ] as const;
 
 export const AccrueParams = [
   { name: "token0", type: "address" },
   { name: "token1", type: "address" },
   { name: "scalingFactor", type: "uint8" },
+  { name: "strike", type: "int24" },
 ] as const;
 
 export const CreatePairParams = [

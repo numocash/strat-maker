@@ -43,7 +43,7 @@ export type Position<TOrderType extends OrderType> = ILRTA<"position"> & {
         token1: ERC20;
         scalingFactor: number;
         strike: Strike;
-        selectorCollateral: Exclude<TokenSelector, "LiquidityPosition">;
+        selectorCollateral: TokenSelector;
       };
 };
 
@@ -132,26 +132,6 @@ export const BiDirectionalID = [
     type: "tuple",
   },
 ] as const;
-
-// export const LimitID = [
-//   {
-//     components: [
-//       {
-//         name: "token0",
-//         type: "address",
-//       },
-//       {
-//         name: "token1",
-//         type: "address",
-//       },
-//       { name: "strike", type: "int24" },
-//       { name: "zeroToOne", type: "bool" },
-//       { name: "liquidityGrowthLast", type: "uint256" },
-//     ],
-//     name: "limitID",
-//     type: "tuple",
-//   },
-// ] as const;
 
 export const DebtID = [
   {
