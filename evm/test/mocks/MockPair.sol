@@ -58,7 +58,7 @@ contract MockPair is Positions {
         public
         returns (int256 amount0, int256 amount1)
     {
-        if (pair.cachedStrikeCurrent == strike) pair._accrue(strike);
+        pair.accrue(strike);
         uint128 token1Liquidity = pair.borrowLiquidity(strike, liquidityDebt);
 
         // calculate the the tokens that are borrowed
@@ -118,7 +118,7 @@ contract MockPair is Positions {
         public
         returns (int256 amount0, int256 amount1)
     {
-        if (pair.cachedStrikeCurrent == strike) pair._accrue(strike);
+        pair.accrue(strike);
         uint256 _liquidityGrowthX128 = pair.strikes[strike].liquidityGrowthX128;
         uint128 liquidity = debtBalanceToLiquidity(balance, _liquidityGrowthX128, true);
         pair.repayLiquidity(strike, liquidity);
@@ -175,7 +175,7 @@ contract MockPair is Positions {
         public
         returns (uint256 amount0, uint256 amount1)
     {
-        if (pair.cachedStrikeCurrent == strike) pair._accrue(strike);
+        pair.accrue(strike);
         uint128 balance = liquidityToBalance(pair, strike, spread, liquidity, true);
         (amount0, amount1) = getAmountsForLiquidity(pair, strike, spread, uint256(liquidity), true);
 
@@ -204,8 +204,8 @@ contract MockPair is Positions {
         if (BalanceLib.getBalance(token1) < balance1Before + amount1) revert();
     }
 
-    function accrue() external {
-        pair.accrue();
+    function accrue(int24 strike) external {
+        pair.accrue(strike);
     }
 
     function removeLiquidity(
@@ -216,7 +216,7 @@ contract MockPair is Positions {
         public
         returns (uint256 amount0, uint256 amount1)
     {
-        if (pair.cachedStrikeCurrent == strike) pair._accrue(strike);
+        pair.accrue(strike);
         uint128 liquidity = balanceToLiquidity(pair, strike, spread, balance, false);
         (amount0, amount1) = getAmountsForLiquidity(pair, strike, spread, uint256(liquidity), false);
 
@@ -263,15 +263,14 @@ contract MockPair is Positions {
         external
         view
         returns (
-            uint256 cachedBlock,
             uint128[NUM_SPREADS] memory composition,
             int24[NUM_SPREADS] memory strikeCurrent,
-            int24 cachedStrikeCurrent,
+            int24 strikeCurrentCached,
             uint8 initialized
         )
     {
-        (cachedBlock, composition, strikeCurrent, cachedStrikeCurrent, initialized) =
-            (pair.cachedBlock, pair.composition, pair.strikeCurrent, pair.cachedStrikeCurrent, pair.initialized);
+        (composition, strikeCurrent, strikeCurrentCached, initialized) =
+            (pair.composition, pair.strikeCurrent, pair.strikeCurrentCached, pair.initialized);
     }
 
     function getStrike(int24 strike) external view returns (Pairs.Strike memory) {

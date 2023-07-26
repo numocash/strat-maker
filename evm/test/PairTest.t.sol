@@ -65,12 +65,18 @@ contract AddLiquidityTest is Test, PairHelper {
         Pairs.Strike memory strike = pair.getStrike(0);
         assertEq(strike.next0To1, -1, "initial strike 0 to 1");
         assertEq(strike.next1To0, 1, "initial strike 1 to 0");
+        assertEq(strike.reference0To1, 1);
+        assertEq(strike.reference1To0, 1);
 
         strike = pair.getStrike(-1);
         assertEq(strike.next0To1, MIN_STRIKE, "0 to 1");
+        assertEq(strike.reference0To1, 1);
+        assertEq(strike.reference1To0, 0);
 
         strike = pair.getStrike(1);
         assertEq(strike.next1To0, MAX_STRIKE, "1 to 0");
+        assertEq(strike.reference0To1, 0);
+        assertEq(strike.reference1To0, 1);
     }
 
     function testGasAddLiquidityFreshStrikes() external {
@@ -139,6 +145,27 @@ contract RemoveLiquidityTest is Test, PairHelper {
         basicRemoveLiquidity();
         Pairs.Strike memory strike = pair.getStrike(0);
         assertEq(strike.liquidityBiDirectional[0], 0);
+    }
+
+    function testAddLiquidityStrikeMapBasic() external {
+        basicAddLiquidity();
+        basicRemoveLiquidity();
+
+        Pairs.Strike memory strike = pair.getStrike(0);
+        assertEq(strike.next0To1, MIN_STRIKE, "initial strike 0 to 1");
+        assertEq(strike.next1To0, MAX_STRIKE, "initial strike 1 to 0");
+        assertEq(strike.reference0To1, 1);
+        assertEq(strike.reference1To0, 1);
+
+        strike = pair.getStrike(-1);
+        assertEq(strike.next0To1, 0, "0 to 1");
+        assertEq(strike.reference0To1, 0);
+        assertEq(strike.reference1To0, 0);
+
+        strike = pair.getStrike(1);
+        assertEq(strike.next1To0, 0, "1 to 0");
+        assertEq(strike.reference0To1, 0);
+        assertEq(strike.reference1To0, 0);
     }
 
     function testRemoveLiquidityPosition() external {
@@ -266,8 +293,8 @@ contract SwapTest is Test, PairHelper {
         assertEq(token0.balanceOf(address(pair)), 1e18 - amountOut);
         assertEq(token1.balanceOf(address(pair)), 1e18 - 1);
 
-        (, uint128[NUM_SPREADS] memory composition, int24[NUM_SPREADS] memory strikeCurrent, int24 cachedStrikeCurrent,)
-        = pair.getPair();
+        (uint128[NUM_SPREADS] memory composition, int24[NUM_SPREADS] memory strikeCurrent, int24 cachedStrikeCurrent,) =
+            pair.getPair();
 
         assertEq(composition[0], type(uint128).max);
         assertEq(strikeCurrent[0], 0);
@@ -290,8 +317,8 @@ contract SwapTest is Test, PairHelper {
         assertEq(token0.balanceOf(address(pair)), 1e18 - amountOut);
         assertEq(token1.balanceOf(address(pair)), 1e18 - 1);
 
-        (, uint128[NUM_SPREADS] memory composition, int24[NUM_SPREADS] memory strikeCurrent, int24 cachedStrikeCurrent,)
-        = pair.getPair();
+        (uint128[NUM_SPREADS] memory composition, int24[NUM_SPREADS] memory strikeCurrent, int24 cachedStrikeCurrent,) =
+            pair.getPair();
 
         assertEq(composition[0], type(uint128).max);
         assertEq(strikeCurrent[0], 0);
@@ -313,8 +340,8 @@ contract SwapTest is Test, PairHelper {
         assertEq(token0.balanceOf(address(pair)), amountIn);
         assertEq(token1.balanceOf(address(pair)), 0);
 
-        (, uint128[NUM_SPREADS] memory composition, int24[NUM_SPREADS] memory strikeCurrent, int24 cachedStrikeCurrent,)
-        = pair.getPair();
+        (uint128[NUM_SPREADS] memory composition, int24[NUM_SPREADS] memory strikeCurrent, int24 cachedStrikeCurrent,) =
+            pair.getPair();
 
         assertEq(composition[0], 0);
         assertEq(strikeCurrent[0], -1);
@@ -338,12 +365,72 @@ contract SwapTest is Test, PairHelper {
         assertEq(token0.balanceOf(address(pair)), amountIn, "balance0 pair");
         assertEq(token1.balanceOf(address(pair)), 0, "balance1 pair");
 
-        (, uint128[NUM_SPREADS] memory composition, int24[NUM_SPREADS] memory strikeCurrent, int24 cachedStrikeCurrent,)
-        = pair.getPair();
+        (uint128[NUM_SPREADS] memory composition, int24[NUM_SPREADS] memory strikeCurrent, int24 cachedStrikeCurrent,) =
+            pair.getPair();
 
         assertEq(composition[0], 0);
         assertEq(strikeCurrent[0], -1);
         assertEq(cachedStrikeCurrent, -2);
+    }
+
+    function testSwap0To1CleanupStrikeMap() external {
+        pair.addLiquidity(-1, 1, 1e18);
+        // 0->1
+        pair.swap(false, -1e18);
+
+        Pairs.Strike memory strike = pair.getStrike(0);
+        assertEq(strike.next0To1, 0, "initial strike 0 to 1");
+        assertEq(strike.next1To0, MAX_STRIKE, "initial strike 1 to 0");
+        assertEq(strike.reference0To1, 0);
+        assertEq(strike.reference1To0, 2);
+
+        strike = pair.getStrike(-2);
+        assertEq(strike.next0To1, MIN_STRIKE, "0 to 1");
+        assertEq(strike.next1To0, 0, "1 to 0");
+        assertEq(strike.reference0To1, 1);
+        assertEq(strike.reference1To0, 0);
+
+        strike = pair.getStrike(-1);
+        assertEq(strike.next0To1, 0, "0 to 1");
+        assertEq(strike.next1To0, 0, " 1 to 0");
+        assertEq(strike.reference0To1, 0);
+        assertEq(strike.reference1To0, 0);
+
+        strike = pair.getStrike(1);
+        assertEq(strike.next1To0, 0, "1 to 0");
+        assertEq(strike.next1To0, 0, "1 to 0");
+        assertEq(strike.reference0To1, 0);
+        assertEq(strike.reference1To0, 0);
+    }
+
+    function testSwap1To0CleanupStrikeMap() external {
+        basicAddLiquidity();
+        // 1->0
+        pair.swap(false, 1e18 - 1);
+
+        Pairs.Strike memory strike = pair.getStrike(0);
+        assertEq(strike.next0To1, -1, "initial strike 0 to 1");
+        assertEq(strike.next1To0, 0, "initial strike 1 to 0");
+        assertEq(strike.reference0To1, 1);
+        assertEq(strike.reference1To0, 0);
+
+        strike = pair.getStrike(-2);
+        assertEq(strike.next0To1, 0, "0 to 1");
+        assertEq(strike.next1To0, 0, "1 to 0");
+        assertEq(strike.reference0To1, 0);
+        assertEq(strike.reference1To0, 0);
+
+        strike = pair.getStrike(-1);
+        assertEq(strike.next0To1, MIN_STRIKE, "0 to 1");
+        assertEq(strike.next1To0, 0, "1 to 0");
+        assertEq(strike.reference0To1, 1);
+        assertEq(strike.reference1To0, 0);
+
+        strike = pair.getStrike(1);
+        assertEq(strike.next0To1, 0, "1 to 0");
+        assertEq(strike.next1To0, MAX_STRIKE, "1 to 0");
+        assertEq(strike.reference0To1, 0);
+        assertEq(strike.reference1To0, 1);
     }
 
     // function testSwapPartial0To1() external {
@@ -441,7 +528,7 @@ contract SwapTest is Test, PairHelper {
         pair.addLiquidity(0, 1, 1e18);
         pair.swap(false, 0.5e18);
 
-        (, uint128[NUM_SPREADS] memory composition,,,) = pair.getPair();
+        (uint128[NUM_SPREADS] memory composition,,,) = pair.getPair();
 
         assertApproxEqRel(composition[0], type(uint128).max - mulDiv(0.5e18, Q128, 1e18 + 0.5e14), 1e5);
 
@@ -456,7 +543,7 @@ contract SwapTest is Test, PairHelper {
 
         pair.swap(false, 0.5e18);
 
-        (, uint128[NUM_SPREADS] memory composition,,,) = pair.getPair();
+        (uint128[NUM_SPREADS] memory composition,,,) = pair.getPair();
 
         assertApproxEqRel(composition[0], type(uint128).max - mulDiv(1.5e18, Q128, 2e18 + 0.75e14), 1e5);
         assertApproxEqRel(composition[1], type(uint128).max - mulDiv(1.5e18, Q128, 2e18 + 0.75e14), 1e5);
@@ -510,7 +597,7 @@ contract BorrowTest is Test, PairHelper {
         pair.borrowLiquidity(0, Engine.TokenSelector.Token0, 1.5e18, 0.5e18);
 
         vm.roll(10);
-        pair.accrue();
+        pair.accrue(0);
 
         Pairs.Strike memory strike = pair.getStrike(0);
 

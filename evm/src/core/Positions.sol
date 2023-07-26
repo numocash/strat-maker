@@ -19,14 +19,6 @@ abstract contract Positions is ILRTA {
         uint8 spread;
     }
 
-    // struct LimitID {
-    //     address token0;
-    //     address token1;
-    //     int24 strike;
-    //     bool zeroToOne;
-    //     uint256 liquidityGrowthLast;
-    // }
-
     struct DebtID {
         address token0;
         address token1;
@@ -251,27 +243,6 @@ abstract contract Positions is ILRTA {
         );
     }
 
-    // function _limitID(
-    //     address token0,
-    //     address token1,
-    //     int24 strike,
-    //     bool zeroToOne,
-    //     uint256 liquidityGrowthLast
-    // )
-    //     internal
-    //     pure
-    //     returns (bytes32)
-    // {
-    //     return dataID(
-    //         abi.encode(
-    //             ILRTADataID(
-    //                 Engine.OrderType.Limit, abi.encode(LimitID(token0, token1, strike, zeroToOne,
-    // liquidityGrowthLast))
-    //             )
-    //         )
-    //     );
-    // }
-
     function _debtID(
         address token0,
         address token1,
@@ -323,26 +294,6 @@ abstract contract Positions is ILRTA {
 
         emit Transfer(address(0), to, abi.encode(ILRTATransferDetails(id, Engine.OrderType.BiDirectional, amount)));
     }
-
-    // function _mintLimit(
-    //     address to,
-    //     address token0,
-    //     address token1,
-    //     int24 strike,
-    //     bool zeroToOne,
-    //     uint256 liquidityGrowthLast,
-    //     uint256 amount
-    // )
-    //     internal
-    // {
-    //     bytes32 id = _limitID(token0, token1, strike, zeroToOne, liquidityGrowthLast);
-
-    //     unchecked {
-    //         _dataOf[to][id].balance += amount;
-    //     }
-
-    //     emit Transfer(address(0), to, abi.encode(ILRTATransferDetails(id, amount, Engine.OrderType.Limit)));
-    // }
 
     function _mintDebt(
         address to,
@@ -399,24 +350,6 @@ abstract contract Positions is ILRTA {
 
         emit Transfer(from, address(0), abi.encode(ILRTATransferDetails(id, orderType, amount)));
     }
-
-    // function _burnLimit(
-    //     address from,
-    //     address token0,
-    //     address token1,
-    //     int24 strike,
-    //     bool zeroToOne,
-    //     uint256 liquidityGrowthLast,
-    //     uint256 amount
-    // )
-    //     internal
-    // {
-    //     bytes32 id = _limitID(token0, token1, strike, zeroToOne, liquidityGrowthLast);
-
-    //     _dataOf[from][id].balance -= amount;
-
-    //     emit Transfer(from, address(0), abi.encode(ILRTATransferDetails(id, amount, Engine.OrderType.Limit)));
-    // }
 
     function _burnDebt(
         address from,

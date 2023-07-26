@@ -228,7 +228,6 @@ beforeAll(async () => {
             0,
             1,
             1,
-            TokenSelectorEnum.LiquidityPosition,
             parseEther("1"),
           ]),
         ],
@@ -309,7 +308,7 @@ describe("reads", () => {
     expect(pairData).toBeTruthy();
 
     expect(pairData.initialized).toBeTruthy();
-    expect(pairData.cachedStrikeCurrent).toBe(0);
+    expect(pairData.strikeCurrentCached).toBe(0);
   });
 
   test("get strike", async () => {

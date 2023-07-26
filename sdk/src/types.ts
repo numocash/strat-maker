@@ -2,10 +2,11 @@ import {
   CommandEnum,
   NUM_SPREADS,
   OrderTypeEnum,
+  SwapTokenSelectorEnum,
   TokenSelectorEnum,
 } from "./constants.js";
 import type { AbiTypeToPrimitiveType } from "abitype";
-import type { ERC20, ERC20Amount, Fraction } from "reverse-mirage";
+import type { ERC20, Fraction } from "reverse-mirage";
 
 /**
  * A tuple of length `N` with elements of type `T`.
@@ -26,19 +27,12 @@ export type Strike = AbiTypeToPrimitiveType<"int24">;
 
 export type Spread = 1 | 2 | 3 | 4 | 5;
 
-// export type LimitData = {
-//   liquidity0To1: bigint;
-//   liquidity1To0: bigint;
-//   liquidity0InPerLiquidity: Fraction;
-//   liquidity1InPerLiquidity: Fraction;
-// };
-
 export type StrikeData = {
-  // limitData: LimitData;
+  liquidityGrowth: Fraction;
+  blockLast: bigint;
   totalSupply: Tuple<bigint, typeof NUM_SPREADS>;
   liquidityBiDirectional: Tuple<bigint, typeof NUM_SPREADS>;
   liquidityBorrowed: Tuple<bigint, typeof NUM_SPREADS>;
-  liquidityGrowth: Fraction;
   next0To1: Strike;
   next1To0: Strike;
   activeSpread: 0 | 1 | 2 | 3 | 4;
@@ -55,12 +49,13 @@ export type PairData = {
   bitMap1To0: BitMap;
   composition: Tuple<Fraction, typeof NUM_SPREADS>;
   strikeCurrent: Tuple<Strike, typeof NUM_SPREADS>;
-  cachedStrikeCurrent: Strike;
-  cachedBlock: bigint;
+  strikeCurrentCached: Strike;
   initialized: boolean;
 };
 
 export type TokenSelector = keyof typeof TokenSelectorEnum;
+
+export type SwapTokenSelector = keyof typeof SwapTokenSelectorEnum;
 
 export type OrderType = keyof typeof OrderTypeEnum;
 
@@ -83,7 +78,6 @@ export type AddLiquidityCommand = CommandType<
     pair: Pair;
     strike: Strike;
     spread: Spread;
-    tokenSelector: TokenSelector;
     amountDesired: bigint;
   }
 >;
@@ -94,7 +88,6 @@ export type RemoveLiquidityCommands = CommandType<
     pair: Pair;
     strike: Strike;
     spread: Spread;
-    tokenSelector: TokenSelector;
     amountDesired: bigint;
   }
 >;
@@ -104,9 +97,8 @@ export type BorrowLiquidityCommand = CommandType<
   {
     pair: Pair;
     strike: Strike;
-    selectorCollateral: Exclude<TokenSelector, "LiquidityPosition">;
+    selectorCollateral: TokenSelector;
     amountDesiredCollateral: bigint;
-    // selectorDebt: TokenSelector;
     amountDesiredDebt: bigint;
   }
 >;
@@ -116,9 +108,8 @@ export type RepayLiquidityCommand = CommandType<
   {
     pair: Pair;
     strike: Strike;
-    selectorCollateral: Exclude<TokenSelector, "LiquidityPosition">;
+    selectorCollateral: TokenSelector;
     leverageRatio: Fraction;
-    // selectorDebt: TokenSelector;
     amountDesiredDebt: bigint;
   }
 >;
@@ -127,7 +118,8 @@ export type SwapCommand = CommandType<
   "Swap",
   {
     pair: Pair;
-    amountDesired: ERC20Amount<Pair["token0"] | Pair["token1"]>;
+    selector: SwapTokenSelector;
+    amountDesired: bigint;
   }
 >;
 
@@ -135,6 +127,7 @@ export type AccrueCommand = CommandType<
   "Accrue",
   {
     pair: Pair;
+    strike: Strike;
   }
 >;
 

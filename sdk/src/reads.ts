@@ -33,54 +33,44 @@ export const engineGetPair = (
           args.pair.token0.address,
           args.pair.token1.address,
           0,
-          pairData[3],
+          pairData[2],
         ],
       });
       return { pairData, strikeData };
     },
     parse: ({ pairData, strikeData }): PairData => ({
       strikes: {
-        [pairData[3]]: {
-          // limitData: {
-          //   liquidity0To1: strikeData.limit.liquidity0To1,
-          //   liquidity1To0: strikeData.limit.liquidity1To0,
-          //   liquidity0InPerLiquidity: q128ToFraction(
-          //     strikeData.limit.liquidity0InPerLiquidity,
-          //   ),
-          //   liquidity1InPerLiquidity: q128ToFraction(
-          //     strikeData.limit.liquidity1InPerLiquidity,
-          //   ),
-          // },
+        [pairData[2]]: {
+          liquidityGrowth: q128ToFraction(strikeData.liquidityGrowthX128),
+          blockLast: strikeData.blockLast,
           totalSupply: strikeData.totalSupply as StrikeData["totalSupply"],
           liquidityBiDirectional:
             strikeData.liquidityBiDirectional as StrikeData["liquidityBiDirectional"],
           liquidityBorrowed:
             strikeData.liquidityBorrowed as StrikeData["liquidityBorrowed"],
-          liquidityGrowth: q128ToFraction(strikeData.liquidityGrowthX128),
           next0To1: strikeData.next0To1,
           next1To0: strikeData.next1To0,
           activeSpread: strikeData.activeSpread as 0 | 1 | 2 | 3 | 4,
         },
       },
       bitMap0To1: {
-        centerStrike: pairData[3],
+        centerStrike: pairData[2],
         words: [0n, 0n, 0n],
       },
       bitMap1To0: {
         centerStrike: pairData[3],
         words: [0n, 0n, 0n],
       },
-      cachedBlock: pairData[0],
       composition: [
-        q128ToFraction(pairData[1][0]),
-        q128ToFraction(pairData[1][1]),
-        q128ToFraction(pairData[1][2]),
-        q128ToFraction(pairData[1][3]),
-        q128ToFraction(pairData[1][4]),
+        q128ToFraction(pairData[0][0]),
+        q128ToFraction(pairData[0][1]),
+        q128ToFraction(pairData[0][2]),
+        q128ToFraction(pairData[0][3]),
+        q128ToFraction(pairData[0][4]),
       ],
-      strikeCurrent: pairData[2] as PairData["strikeCurrent"],
-      cachedStrikeCurrent: pairData[3],
-      initialized: Boolean(pairData[4]),
+      strikeCurrent: pairData[1] as PairData["strikeCurrent"],
+      strikeCurrentCached: pairData[2],
+      initialized: Boolean(pairData[3]),
     }),
   } satisfies ReverseMirageRead<{
     pairData: AbiParametersToPrimitiveTypes<
@@ -113,22 +103,13 @@ export const engineGetStrike = (
         ],
       }),
     parse: (data): StrikeData => ({
-      // limitData: {
-      //   liquidity0To1: data.limit.liquidity0To1,
-      //   liquidity1To0: data.limit.liquidity1To0,
-      //   liquidity0InPerLiquidity: q128ToFraction(
-      //     data.limit.liquidity0InPerLiquidity,
-      //   ),
-      //   liquidity1InPerLiquidity: q128ToFraction(
-      //     data.limit.liquidity1InPerLiquidity,
-      //   ),
-      // },
+      liquidityGrowth: q128ToFraction(data.liquidityGrowthX128),
+      blockLast: data.blockLast,
       totalSupply: data.totalSupply as StrikeData["totalSupply"],
       liquidityBiDirectional:
         data.liquidityBiDirectional as StrikeData["liquidityBiDirectional"],
       liquidityBorrowed:
         data.liquidityBorrowed as StrikeData["liquidityBorrowed"],
-      liquidityGrowth: q128ToFraction(data.liquidityGrowthX128),
       next0To1: data.next0To1,
       next1To0: data.next1To0,
       activeSpread: data.activeSpread as 0 | 1 | 2 | 3 | 4,
