@@ -87,22 +87,6 @@ function debtLiquidityToBalance(
     );
 }
 
-function getLiquidityBorrowed(
-    Pairs.Pair storage pair,
-    int24 strike,
-    Positions.DebtData storage debtData
-)
-    returns (uint256 liquidity)
-{}
-
-function getLiquidityCollateral(
-    Pairs.Pair storage pair,
-    int24 strike,
-    Positions.DebtData storage debtData
-)
-    returns (uint256 liquidity)
-{}
-
 function addPositions(
     uint128 balance0,
     uint128 balance1,

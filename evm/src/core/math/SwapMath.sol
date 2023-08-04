@@ -2,14 +2,7 @@
 pragma solidity ^0.8.19;
 
 import {mulDiv, mulDivRoundingUp} from "./FullMath.sol";
-import {
-    getAmount0Delta,
-    getAmount1Delta,
-    getAmount0FromComposition,
-    getAmount1FromComposition,
-    getLiquidityDeltaAmount0,
-    getLiquidityDeltaAmount1
-} from "./LiquidityMath.sol";
+import {getAmount0, getAmount1, getLiquidityForAmount0, getLiquidityForAmount1} from "./LiquidityMath.sol";
 import {Q128} from "./StrikeMath.sol";
 
 /// @notice Compoutes the result of a swap within a strike
@@ -29,7 +22,7 @@ function computeSwapStep(
 {
     bool isExactIn = amountDesired > 0;
     if (isExactIn) {
-        uint256 maxAmountIn = isToken0 ? getAmount0Delta(liquidity, ratioX128, true) : getAmount1Delta(liquidity);
+        uint256 maxAmountIn = isToken0 ? getAmount0(liquidity, ratioX128, true) : getAmount1(liquidity);
 
         bool allLiquiditySwapped = uint256(amountDesired) > maxAmountIn;
 
@@ -40,11 +33,11 @@ function computeSwapStep(
             liquidityRemaining = allLiquiditySwapped
                 ? 0
                 : isToken0
-                    ? getLiquidityDeltaAmount0(maxAmountIn - uint256(amountDesired), ratioX128, false)
-                    : getLiquidityDeltaAmount1(maxAmountIn - uint256(amountDesired));
+                    ? getLiquidityForAmount0(maxAmountIn - uint256(amountDesired), ratioX128, false)
+                    : getLiquidityForAmount1(maxAmountIn - uint256(amountDesired));
         }
     } else {
-        uint256 maxAmountOut = isToken0 ? getAmount0Delta(liquidity, ratioX128, false) : getAmount1Delta(liquidity);
+        uint256 maxAmountOut = isToken0 ? getAmount0(liquidity, ratioX128, false) : getAmount1(liquidity);
 
         bool allLiquiditySwapped = uint256(-amountDesired) > maxAmountOut;
 
@@ -56,8 +49,8 @@ function computeSwapStep(
             liquidityRemaining = allLiquiditySwapped
                 ? 0
                 : isToken0
-                    ? getLiquidityDeltaAmount0(maxAmountOut - uint256(-amountDesired), ratioX128, false)
-                    : getLiquidityDeltaAmount1(maxAmountOut - uint256(-amountDesired));
+                    ? getLiquidityForAmount0(maxAmountOut - uint256(-amountDesired), ratioX128, false)
+                    : getLiquidityForAmount1(maxAmountOut - uint256(-amountDesired));
         }
     }
 }
