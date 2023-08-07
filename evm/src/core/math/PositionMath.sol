@@ -9,7 +9,7 @@ import {Positions} from "../Positions.sol";
 error Overflow();
 
 /// @notice Convert liquidity position balance to liquidity
-/// @dev Assume strike and spread are valid, rounds down
+/// @dev Assume strike and spread are valid, rounds down, totalSupply > 0
 /// @dev liquidity = (balance * totalLiquidity) / totalSupply
 function balanceToLiquidity(
     Pairs.Pair storage pair,
@@ -23,22 +23,12 @@ function balanceToLiquidity(
     unchecked {
         uint8 spreadIndex = spread - 1;
         uint256 totalSupply = pair.strikes[strike].totalSupply[spreadIndex];
+        uint256 totalLiquidity = pair.strikes[strike].liquidityBiDirectional[spreadIndex]
+            + pair.strikes[strike].liquidityBorrowed[spreadIndex];
 
-        if (totalSupply == 0) {
-            return balance;
-        } else {
-            uint256 _liquidity = (
-                uint256(balance)
-                    * (
-                        uint256(
-                            pair.strikes[strike].liquidityBiDirectional[spreadIndex]
-                                + pair.strikes[strike].liquidityBorrowed[spreadIndex]
-                        )
-                    )
-            ) / totalSupply;
-            if (_liquidity > type(uint128).max) revert Overflow();
-            return uint128(_liquidity);
-        }
+        uint256 _liquidity = (uint256(balance) * totalLiquidity) / totalSupply;
+        if (_liquidity > type(uint128).max) revert Overflow();
+        return uint128(_liquidity);
     }
 }
 
@@ -46,8 +36,6 @@ function balanceToLiquidity(
 /// @dev Assume strike and spread are valid, rounds down
 /// @dev Cannot overflow because liquidity >= balance for liquidity positions
 /// @dev balance = (liquidity * totalSupply) / totalLiquidity
-/// @custom:team is there any assumption we can make about how much liquidity there is to potentially remove the
-/// totalLiquidity zero check
 function liquidityToBalance(
     Pairs.Pair storage pair,
     int24 strike,
@@ -65,8 +53,9 @@ function liquidityToBalance(
         if (totalLiquidity == 0) {
             return liquidity;
         } else {
-            return
-                uint128((uint256(liquidity) * uint256(pair.strikes[strike].totalSupply[spreadIndex])) / totalLiquidity);
+            uint256 totalSupply = pair.strikes[strike].totalSupply[spreadIndex];
+
+            return uint128((uint256(liquidity) * totalSupply) / totalLiquidity);
         }
     }
 }

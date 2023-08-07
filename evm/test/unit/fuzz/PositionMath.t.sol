@@ -21,6 +21,7 @@ contract PositionMathFuzzTest is Test {
         uint8 spread = 1;
 
         vm.assume(totalLiquidity >= totalSupply);
+        vm.assume(totalSupply > 0);
 
         pair.strikes[strike].totalSupply[spread - 1] = totalSupply;
         pair.strikes[strike].liquidityBiDirectional[spread - 1] = totalLiquidity;

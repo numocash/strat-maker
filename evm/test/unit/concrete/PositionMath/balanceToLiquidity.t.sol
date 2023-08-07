@@ -9,10 +9,6 @@ import {Pairs} from "src/core/Pairs.sol";
 contract BalanceToLiquidityTest is Test {
     Pairs.Pair private pair;
 
-    function test_BalanceToLiquidity_TotalSupplyZero() external {
-        assertEq(balanceToLiquidity(pair, 0, 1, 1e18), 1e18);
-    }
-
     function test_BalanceToLiquidity() external {
         // setup pair
         pair.strikes[0].totalSupply[0] = 1e18;
