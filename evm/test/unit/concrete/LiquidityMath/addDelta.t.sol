@@ -10,16 +10,20 @@ contract AddDeltaTest is Test {
         assertEq(addDelta(2e18, 0), 2e18);
         assertEq(addDelta(2e18, 1e18), 3e18);
         assertEq(addDelta(type(uint128).max - 1, 1), type(uint128).max, "max values");
-
-        vm.expectRevert();
-        addDelta(type(uint128).max, 1);
     }
 
     function test_AddDelta_Negative() external {
         assertEq(addDelta(2e18, -1e18), 1e18);
         assertEq(addDelta(2e18, -2e18), 0);
         assertEq(addDelta(type(uint128).max, -type(int128).max), 2 ** 127, "max values");
+    }
 
+    function test_AddDelta_Overflow() external {
+        vm.expectRevert();
+        addDelta(type(uint128).max, 1);
+    }
+
+    function test_AddDelta_Underflow() external {
         vm.expectRevert();
         addDelta(1e18, -2e18);
     }

@@ -78,7 +78,7 @@ contract MockPair is Positions {
         }
 
         uint256 _liquidityGrowthX128 = pair.strikes[strike].liquidityGrowthX128;
-        uint128 balance = debtLiquidityToBalance(liquidityDebt, _liquidityGrowthX128, false);
+        uint128 balance = debtLiquidityToBalance(liquidityDebt, _liquidityGrowthX128);
         uint256 leverageRatioX128 = mulDiv(liquidityCollateral, Q128, balance);
 
         // mint position to user
@@ -120,7 +120,7 @@ contract MockPair is Positions {
     {
         pair.accrue(strike);
         uint256 _liquidityGrowthX128 = pair.strikes[strike].liquidityGrowthX128;
-        uint128 liquidity = debtBalanceToLiquidity(balance, _liquidityGrowthX128, true);
+        uint128 liquidity = debtBalanceToLiquidity(balance, _liquidityGrowthX128);
         pair.repayLiquidity(strike, liquidity);
 
         {
@@ -176,7 +176,7 @@ contract MockPair is Positions {
         returns (uint256 amount0, uint256 amount1)
     {
         pair.accrue(strike);
-        uint128 balance = liquidityToBalance(pair, strike, spread, liquidity, true);
+        uint128 balance = liquidityToBalance(pair, strike, spread, liquidity);
         (amount0, amount1) = getAmounts(pair, uint256(liquidity), strike, spread, true);
 
         pair.updateStrike(strike, spread, int128(balance), int128(liquidity));
@@ -217,7 +217,7 @@ contract MockPair is Positions {
         returns (uint256 amount0, uint256 amount1)
     {
         pair.accrue(strike);
-        uint128 liquidity = balanceToLiquidity(pair, strike, spread, balance, false);
+        uint128 liquidity = balanceToLiquidity(pair, strike, spread, balance);
         (amount0, amount1) = getAmounts(pair, uint256(liquidity), strike, spread, false);
 
         pair.updateStrike(strike, spread, -int128(balance), -int128(liquidity));

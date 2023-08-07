@@ -331,7 +331,7 @@ contract Engine is Positions {
 
         // calculate how much to add
         int128 liquidity = toInt128(params.amountDesired);
-        int128 balance = toInt128(liquidityToBalance(pair, params.strike, params.spread, params.amountDesired, true));
+        int128 balance = toInt128(liquidityToBalance(pair, params.strike, params.spread, params.amountDesired));
         (uint256 _amount0, uint256 _amount1) = getAmounts(
             pair, scaleLiquidityUp(params.amountDesired, params.scalingFactor), params.strike, params.spread, true
         );
@@ -397,7 +397,7 @@ contract Engine is Positions {
         if (params.amountDesiredDebt > liquidityCollateral) revert InsufficientInput();
 
         uint128 balance =
-            debtLiquidityToBalance(params.amountDesiredDebt, pair.strikes[params.strike].liquidityGrowthX128, false);
+            debtLiquidityToBalance(params.amountDesiredDebt, pair.strikes[params.strike].liquidityGrowthX128);
         uint256 leverageRatioX128 = mulDiv(liquidityCollateral, Q128, balance);
 
         // mint position to user
@@ -421,7 +421,7 @@ contract Engine is Positions {
         pair.accrue(params.strike);
 
         uint128 liquidityDebt =
-            debtBalanceToLiquidity(params.amountDesiredDebt, pair.strikes[params.strike].liquidityGrowthX128, true);
+            debtBalanceToLiquidity(params.amountDesiredDebt, pair.strikes[params.strike].liquidityGrowthX128);
 
         pair.repayLiquidity(params.strike, liquidityDebt);
 
@@ -466,7 +466,7 @@ contract Engine is Positions {
         // calculate how much to remove
         int128 balance = -toInt128(params.amountDesired);
         int128 liquidity =
-            -toInt128(balanceToLiquidity(pair, params.strike, params.spread, uint128(params.amountDesired), false));
+            -toInt128(balanceToLiquidity(pair, params.strike, params.spread, uint128(params.amountDesired)));
         (uint256 _amount0, uint256 _amount1) = getAmounts(
             pair, scaleLiquidityUp(uint128(-liquidity), params.scalingFactor), params.strike, params.spread, false
         );
