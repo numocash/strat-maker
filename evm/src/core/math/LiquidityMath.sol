@@ -33,8 +33,9 @@ function getAmount1(uint256 liquidity) pure returns (uint256 amount1) {
 
 /// @notice Calculate the amount of liquidity for `amount0` token 0 for strike with ratio `ratioX128`.
 /// @dev L = x * Pi
-function getLiquidityForAmount0(uint256 amount0, uint256 ratioX128, bool roundUp) pure returns (uint256 liquidity) {
-    return roundUp ? mulDivRoundingUp(amount0, ratioX128, Q128) : mulDiv(amount0, ratioX128, Q128);
+/// @dev Rounds down
+function getLiquidityForAmount0(uint256 amount0, uint256 ratioX128) pure returns (uint256 liquidity) {
+    return mulDiv(amount0, ratioX128, Q128);
 }
 
 /// @notice Calculate the amount of liquidity for `amount1` token 1.

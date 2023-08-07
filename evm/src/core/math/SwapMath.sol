@@ -35,7 +35,7 @@ function computeSwapStep(
             liquidityRemaining = allLiquiditySwapped
                 ? 0
                 : isToken0
-                    ? getLiquidityForAmount0(maxAmountIn - uint256(amountDesired), ratioX128, false)
+                    ? getLiquidityForAmount0(maxAmountIn - uint256(amountDesired), ratioX128)
                     : getLiquidityForAmount1(maxAmountIn - uint256(amountDesired));
         }
     } else {
@@ -51,7 +51,7 @@ function computeSwapStep(
             liquidityRemaining = allLiquiditySwapped
                 ? 0
                 : isToken0
-                    ? getLiquidityForAmount0(maxAmountOut - uint256(-amountDesired), ratioX128, false)
+                    ? getLiquidityForAmount0(maxAmountOut - uint256(-amountDesired), ratioX128)
                     : getLiquidityForAmount1(maxAmountOut - uint256(-amountDesired));
         }
     }

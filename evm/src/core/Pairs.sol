@@ -217,8 +217,7 @@ library Pairs {
                                                 amountIn * i,
                                                 state.liquiditySwap * 10_000
                                             ),
-                                            ratioX128,
-                                            false
+                                            ratioX128
                                         );
                                         pair.strikes[activeStrike].liquidityBiDirectional[i - 1] +=
                                             scaleLiquidityDown(liquidityNew, scalingFactor);

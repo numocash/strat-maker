@@ -386,7 +386,7 @@ contract Engine is Positions {
         if (params.selectorCollateral == TokenSelector.Token0) {
             account.updateToken(params.token0, toInt256(params.amountDesiredCollateral));
             liquidityCollateral =
-                getLiquidityForAmount0(params.amountDesiredCollateral, getRatioAtStrike(params.strike), false);
+                getLiquidityForAmount0(params.amountDesiredCollateral, getRatioAtStrike(params.strike));
         } else if (params.selectorCollateral == TokenSelector.Token1) {
             account.updateToken(params.token1, toInt256(params.amountDesiredCollateral));
             liquidityCollateral = getLiquidityForAmount1(params.amountDesiredCollateral);

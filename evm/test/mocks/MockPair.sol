@@ -69,7 +69,7 @@ contract MockPair is Positions {
         uint256 liquidityCollateral;
         if (selectorCollateral == Engine.TokenSelector.Token0) {
             amount0 += toInt256(amountDesiredCollateral);
-            liquidityCollateral = getLiquidityForAmount0(amountDesiredCollateral, getRatioAtStrike(strike), false);
+            liquidityCollateral = getLiquidityForAmount0(amountDesiredCollateral, getRatioAtStrike(strike));
         } else if (selectorCollateral == Engine.TokenSelector.Token1) {
             amount1 += toInt256(amountDesiredCollateral);
             liquidityCollateral = getLiquidityForAmount1(amountDesiredCollateral);
