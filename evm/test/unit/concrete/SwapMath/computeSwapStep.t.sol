@@ -146,4 +146,23 @@ contract ComputeSwapStepTest is Test {
         assertEq(amountOut, 1e18);
         assertEq(liquidityRemaining, 0);
     }
+
+    // Token 0 no in
+
+    function test_ComputeSwapStep_Token0NoInput() external {
+        (uint256 amountIn, uint256 amountOut, uint256 liquidityRemaining) = computeSwapStep(Q128, 1e18, true, 0);
+
+        assertEq(amountIn, 0);
+        assertEq(amountOut, 0);
+        assertEq(liquidityRemaining, 1e18);
+    }
+
+    // Token 1 no in
+    function test_ComputeSwapStep_Token1NoInput() external {
+        (uint256 amountIn, uint256 amountOut, uint256 liquidityRemaining) = computeSwapStep(Q128, 1e18, false, 0);
+
+        assertEq(amountIn, 0);
+        assertEq(amountOut, 0);
+        assertEq(liquidityRemaining, 1e18);
+    }
 }
