@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {debtBalanceToLiquidity} from "src/core/math/PositionMath.sol";
 
 contract DebtBalanceToLiquidityeTest is Test {
-    function test_DebtBalanceToLiquiditye() external {
+    function test_DebtBalanceToLiquidity() external {
         assertEq(debtBalanceToLiquidity(1e18, 0), 1e18);
         assertEq(debtBalanceToLiquidity(1e18, 1), 1e18);
     }

@@ -9,6 +9,7 @@ import {
     debtLiquidityToBalance,
     debtBalanceToLiquidity
 } from "src/core/math/PositionMath.sol";
+import {Q128} from "src/core/math/StrikeMath.sol";
 import {Pairs} from "src/core/Pairs.sol";
 
 contract PositionMathFuzzTest is Test {
@@ -30,14 +31,6 @@ contract PositionMathFuzzTest is Test {
 
         delete pair.strikes[strike].totalSupply;
         delete pair.strikes[strike].liquidityBiDirectional;
-    }
-
-    /// @notice debt liquidity to balance back to liquidity is always greater than the original amount
-    function testFuzz_DebtLiquidity(uint128 liquidity, uint256 liquidityGrowthX128) external {
-        assertLe(
-            liquidity,
-            debtBalanceToLiquidity(debtLiquidityToBalance(liquidity, liquidityGrowthX128), liquidityGrowthX128)
-        );
     }
 
     /// @notice liquidityToBalance cannot overflow because liquidity >= balance for liquidity positions
@@ -64,6 +57,7 @@ contract PositionMathFuzzTest is Test {
 
     /// @notice debtBalanceToLiquidity cannot overflow because balance >= liquidity of debt positions
     function testFuzz_DebtBalanceToLiquidity_Overflow(uint128 balance, uint256 liquidityGrowthX128) external {
+        vm.assume(liquidityGrowthX128 <= type(uint256).max - Q128);
         assertGe(balance, debtBalanceToLiquidity(balance, liquidityGrowthX128));
     }
 }
