@@ -8,8 +8,6 @@ import {mulDiv, mulDivRoundingUp} from "src/core/math/FullMath.sol";
 import {mulDivOverflow, mulDivRoundingUpOverflow} from "../../utils/FullMath.sol";
 import {Q128} from "src/core/math/StrikeMath.sol";
 
-import {console2} from "forge-std/console2.sol";
-
 contract SwapMathFuzzTest is Test {
     /// @notice token 0 exact in always has a price <= ratio, 0 => 1
     function testFuzz_ComputeSwapStep_Token0ExactIn_PriceLess(

@@ -5,8 +5,6 @@ import {mulDiv, mulDivRoundingUp} from "./FullMath.sol";
 import {getAmount0, getAmount1, getLiquidityForAmount0, getLiquidityForAmount1} from "./LiquidityMath.sol";
 import {Q128} from "./StrikeMath.sol";
 
-import {console2} from "forge-std/console2.sol";
-
 /// @notice Computes the result of a swap within a strike
 /// @param liquidity Amount of liquidity in the direction of the swap
 /// @param isToken0 True if amountDesired refers to token0
