@@ -7,11 +7,11 @@ import {Pairs, NUM_SPREADS} from "./Pairs.sol";
 import {Positions} from "./Positions.sol";
 import {mulDiv} from "./math/FullMath.sol";
 import {
-    getAmountsForLiquidity,
-    getAmount0Delta,
-    getAmount1Delta,
-    getLiquidityDeltaAmount0,
-    getLiquidityDeltaAmount1,
+    getAmounts,
+    getAmount0,
+    getAmount1,
+    getLiquidityForAmount0,
+    getLiquidityForAmount1,
     scaleLiquidityUp,
     scaleLiquidityDown
 } from "./math/LiquidityMath.sol";
@@ -21,7 +21,7 @@ import {
     debtBalanceToLiquidity,
     debtLiquidityToBalance
 } from "./math/PositionMath.sol";
-import {Q128} from "./math/StrikeMath.sol";
+import {getRatioAtStrike, Q128} from "./math/StrikeMath.sol";
 
 import {BalanceLib} from "src/libraries/BalanceLib.sol";
 import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
@@ -331,9 +331,9 @@ contract Engine is Positions {
 
         // calculate how much to add
         int128 liquidity = toInt128(params.amountDesired);
-        int128 balance = toInt128(liquidityToBalance(pair, params.strike, params.spread, params.amountDesired, true));
-        (uint256 _amount0, uint256 _amount1) = getAmountsForLiquidity(
-            pair, params.strike, params.spread, scaleLiquidityUp(params.amountDesired, params.scalingFactor), true
+        int128 balance = toInt128(liquidityToBalance(pair, params.strike, params.spread, params.amountDesired));
+        (uint256 _amount0, uint256 _amount1) = getAmounts(
+            pair, scaleLiquidityUp(params.amountDesired, params.scalingFactor), params.strike, params.spread, true
         );
         int256 amount0 = int256(_amount0);
         int256 amount1 = int256(_amount1);
@@ -370,25 +370,26 @@ contract Engine is Positions {
         account.updateToken(
             params.token0,
             -toInt256(
-                getAmount0Delta(
+                getAmount0(
                     scaleLiquidityUp(params.amountDesiredDebt - liquidityToken1, params.scalingFactor),
-                    params.strike,
+                    getRatioAtStrike(params.strike),
                     false
                 )
             )
         );
         account.updateToken(
-            params.token1, -toInt256(getAmount1Delta(scaleLiquidityUp(liquidityToken1, params.scalingFactor)))
+            params.token1, -toInt256(getAmount1(scaleLiquidityUp(liquidityToken1, params.scalingFactor)))
         );
 
         // add collateral to account
         uint256 liquidityCollateral;
         if (params.selectorCollateral == TokenSelector.Token0) {
             account.updateToken(params.token0, toInt256(params.amountDesiredCollateral));
-            liquidityCollateral = getLiquidityDeltaAmount0(params.amountDesiredCollateral, params.strike, false);
+            liquidityCollateral =
+                getLiquidityForAmount0(params.amountDesiredCollateral, getRatioAtStrike(params.strike));
         } else if (params.selectorCollateral == TokenSelector.Token1) {
             account.updateToken(params.token1, toInt256(params.amountDesiredCollateral));
-            liquidityCollateral = getLiquidityDeltaAmount1(params.amountDesiredCollateral);
+            liquidityCollateral = getLiquidityForAmount1(params.amountDesiredCollateral);
         } else {
             revert InvalidSelector();
         }
@@ -396,7 +397,7 @@ contract Engine is Positions {
         if (params.amountDesiredDebt > liquidityCollateral) revert InsufficientInput();
 
         uint128 balance =
-            debtLiquidityToBalance(params.amountDesiredDebt, pair.strikes[params.strike].liquidityGrowthX128, false);
+            debtLiquidityToBalance(params.amountDesiredDebt, pair.strikes[params.strike].liquidityGrowthX128);
         uint256 leverageRatioX128 = mulDiv(liquidityCollateral, Q128, balance);
 
         // mint position to user
@@ -420,29 +421,30 @@ contract Engine is Positions {
         pair.accrue(params.strike);
 
         uint128 liquidityDebt =
-            debtBalanceToLiquidity(params.amountDesiredDebt, pair.strikes[params.strike].liquidityGrowthX128, true);
+            debtBalanceToLiquidity(params.amountDesiredDebt, pair.strikes[params.strike].liquidityGrowthX128);
 
         pair.repayLiquidity(params.strike, liquidityDebt);
 
         // calculate tokens owed and add to account
-        (uint256 amount0, uint256 amount1) = getAmountsForLiquidity(
+        (uint256 amount0, uint256 amount1) = getAmounts(
             pair,
+            scaleLiquidityUp(params.amountDesiredDebt, params.scalingFactor),
             params.strike,
             pair.strikes[params.strike].activeSpread + 1,
-            scaleLiquidityUp(params.amountDesiredDebt, params.scalingFactor),
             true
         );
         account.updateToken(params.token0, toInt256(amount0));
         account.updateToken(params.token1, toInt256(amount1));
 
         // add unlocked collateral to account
-
         uint256 liquidityCollateral = mulDiv(params.amountDesiredDebt, params.leverageRatioX128, Q128)
             - 2 * (params.amountDesiredDebt - liquidityDebt);
         if (params.selectorCollateral == TokenSelector.Token0) {
-            account.updateToken(params.token0, -toInt256(getAmount0Delta(liquidityCollateral, params.strike, false)));
+            account.updateToken(
+                params.token0, -toInt256(getAmount0(liquidityCollateral, getRatioAtStrike(params.strike), false))
+            );
         } else if (params.selectorCollateral == TokenSelector.Token1) {
-            account.updateToken(params.token0, -toInt256(getAmount1Delta(liquidityCollateral)));
+            account.updateToken(params.token0, -toInt256(getAmount1(liquidityCollateral)));
         } else {
             revert InvalidSelector();
         }
@@ -464,9 +466,9 @@ contract Engine is Positions {
         // calculate how much to remove
         int128 balance = -toInt128(params.amountDesired);
         int128 liquidity =
-            -toInt128(balanceToLiquidity(pair, params.strike, params.spread, uint128(params.amountDesired), false));
-        (uint256 _amount0, uint256 _amount1) = getAmountsForLiquidity(
-            pair, params.strike, params.spread, scaleLiquidityUp(uint128(-liquidity), params.scalingFactor), false
+            -toInt128(balanceToLiquidity(pair, params.strike, params.spread, uint128(params.amountDesired)));
+        (uint256 _amount0, uint256 _amount1) = getAmounts(
+            pair, scaleLiquidityUp(uint128(-liquidity), params.scalingFactor), params.strike, params.spread, false
         );
         int256 amount0 = -int256(_amount0);
         int256 amount1 = -int256(_amount1);

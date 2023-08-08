@@ -8,11 +8,11 @@ import {BalanceLib} from "src/libraries/BalanceLib.sol";
 import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
 import {mulDiv} from "src/core/math/FullMath.sol";
 import {
-    getAmount0Delta,
-    getAmount1Delta,
-    getLiquidityDeltaAmount0,
-    getLiquidityDeltaAmount1,
-    getAmountsForLiquidity,
+    getAmount0,
+    getAmount1,
+    getLiquidityForAmount0,
+    getLiquidityForAmount1,
+    getAmounts,
     toInt256
 } from "src/core/math/LiquidityMath.sol";
 import {
@@ -21,7 +21,7 @@ import {
     debtBalanceToLiquidity,
     debtLiquidityToBalance
 } from "src/core/math/PositionMath.sol";
-import {Q128} from "src/core/math/StrikeMath.sol";
+import {getRatioAtStrike, Q128} from "src/core/math/StrikeMath.sol";
 
 import {IExecuteCallback} from "src/core/interfaces/IExecuteCallback.sol";
 
@@ -62,23 +62,23 @@ contract MockPair is Positions {
         uint128 token1Liquidity = pair.borrowLiquidity(strike, liquidityDebt);
 
         // calculate the the tokens that are borrowed
-        amount0 = -toInt256(getAmount0Delta(liquidityDebt - token1Liquidity, strike, false));
-        amount1 = -toInt256(getAmount1Delta(token1Liquidity));
+        amount0 = -toInt256(getAmount0(liquidityDebt - token1Liquidity, getRatioAtStrike(strike), false));
+        amount1 = -toInt256(getAmount1(token1Liquidity));
 
         // add collateral to account
         uint256 liquidityCollateral;
         if (selectorCollateral == Engine.TokenSelector.Token0) {
             amount0 += toInt256(amountDesiredCollateral);
-            liquidityCollateral = getLiquidityDeltaAmount0(amountDesiredCollateral, strike, false);
+            liquidityCollateral = getLiquidityForAmount0(amountDesiredCollateral, getRatioAtStrike(strike));
         } else if (selectorCollateral == Engine.TokenSelector.Token1) {
             amount1 += toInt256(amountDesiredCollateral);
-            liquidityCollateral = getLiquidityDeltaAmount1(amountDesiredCollateral);
+            liquidityCollateral = getLiquidityForAmount1(amountDesiredCollateral);
         } else {
             revert Engine.InvalidSelector();
         }
 
         uint256 _liquidityGrowthX128 = pair.strikes[strike].liquidityGrowthX128;
-        uint128 balance = debtLiquidityToBalance(liquidityDebt, _liquidityGrowthX128, false);
+        uint128 balance = debtLiquidityToBalance(liquidityDebt, _liquidityGrowthX128);
         uint256 leverageRatioX128 = mulDiv(liquidityCollateral, Q128, balance);
 
         // mint position to user
@@ -120,12 +120,12 @@ contract MockPair is Positions {
     {
         pair.accrue(strike);
         uint256 _liquidityGrowthX128 = pair.strikes[strike].liquidityGrowthX128;
-        uint128 liquidity = debtBalanceToLiquidity(balance, _liquidityGrowthX128, true);
+        uint128 liquidity = debtBalanceToLiquidity(balance, _liquidityGrowthX128);
         pair.repayLiquidity(strike, liquidity);
 
         {
             (uint256 _amount0, uint256 _amount1) =
-                getAmountsForLiquidity(pair, strike, pair.strikes[strike].activeSpread + 1, liquidity, true);
+                getAmounts(pair, liquidity, strike, pair.strikes[strike].activeSpread + 1, true);
             amount0 = int256(_amount0);
             amount1 = int256(_amount1);
         }
@@ -133,9 +133,9 @@ contract MockPair is Positions {
         {
             uint256 liquidityCollateral = mulDiv(balance, leverageRatioX128, Q128) - 2 * (balance - liquidity);
             if (selectorCollateral == Engine.TokenSelector.Token0) {
-                amount0 -= toInt256(getAmount0Delta(liquidityCollateral, strike, false));
+                amount0 -= toInt256(getAmount0(liquidityCollateral, getRatioAtStrike(strike), false));
             } else {
-                amount1 -= toInt256(getAmount1Delta(liquidityCollateral));
+                amount1 -= toInt256(getAmount1(liquidityCollateral));
             }
         }
 
@@ -176,8 +176,8 @@ contract MockPair is Positions {
         returns (uint256 amount0, uint256 amount1)
     {
         pair.accrue(strike);
-        uint128 balance = liquidityToBalance(pair, strike, spread, liquidity, true);
-        (amount0, amount1) = getAmountsForLiquidity(pair, strike, spread, uint256(liquidity), true);
+        uint128 balance = liquidityToBalance(pair, strike, spread, liquidity);
+        (amount0, amount1) = getAmounts(pair, uint256(liquidity), strike, spread, true);
 
         pair.updateStrike(strike, spread, int128(balance), int128(liquidity));
 
@@ -217,8 +217,8 @@ contract MockPair is Positions {
         returns (uint256 amount0, uint256 amount1)
     {
         pair.accrue(strike);
-        uint128 liquidity = balanceToLiquidity(pair, strike, spread, balance, false);
-        (amount0, amount1) = getAmountsForLiquidity(pair, strike, spread, uint256(liquidity), false);
+        uint128 liquidity = balanceToLiquidity(pair, strike, spread, balance);
+        (amount0, amount1) = getAmounts(pair, uint256(liquidity), strike, spread, false);
 
         pair.updateStrike(strike, spread, -int128(balance), -int128(liquidity));
         SafeTransferLib.safeTransfer(token0, msg.sender, amount0);

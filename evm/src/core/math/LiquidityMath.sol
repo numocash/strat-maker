@@ -5,61 +5,53 @@ import {mulDiv, mulDivRoundingUp} from "./FullMath.sol";
 import {getRatioAtStrike, Q128} from "./StrikeMath.sol";
 import {Pairs} from "../Pairs.sol";
 
+/// @notice scale liquidity up by a scaling factor
+/// @dev scaling factor must be <=128, >128 loses precision unnecessarily
 function scaleLiquidityUp(uint128 liquidity, uint8 scalingFactor) pure returns (uint256) {
-    return liquidity * 2 ** scalingFactor;
+    return uint256(liquidity) << scalingFactor;
 }
 
+/// @notice scale liquidity down by a scaling factor
+/// @dev scaling factor must be <=128, >128 loses precision unnecessarily
+/// @custom:team Should we be rounding up at any point?
+/// @custom:team Should we check for overflow on the top end?
 function scaleLiquidityDown(uint256 liquidity, uint8 scalingFactor) pure returns (uint128) {
-    return uint128(liquidity / 2 ** scalingFactor);
+    return uint128(liquidity >> scalingFactor);
 }
 
-/// @notice Calculate amount0 delta when moving completely through the liquidity at the strike.
-/// i.e. x = L / Pi
-function getAmount0Delta(uint256 liquidity, int24 strike, bool roundUp) pure returns (uint256 amount0) {
-    return roundUp
-        ? mulDivRoundingUp(liquidity, Q128, getRatioAtStrike(strike))
-        : mulDiv(liquidity, Q128, getRatioAtStrike(strike));
-}
-
-/// @notice Calculate amount0 delta when moving completely through the liquidity at the strike.
-/// i.e. x = L / Pi
-function getAmount0Delta(uint256 liquidity, uint256 ratioX128, bool roundUp) pure returns (uint256 amount0) {
+/// @notice Calculate the amount of token 0 for `liquidity` units of liquidity for strike with ratio `ratioX128`.
+/// @dev x = L / Pi
+function getAmount0(uint256 liquidity, uint256 ratioX128, bool roundUp) pure returns (uint256 amount0) {
     return roundUp ? mulDivRoundingUp(liquidity, Q128, ratioX128) : mulDiv(liquidity, Q128, ratioX128);
 }
 
-/// @notice Calculate amount1 delta when moving completely through the liquidity at the strike.
-/// i.e. y = L
-function getAmount1Delta(uint256 liquidity) pure returns (uint256 amount1) {
+/// @notice Calculate the amount of token 1 for `liquidity` units of liquidity.
+/// @dev y = L
+function getAmount1(uint256 liquidity) pure returns (uint256 amount1) {
     return liquidity;
 }
 
-/// @notice Calculate liquidity for amount0
-/// i.e. L = x * Pi
-function getLiquidityDeltaAmount0(uint256 amount0, int24 strike, bool roundUp) pure returns (uint256 liquidity) {
-    return roundUp
-        ? mulDivRoundingUp(amount0, getRatioAtStrike(strike), Q128)
-        : mulDiv(amount0, getRatioAtStrike(strike), Q128);
+/// @notice Calculate the amount of liquidity for `amount0` token 0 for strike with ratio `ratioX128`.
+/// @dev L = x * Pi
+/// @dev Rounds down
+function getLiquidityForAmount0(uint256 amount0, uint256 ratioX128) pure returns (uint256 liquidity) {
+    return mulDiv(amount0, ratioX128, Q128);
 }
 
-/// @notice Calculate liquidity for amount0
-/// i.e. L = x * Pi
-function getLiquidityDeltaAmount0(uint256 amount0, uint256 ratioX128, bool roundUp) pure returns (uint256 liquidity) {
-    return roundUp ? mulDivRoundingUp(amount0, ratioX128, Q128) : mulDiv(amount0, ratioX128, Q128);
-}
-
-/// @notice Calculate liquidity for amount1
-/// i.e. L = y
-function getLiquidityDeltaAmount1(uint256 amount1) pure returns (uint256 liquidity) {
+/// @notice Calculate the amount of liquidity for `amount1` token 1.
+/// @dev L = y
+function getLiquidityForAmount1(uint256 amount1) pure returns (uint256 liquidity) {
     return amount1;
 }
 
-/// @notice Calculate amount0 in a strike for a given composition and liquidity
+/// @notice Calculate the amount of token 0 for `liquidity` units of liquidity for `strike` with `composition`%
+/// of liquidity held in token 1.
 /// @custom:team This rounds down extra because composition is between 0 and uint128Max while ratio is scaled by
 /// uint128Max + 1
-function getAmount0FromComposition(
-    uint128 composition,
+function getAmount0(
     uint256 liquidity,
     uint256 ratioX128,
+    uint128 composition,
     bool roundUp
 )
     pure
@@ -75,141 +67,38 @@ function getAmount0FromComposition(
         : mulDiv(liquidity, token0Composition, ratioX128);
 }
 
-/// @notice Calculate amount0 in a strike for a given composition and liquidity
-function getAmount1FromComposition(
-    uint128 composition,
-    uint256 liquidity,
-    bool roundUp
-)
-    pure
-    returns (uint256 amount1)
-{
+/// @notice Calculate the amount of token 1 for `liquidity` units of liquidity with `composition`%
+/// of liquidity held in token 1.
+function getAmount1(uint256 liquidity, uint128 composition, bool roundUp) pure returns (uint256 amount1) {
     return roundUp ? mulDivRoundingUp(liquidity, composition, Q128) : mulDiv(liquidity, composition, Q128);
 }
 
-/// @notice Calculate amount{0,1} needed for the given liquidity change
-function getAmount0ForLiquidity(
+/// @notice Calculate the amount of token 0 and token 1 for `liquidity` units of liquidity with `pair`
+/// @dev Assumes spread is valid
+function getAmounts(
     Pairs.Pair storage pair,
+    uint256 liquidity,
     int24 strike,
     uint8 spread,
-    uint256 liquidity,
-    bool roundUp
-)
-    view
-    returns (uint256 amount0)
-{
-    int24 _strikeCurrent = pair.strikeCurrent[spread - 1];
-
-    if (strike > _strikeCurrent) {
-        return getAmount0Delta(liquidity, strike, roundUp);
-    } else if (strike < _strikeCurrent) {
-        return 0;
-    } else {
-        uint128 composition = pair.composition[spread - 1];
-        return getAmount0FromComposition(composition, liquidity, getRatioAtStrike(strike), roundUp);
-    }
-}
-
-/// @notice Calculate amount{0,1} needed for the given liquidity change
-function getAmount1ForLiquidity(
-    Pairs.Pair storage pair,
-    int24 strike,
-    uint8 spread,
-    uint256 liquidity,
-    bool roundUp
-)
-    view
-    returns (uint256 amount1)
-{
-    int24 _strikeCurrent = pair.strikeCurrent[spread - 1];
-
-    if (strike < _strikeCurrent) {
-        return getAmount1Delta(liquidity);
-    } else if (strike > _strikeCurrent) {
-        return 0;
-    } else {
-        uint128 composition = pair.composition[spread - 1];
-        return getAmount1FromComposition(composition, liquidity, roundUp);
-    }
-}
-
-/// @notice Calculate amount{0,1} needed for the given liquidity change
-function getAmountsForLiquidity(
-    Pairs.Pair storage pair,
-    int24 strike,
-    uint8 spread,
-    uint256 liquidity,
     bool roundUp
 )
     view
     returns (uint256 amount0, uint256 amount1)
 {
-    int24 _strikeCurrent = pair.strikeCurrent[spread - 1];
+    unchecked {
+        int24 _strikeCurrent = pair.strikeCurrent[spread - 1];
 
-    if (strike > _strikeCurrent) {
-        return (getAmount0Delta(liquidity, strike, roundUp), 0);
-    } else if (strike < _strikeCurrent) {
-        return (0, getAmount1Delta(liquidity));
-    } else {
-        uint128 composition = pair.composition[spread - 1];
-        return (
-            getAmount0FromComposition(composition, liquidity, getRatioAtStrike(strike), roundUp),
-            getAmount1FromComposition(composition, liquidity, roundUp)
-        );
-    }
-}
-
-/// @notice Calculate max liquidity received if adding the given amount0
-/// @custom:team can make more efficient on average by rearranging if statements
-function getLiquidityForAmount0(
-    Pairs.Pair storage pair,
-    int24 strike,
-    uint8 spread,
-    uint256 amount0,
-    bool roundUp
-)
-    view
-    returns (uint256 liquidity)
-{
-    int24 _strikeCurrent = pair.strikeCurrent[spread - 1];
-
-    if (strike > _strikeCurrent) {
-        return getLiquidityDeltaAmount0(amount0, strike, roundUp);
-    } else if (strike == _strikeCurrent) {
-        uint128 composition = pair.composition[spread - 1];
-        uint128 token0Composition;
-        unchecked {
-            token0Composition = type(uint128).max - composition;
+        if (strike > _strikeCurrent) {
+            return (getAmount0(liquidity, getRatioAtStrike(strike), roundUp), 0);
+        } else if (strike < _strikeCurrent) {
+            return (0, getAmount1(liquidity));
+        } else {
+            uint128 composition = pair.composition[spread - 1];
+            return (
+                getAmount0(liquidity, getRatioAtStrike(strike), composition, roundUp),
+                getAmount1(liquidity, composition, roundUp)
+            );
         }
-
-        return roundUp
-            ? mulDivRoundingUp(amount0, getRatioAtStrike(_strikeCurrent), token0Composition)
-            : mulDiv(amount0, getRatioAtStrike(_strikeCurrent), token0Composition);
-    } else {
-        return 0;
-    }
-}
-
-/// @notice Calculate max liquidity received if adding the given amount1
-function getLiquidityForAmount1(
-    Pairs.Pair storage pair,
-    int24 strike,
-    uint8 spread,
-    uint256 amount1,
-    bool roundUp
-)
-    view
-    returns (uint256 liquidity)
-{
-    int24 _strikeCurrent = pair.strikeCurrent[spread - 1];
-
-    if (strike < _strikeCurrent) {
-        return getLiquidityDeltaAmount1(amount1);
-    } else if (strike == _strikeCurrent) {
-        uint256 composition = pair.composition[spread - 1];
-        return roundUp ? mulDivRoundingUp(amount1, composition, Q128) : mulDiv(amount1, composition, Q128);
-    } else {
-        return 0;
     }
 }
 

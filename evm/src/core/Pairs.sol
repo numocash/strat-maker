@@ -4,8 +4,8 @@ pragma solidity ^0.8.19;
 import {BitMaps} from "./BitMaps.sol";
 import {mulDiv, mulDivRoundingUp} from "./math/FullMath.sol";
 import {
-    getLiquidityDeltaAmount0,
-    getLiquidityDeltaAmount1,
+    getLiquidityForAmount0,
+    getLiquidityForAmount1,
     scaleLiquidityDown,
     addDelta,
     toInt256
@@ -211,14 +211,13 @@ library Pairs {
                                     int24 activeStrike = state.strikeCurrentCached + int24(int256(i));
 
                                     if (activeStrike == state.strikeCurrent[i - 1]) {
-                                        uint256 liquidityNew = getLiquidityDeltaAmount0(
+                                        uint256 liquidityNew = getLiquidityForAmount0(
                                             mulDiv(
                                                 state.liquiditySwapSpread[i - 1],
                                                 amountIn * i,
                                                 state.liquiditySwap * 10_000
                                             ),
-                                            state.strikeCurrentCached,
-                                            false
+                                            ratioX128
                                         );
                                         pair.strikes[activeStrike].liquidityBiDirectional[i - 1] +=
                                             scaleLiquidityDown(liquidityNew, scalingFactor);
@@ -234,7 +233,7 @@ library Pairs {
                                     int24 activeStrike = state.strikeCurrentCached - int24(int256(i));
 
                                     if (activeStrike == state.strikeCurrent[i - 1]) {
-                                        uint256 liquidityNew = getLiquidityDeltaAmount1(
+                                        uint256 liquidityNew = getLiquidityForAmount1(
                                             mulDiv(
                                                 state.liquiditySwapSpread[i - 1],
                                                 amountIn * i,

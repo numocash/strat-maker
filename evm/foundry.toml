@@ -12,3 +12,7 @@ number_underscore = "thousands"
 quote_style = "double"
 tab_width = 4
 wrap_comments = true
+
+[profile.default.fuzz]
+max_test_rejects = 1_000_000 # Number of times `vm.assume` can fail
+runs = 200
