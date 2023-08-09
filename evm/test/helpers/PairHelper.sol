@@ -15,7 +15,7 @@ contract PairHelper is IExecuteCallback {
         MockERC20 tokenA = new MockERC20();
         MockERC20 tokenB = new MockERC20();
         (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
-        pair = new MockPair(address(0), address(token0), address(token1),0, 0);
+        pair = new MockPair(address(token0), address(token1),0, 0);
     }
 
     function executeCallback(IExecuteCallback.CallbackParams calldata params) external {

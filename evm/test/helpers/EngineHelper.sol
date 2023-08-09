@@ -13,7 +13,7 @@ contract EngineHelper is IExecuteCallback {
     MockERC20 internal token1;
 
     function _setUp() internal {
-        engine = new Engine(address(0));
+        engine = new Engine();
         MockERC20 tokenA = new MockERC20();
         MockERC20 tokenB = new MockERC20();
         (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
@@ -44,7 +44,7 @@ contract EngineHelper is IExecuteCallback {
             bytes32 id = params.lpIDs[i];
 
             if (params.lpIDs[i] != bytes32(0)) {
-                engine.transfer(msg.sender, Positions.ILRTATransferDetails(id, params.orderTypes[i], delta));
+                engine.transfer_XXXXXX(msg.sender, Positions.ILRTATransferDetails(id, params.orderTypes[i], delta));
             }
 
             unchecked {

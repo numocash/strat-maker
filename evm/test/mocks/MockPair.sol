@@ -34,15 +34,7 @@ contract MockPair is Positions {
 
     Pairs.Pair private pair;
 
-    constructor(
-        address _superSignature,
-        address _token0,
-        address _token1,
-        uint8 _scalingFactor,
-        int24 strikeInitial
-    )
-        Positions(_superSignature)
-    {
+    constructor(address _token0, address _token1, uint8 _scalingFactor, int24 strikeInitial) Positions() {
         token0 = _token0;
         token1 = _token1;
         scalingFactor = _scalingFactor;
