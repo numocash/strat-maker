@@ -69,8 +69,20 @@ abstract contract Positions is ILRTA {
                                  LOGIC
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    function dataOf_XXXXXX(address owner, bytes32 id) external view returns (ILRTAData memory) {
+    function dataOf_cGJnTo(address owner, bytes32 id) external view returns (ILRTAData memory) {
         return _dataOf[owner][id];
+    }
+
+    function allowanceOf_QDmnOj(
+        address owner,
+        address spender,
+        bytes32
+    )
+        external
+        view
+        returns (ILRTAApprovalDetails memory)
+    {
+        return _allowanceOf[owner][spender];
     }
 
     function validateRequest_sUsyFN(
