@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
-import {mulDiv} from "./FullMath.sol";
-
 uint256 constant Q128 = 0x100000000000000000000000000000000;
-uint256 constant Q192 = 0x1000000000000000000000000000000000000000000000000;
 
 int24 constant MAX_STRIKE = 776_363;
 int24 constant MIN_STRIKE = -776_363;
@@ -25,6 +22,7 @@ error InvalidStrike();
 /// @dev From Uniswap (), and Muffin ()
 function getRatioAtStrike(int24 strike) pure returns (uint256 ratioX128) {
     unchecked {
+        if (strike == 0) return Q128;
         if (strike < MIN_STRIKE || strike > MAX_STRIKE) revert InvalidStrike();
 
         uint256 x = uint256(uint24(strike < 0 ? -strike : strike));
@@ -52,7 +50,7 @@ function getRatioAtStrike(int24 strike) pure returns (uint256 ratioX128) {
         if (x & 0x80000 > 0) ratioX128 = (ratioX128 * 0x48A170391F7DC42444E8FA2) >> 128;
         // Stop computation here since |strike| < 2**20
 
-        if (strike < 0) ratioX128 = mulDiv(ratioX128, ratioX128, Q128);
-        else if (strike > 0) ratioX128 = mulDiv(Q192, Q192, ratioX128 * ratioX128);
+        ratioX128 = (ratioX128 * ratioX128) / Q128;
+        if (strike > 0) ratioX128 = type(uint256).max / ratioX128;
     }
 }
