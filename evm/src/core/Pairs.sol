@@ -520,7 +520,7 @@ library Pairs {
 
             uint128 spreadGrowth = uint128(((i + 1) * blocks * liquidityBorrowed) / 10_000);
 
-            pair.strikes[strike].liquidityBiDirectional[i] += spreadGrowth;
+            pair.strikes[strike].liquidityBiDirectional[i] += spreadGrowth; // think this is wrong
             liquidityRepaid += spreadGrowth;
             liquidityBorrowedTotal += liquidityBorrowed;
         }
@@ -531,7 +531,7 @@ library Pairs {
             pair.strikes[strike].liquidityGrowthX128 + Q128,
             liquidityBorrowedTotal,
             liquidityBorrowedTotal - liquidityRepaid
-        ) - Q128;
+        ) - Q128; // think this is wrong
 
         repayLiquidity(pair, strike, liquidityRepaid);
         pair.strikes[strike].blockLast = block.number;

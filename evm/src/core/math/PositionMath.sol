@@ -6,6 +6,7 @@ import {Q128} from "./StrikeMath.sol";
 import {Pairs} from "../Pairs.sol";
 import {Positions} from "../Positions.sol";
 
+/// @notice Error thrown when result of a math operation is greater than maximum allowable number
 error Overflow();
 
 /// @notice Convert liquidity position balance to liquidity

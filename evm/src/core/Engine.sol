@@ -566,7 +566,9 @@ contract Engine is Positions {
         returns (uint128 balance, uint256 leverageRatioX128)
     {
         balance = _dataOf[owner][_debtID(token0, token1, scalingFactor, strike, selector)].balance;
-        Positions.DebtData memory debtData = _dataOfDebt(owner, token0, token1, scalingFactor, strike, selector);
+        Positions.DebtData memory debtData = abi.decode(
+            _dataOf[owner][_debtID(token0, token1, scalingFactor, strike, selector)].data, (Positions.DebtData)
+        );
 
         return (balance, debtData.leverageRatioX128);
     }
