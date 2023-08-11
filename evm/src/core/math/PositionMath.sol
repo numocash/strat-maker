@@ -65,7 +65,12 @@ function liquidityToBalance(
 /// @dev liquidity = balance / liquidityGrowthExp
 /// @dev Rounds up, cannot overflow because balance >= liquidity for debt positions
 function debtBalanceToLiquidity(uint128 balance, uint256 liquidityGrowthExpX128) pure returns (uint128) {
-    return uint128(mulDivRoundingUp(balance, Q128, liquidityGrowthExpX128));
+    unchecked {
+        uint256 numerator = uint256(balance) * Q128;
+        return numerator % liquidityGrowthExpX128 == 0
+            ? uint128(numerator / liquidityGrowthExpX128)
+            : uint128(numerator / liquidityGrowthExpX128) + 1;
+    }
 }
 
 /// @notice Convert liquidity to debt position balance
