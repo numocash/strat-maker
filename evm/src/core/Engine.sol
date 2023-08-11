@@ -391,7 +391,7 @@ contract Engine is Positions {
         if (params.amountDesiredDebt > liquidityCollateral) revert InsufficientInput();
 
         uint128 balance =
-            debtLiquidityToBalance(params.amountDesiredDebt, pair.strikes[params.strike].liquidityGrowthX128);
+            debtLiquidityToBalance(params.amountDesiredDebt, pair.strikes[params.strike].liquidityGrowthExpX128);
         uint256 leverageRatioX128 = mulDiv(liquidityCollateral, Q128, balance);
 
         // mint position to user
@@ -415,7 +415,7 @@ contract Engine is Positions {
         pair.accrue(params.strike);
 
         uint128 liquidityDebt =
-            debtBalanceToLiquidity(params.amountDesiredDebt, pair.strikes[params.strike].liquidityGrowthX128);
+            debtBalanceToLiquidity(params.amountDesiredDebt, pair.strikes[params.strike].liquidityGrowthExpX128);
 
         pair.repayLiquidity(params.strike, liquidityDebt);
 

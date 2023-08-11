@@ -36,7 +36,7 @@ library Pairs {
 
     /// @custom:team could we make reference a bitmap
     struct Strike {
-        uint256 liquidityGrowthX128;
+        uint256 liquidityGrowthExpX128;
         uint256 blockLast;
         uint128[NUM_SPREADS] totalSupply;
         uint128[NUM_SPREADS] liquidityBiDirectional;
@@ -527,8 +527,8 @@ library Pairs {
 
         if (liquidityRepaid == 0) return;
 
-        pair.strikes[strike].liquidityGrowthX128 = mulDivRoundingUp(
-            pair.strikes[strike].liquidityGrowthX128 + Q128,
+        pair.strikes[strike].liquidityGrowthExpX128 = mulDivRoundingUp(
+            pair.strikes[strike].liquidityGrowthExpX128 + Q128,
             liquidityBorrowedTotal,
             liquidityBorrowedTotal - liquidityRepaid
         ) - Q128; // think this is wrong

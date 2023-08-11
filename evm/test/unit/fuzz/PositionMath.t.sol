@@ -58,7 +58,7 @@ contract PositionMathFuzzTest is Test {
 
     /// @notice debtBalanceToLiquidity cannot overflow because balance >= liquidity of debt positions
     function testFuzz_DebtBalanceToLiquidity_Overflow(uint128 balance, uint256 liquidityGrowthX128) external {
-        vm.assume(liquidityGrowthX128 <= type(uint256).max - Q128);
+        vm.assume(liquidityGrowthX128 <= type(uint256).max && liquidityGrowthX128 >= Q128);
         assertGe(balance, debtBalanceToLiquidity(balance, liquidityGrowthX128));
     }
 }
