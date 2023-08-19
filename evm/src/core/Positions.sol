@@ -2,7 +2,6 @@
 pragma solidity ^0.8.19;
 
 import {Engine} from "./Engine.sol";
-import {addPositions} from "./math/PositionMath.sol";
 import {ILRTA} from "ilrta/ILRTA.sol";
 
 /// @title Positions
@@ -22,14 +21,15 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
     }
 
     /// @notice The data that a position records
-    /// @param balance The balance of the position either in units of share of liquidity provided or interested adjusted
-    /// liquidity debt
+    /// @param balance The balance of the position either in units of share of liquidity provided or non-interested
+    /// adjusted liquidity debt
     /// @param orderType Signifies the type of position
-    /// @param data Extra data that is either empty or type of DebtData
+    /// @param liquidityBuffer The amount of non-fee adjusted liquidity collateral - liquidity debt when order type is
+    /// debt, else 0
     struct ILRTAData {
         uint128 balance;
         Engine.OrderType orderType;
-        bytes data;
+        uint120 liquidityBuffer;
     }
 
     /// @notice Information needed to describe a transfer
@@ -76,13 +76,6 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
         uint8 scalingFactor;
         int24 strike;
         Engine.TokenSelector selector;
-    }
-
-    /// @notice Extra data needed for a debt position
-    /// @param leverageRatioX128
-    /// @custom:team fill out leverageRatioX128
-    struct DebtData {
-        uint256 leverageRatioX128;
     }
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
@@ -172,40 +165,28 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     /// @notice Helper function for transfers, uses `orderType` and updates a position based on the type
+    /// @custom:team Would be it be good to completely clear out a position
     function _transfer(address from, address to, ILRTATransferDetails memory transferDetails) private returns (bool) {
-        if (transferDetails.orderType != Engine.OrderType.Debt) {
-            _dataOf[from][transferDetails.id].balance -= transferDetails.amount;
-            unchecked {
-                _dataOf[to][transferDetails.id].balance += transferDetails.amount;
-            }
+        uint128 fromBalance = _dataOf[from][transferDetails.id].balance;
 
-            emit Transfer(from, to, abi.encode(transferDetails));
-            return true;
-        } else {
-            uint128 senderBalance = _dataOf[from][transferDetails.id].balance;
-            uint128 recipientBalance = _dataOf[to][transferDetails.id].balance;
-
-            uint256 leverageRatioX128 = recipientBalance == 0
-                ? abi.decode(_dataOf[from][transferDetails.id].data, (DebtData)).leverageRatioX128
-                : addPositions(
-                    transferDetails.amount,
-                    recipientBalance,
-                    abi.decode(_dataOf[from][transferDetails.id].data, (DebtData)),
-                    abi.decode(_dataOf[to][transferDetails.id].data, (DebtData))
-                );
-
-            if (senderBalance == transferDetails.amount) delete _dataOf[from][transferDetails.id];
-            else _dataOf[from][transferDetails.id].balance = senderBalance - transferDetails.amount;
-
-            unchecked {
-                _dataOf[to][transferDetails.id].balance = recipientBalance + transferDetails.amount;
-            }
-
-            _dataOf[to][transferDetails.id].data = abi.encode(DebtData(leverageRatioX128));
-
-            emit Transfer(from, to, abi.encode(transferDetails));
-            return true;
+        _dataOf[from][transferDetails.id].balance = fromBalance - transferDetails.amount;
+        unchecked {
+            _dataOf[to][transferDetails.id].balance += transferDetails.amount;
         }
+
+        if (transferDetails.orderType == Engine.OrderType.Debt) {
+            // transfer a proportional amount of the liquidity buffer
+            uint120 liquidityBufferTransfer;
+            uint120 fromLiquidityBuffer = _dataOf[from][transferDetails.id].liquidityBuffer;
+            unchecked {
+                liquidityBufferTransfer = uint120((fromLiquidityBuffer * transferDetails.amount) / fromBalance);
+                _dataOf[from][transferDetails.id].liquidityBuffer = fromLiquidityBuffer - liquidityBufferTransfer;
+            }
+            _dataOf[to][transferDetails.id].liquidityBuffer += liquidityBufferTransfer;
+        }
+
+        emit Transfer(from, to, abi.encode(transferDetails));
+        return true;
     }
 
     /// @notice Returns the id of a liquidity position
@@ -279,7 +260,7 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
         int24 strike,
         Engine.TokenSelector selector,
         uint128 amount,
-        uint256 leverageRatioX128
+        uint120 liquidityBuffer
     )
         internal
     {
@@ -288,15 +269,11 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
 
         if (balance == 0) {
             _dataOf[to][id].balance = amount;
-            _dataOf[to][id].data = abi.encode(DebtData(leverageRatioX128));
+            _dataOf[to][id].liquidityBuffer = liquidityBuffer;
         } else {
-            DebtData memory debtData = abi.decode(_dataOf[to][id].data, (DebtData));
-
-            _dataOf[to][id].data =
-                abi.encode(DebtData(addPositions(amount, balance, DebtData(leverageRatioX128), debtData)));
-
             unchecked {
                 _dataOf[to][id].balance = balance + amount;
+                _dataOf[to][id].liquidityBuffer += liquidityBuffer;
             }
         }
 

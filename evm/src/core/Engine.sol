@@ -376,14 +376,17 @@ contract Engine is Positions {
         );
 
         // add collateral to account
-        uint256 liquidityCollateral;
+        uint128 liquidityCollateral;
         if (params.selectorCollateral == TokenSelector.Token0) {
             account.updateToken(params.token0, toInt256(params.amountDesiredCollateral));
-            liquidityCollateral =
-                getLiquidityForAmount0(params.amountDesiredCollateral, getRatioAtStrike(params.strike));
+            liquidityCollateral = scaleLiquidityDown(
+                getLiquidityForAmount0(params.amountDesiredCollateral, getRatioAtStrike(params.strike)),
+                params.scalingFactor
+            );
         } else if (params.selectorCollateral == TokenSelector.Token1) {
             account.updateToken(params.token1, toInt256(params.amountDesiredCollateral));
-            liquidityCollateral = getLiquidityForAmount1(params.amountDesiredCollateral);
+            liquidityCollateral =
+                scaleLiquidityDown(getLiquidityForAmount1(params.amountDesiredCollateral), params.scalingFactor);
         } else {
             revert InvalidSelector();
         }
@@ -392,7 +395,6 @@ contract Engine is Positions {
 
         uint128 balance =
             debtLiquidityToBalance(params.amountDesiredDebt, pair.strikes[params.strike].liquidityGrowthExpX128);
-        uint256 leverageRatioX128 = mulDiv(liquidityCollateral, Q128, balance);
 
         // mint position to user
         _mintDebt(
@@ -403,7 +405,7 @@ contract Engine is Positions {
             params.strike,
             params.selectorCollateral,
             balance,
-            leverageRatioX128
+            uint120(liquidityCollateral - params.amountDesiredDebt) // can be unchecked
         );
 
         emit BorrowLiquidity(pairID);
@@ -536,40 +538,5 @@ contract Engine is Positions {
         (, Pairs.Pair storage pair) = pairs.getPairAndID(token0, token1, scalingFactor);
 
         return pair.strikes[strike];
-    }
-
-    function getPositionBiDirectional(
-        address owner,
-        address token0,
-        address token1,
-        uint8 scalingFactor,
-        int24 strike,
-        uint8 spread
-    )
-        external
-        view
-        returns (uint128 balance)
-    {
-        return _dataOf[owner][_biDirectionalID(token0, token1, scalingFactor, strike, spread)].balance;
-    }
-
-    function getPositionDebt(
-        address owner,
-        address token0,
-        address token1,
-        uint8 scalingFactor,
-        int24 strike,
-        Engine.TokenSelector selector
-    )
-        external
-        view
-        returns (uint128 balance, uint256 leverageRatioX128)
-    {
-        balance = _dataOf[owner][_debtID(token0, token1, scalingFactor, strike, selector)].balance;
-        Positions.DebtData memory debtData = abi.decode(
-            _dataOf[owner][_debtID(token0, token1, scalingFactor, strike, selector)].data, (Positions.DebtData)
-        );
-
-        return (balance, debtData.leverageRatioX128);
     }
 }

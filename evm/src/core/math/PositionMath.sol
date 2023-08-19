@@ -81,19 +81,3 @@ function debtLiquidityToBalance(uint128 liquidity, uint256 liquidityGrowthExpX12
     if (balance > type(uint128).max) revert Overflow();
     return uint128(balance);
 }
-
-/// @notice Combine two positions, adding together the leverage ratio
-function addPositions(
-    uint128 balance0,
-    uint128 balance1,
-    Positions.DebtData memory debtData0,
-    Positions.DebtData memory debtData1
-)
-    pure
-    returns (uint256 leverageRatioX128)
-{
-    uint256 collateral0 = mulDiv(balance0, debtData0.leverageRatioX128, Q128);
-    uint256 collateral1 = mulDiv(balance1, debtData1.leverageRatioX128, Q128);
-
-    return mulDiv(collateral0 + collateral1, Q128, uint256(balance0) + uint256(balance1));
-}

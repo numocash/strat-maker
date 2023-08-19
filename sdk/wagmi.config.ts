@@ -10,7 +10,7 @@ export default defineConfig({
     }),
     foundry({
       project: "node_modules/ilrta-evm/",
-      include: ["Permit3", "SuperSignature"],
+      include: ["Permit3"],
     }),
   ],
 });
