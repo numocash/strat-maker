@@ -4,6 +4,47 @@ pragma solidity ^0.8.19;
 import {Engine} from "./Engine.sol";
 import {ILRTA} from "ilrta/ILRTA.sol";
 
+/// @notice Returns the id of a liquidity position
+function biDirectionalID(
+    address token0,
+    address token1,
+    uint8 scalingFactor,
+    int24 strike,
+    uint8 spread
+)
+    pure
+    returns (bytes32)
+{
+    return keccak256(
+        abi.encode(
+            Positions.ILRTADataID(
+                Engine.OrderType.BiDirectional,
+                abi.encode(Positions.BiDirectionalID(token0, token1, scalingFactor, strike, spread))
+            )
+        )
+    );
+}
+
+/// @notice Returns the id of a debt position
+function debtID(
+    address token0,
+    address token1,
+    uint8 scalingFactor,
+    int24 strike,
+    Engine.TokenSelector selector
+)
+    pure
+    returns (bytes32)
+{
+    return keccak256(
+        abi.encode(
+            Positions.ILRTADataID(
+                Engine.OrderType.Debt, abi.encode(Positions.DebtID(token0, token1, scalingFactor, strike, selector))
+            )
+        )
+    );
+}
+
 /// @title Positions
 /// @notice Representation of a position on the exchange
 abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
@@ -23,13 +64,11 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
     /// @notice The data that a position records
     /// @param balance The balance of the position either in units of share of liquidity provided or non-interested
     /// adjusted liquidity debt
-    /// @param orderType Signifies the type of position
     /// @param liquidityBuffer The amount of non-fee adjusted liquidity collateral - liquidity debt when order type is
     /// debt, else 0
     struct ILRTAData {
         uint128 balance;
-        Engine.OrderType orderType;
-        uint120 liquidityBuffer;
+        uint128 liquidityBuffer;
     }
 
     /// @notice Information needed to describe a transfer
@@ -176,10 +215,11 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
 
         if (transferDetails.orderType == Engine.OrderType.Debt) {
             // transfer a proportional amount of the liquidity buffer
-            uint120 liquidityBufferTransfer;
-            uint120 fromLiquidityBuffer = _dataOf[from][transferDetails.id].liquidityBuffer;
+            uint128 liquidityBufferTransfer;
+            uint128 fromLiquidityBuffer = _dataOf[from][transferDetails.id].liquidityBuffer;
             unchecked {
-                liquidityBufferTransfer = uint120((fromLiquidityBuffer * transferDetails.amount) / fromBalance);
+                liquidityBufferTransfer =
+                    uint128((uint256(fromLiquidityBuffer) * uint256(transferDetails.amount)) / uint256(fromBalance));
                 _dataOf[from][transferDetails.id].liquidityBuffer = fromLiquidityBuffer - liquidityBufferTransfer;
             }
             _dataOf[to][transferDetails.id].liquidityBuffer += liquidityBufferTransfer;
@@ -187,47 +227,6 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
 
         emit Transfer(from, to, abi.encode(transferDetails));
         return true;
-    }
-
-    /// @notice Returns the id of a liquidity position
-    function _biDirectionalID(
-        address token0,
-        address token1,
-        uint8 scalingFactor,
-        int24 strike,
-        uint8 spread
-    )
-        internal
-        pure
-        returns (bytes32)
-    {
-        return keccak256(
-            abi.encode(
-                ILRTADataID(
-                    Engine.OrderType.BiDirectional,
-                    abi.encode(BiDirectionalID(token0, token1, scalingFactor, strike, spread))
-                )
-            )
-        );
-    }
-
-    /// @notice Returns the id of a debt position
-    function _debtID(
-        address token0,
-        address token1,
-        uint8 scalingFactor,
-        int24 strike,
-        Engine.TokenSelector selector
-    )
-        internal
-        pure
-        returns (bytes32)
-    {
-        return keccak256(
-            abi.encode(
-                ILRTADataID(Engine.OrderType.Debt, abi.encode(DebtID(token0, token1, scalingFactor, strike, selector)))
-            )
-        );
     }
 
     /// @notice Mint a liquidty position
@@ -242,7 +241,7 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
     )
         internal
     {
-        bytes32 id = _biDirectionalID(token0, token1, scalingFactor, strike, spread);
+        bytes32 id = biDirectionalID(token0, token1, scalingFactor, strike, spread);
         // change in liquidity cannot exceed the maximum liquidity in a strike
         unchecked {
             _dataOf[to][id].balance += amount;
@@ -260,11 +259,11 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
         int24 strike,
         Engine.TokenSelector selector,
         uint128 amount,
-        uint120 liquidityBuffer
+        uint128 liquidityBuffer
     )
         internal
     {
-        bytes32 id = _debtID(token0, token1, scalingFactor, strike, selector);
+        bytes32 id = debtID(token0, token1, scalingFactor, strike, selector);
         uint128 balance = _dataOf[to][id].balance;
 
         if (balance == 0) {
@@ -280,6 +279,7 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
         emit Transfer(address(0), to, abi.encode(ILRTATransferDetails(id, Engine.OrderType.Debt, amount)));
     }
 
+    /// @custom:team How to handle `liquidityBuffer`
     function _burn(address from, bytes32 id, uint128 amount, Engine.OrderType orderType) internal {
         _dataOf[from][id].balance -= amount;
 
