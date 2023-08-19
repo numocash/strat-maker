@@ -204,7 +204,6 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     /// @notice Helper function for transfers, uses `orderType` and updates a position based on the type
-    /// @custom:team Would be it be good to completely clear out a position
     function _transfer(address from, address to, ILRTATransferDetails memory transferDetails) private returns (bool) {
         uint128 fromBalance = _dataOf[from][transferDetails.id].balance;
 
