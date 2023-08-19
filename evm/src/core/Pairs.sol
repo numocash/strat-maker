@@ -37,8 +37,9 @@ library Pairs {
     /// @custom:team could we make reference a bitmap
     struct Strike {
         uint256 liquidityGrowthExpX128;
+        uint256 liquidityGrowthX128;
         uint256 blockLast;
-        uint128[NUM_SPREADS] totalSupply;
+        uint128[NUM_SPREADS] liquidityGrowthSpreadX128;
         uint128[NUM_SPREADS] liquidityBiDirectional;
         uint128[NUM_SPREADS] liquidityBorrowed;
         int24 next0To1;
@@ -398,7 +399,7 @@ library Pairs {
 
     /// @notice Update a strike
     /// @param liquidity The amount of liquidity being added or removed
-    function updateStrike(Pair storage pair, int24 strike, uint8 spread, int128 balance, int128 liquidity) internal {
+    function updateStrike(Pair storage pair, int24 strike, uint8 spread, int128 liquidity) internal {
         if (pair.initialized != 1) revert Initialized();
         _checkStrike(strike - int8(spread));
         _checkStrike(strike + int8(spread));
@@ -406,7 +407,8 @@ library Pairs {
 
         uint128 existingLiquidity = pair.strikes[strike].liquidityBiDirectional[spread - 1];
         pair.strikes[strike].liquidityBiDirectional[spread - 1] = addDelta(existingLiquidity, liquidity);
-        pair.strikes[strike].totalSupply[spread - 1] = addDelta(pair.strikes[strike].totalSupply[spread - 1], balance);
+        // pair.strikes[strike].totalSupply[spread - 1] = addDelta(pair.strikes[strike].totalSupply[spread - 1],
+        // balance);
 
         unchecked {
             if (existingLiquidity == 0 && liquidity > 0) {
