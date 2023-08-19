@@ -2,15 +2,99 @@
 pragma solidity ^0.8.19;
 
 import {Engine} from "./Engine.sol";
-import {addPositions} from "./math/PositionMath.sol";
 import {ILRTA} from "ilrta/ILRTA.sol";
-import {SignatureVerification} from "ilrta/SignatureVerification.sol";
 
-abstract contract Positions is ILRTA {
+/// @notice Returns the id of a liquidity position
+function biDirectionalID(
+    address token0,
+    address token1,
+    uint8 scalingFactor,
+    int24 strike,
+    uint8 spread
+)
+    pure
+    returns (bytes32)
+{
+    return keccak256(
+        abi.encode(
+            Positions.ILRTADataID(
+                Engine.OrderType.BiDirectional,
+                abi.encode(Positions.BiDirectionalID(token0, token1, scalingFactor, strike, spread))
+            )
+        )
+    );
+}
+
+/// @notice Returns the id of a debt position
+function debtID(
+    address token0,
+    address token1,
+    uint8 scalingFactor,
+    int24 strike,
+    Engine.TokenSelector selector
+)
+    pure
+    returns (bytes32)
+{
+    return keccak256(
+        abi.encode(
+            Positions.ILRTADataID(
+                Engine.OrderType.Debt, abi.encode(Positions.DebtID(token0, token1, scalingFactor, strike, selector))
+            )
+        )
+    );
+}
+
+/// @title Positions
+/// @notice Representation of a position on the exchange
+abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                DATA TYPES
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
+    /// @notice The data that distinguishes between positions
+    /// @dev bytes32 id = keccak256(abi.encode(ILRTADataID))
+    /// @param orderType Signifies the type of position
+    /// @param data Extra data that is either of type BiDirectionalID or DebtID depending on `orderType`
+    struct ILRTADataID {
+        Engine.OrderType orderType;
+        bytes data;
+    }
+
+    /// @notice The data that a position records
+    /// @param balance The balance of the position either in units of share of liquidity provided or non-interested
+    /// adjusted liquidity debt
+    /// @param liquidityBuffer The amount of non-fee adjusted liquidity collateral - liquidity debt when order type is
+    /// debt, else 0
+    struct ILRTAData {
+        uint128 balance;
+        uint128 liquidityBuffer;
+    }
+
+    /// @notice Information needed to describe a transfer
+    /// @param id The unique identifier of a position
+    /// @param orderType Signifies the type of position
+    /// @param amount The amount of the position to transfer either in units of share of liquidity provided or
+    /// interested adjusted liquidity debt
+    struct ILRTATransferDetails {
+        bytes32 id;
+        Engine.OrderType orderType;
+        uint128 amount;
+    }
+
+    /// @notice Information needed to describe an approval
+    /// @param approved True if the `spender` is allowed full control of the position of `owner`
+    struct ILRTAApprovalDetails {
+        bool approved;
+    }
+
+    /// @notice Extra data needed to distinguish between liquidity positions
+    /// @param token0 Address of the first token
+    /// @param token1 Address of the second token
+    /// @param scalingFactor Divisor such that liquidity  / 2 ** `scalingFactor` fits in a uint128
+    /// @param strike Strike which to center liquidity around
+    /// @param spread Distance from `strike` in units of strikes which to trade 0 => 1 (`strike` - `spread`) or
+    /// 1 => 0 (`strike` + `spread`)
     struct BiDirectionalID {
         address token0;
         address token1;
@@ -19,6 +103,12 @@ abstract contract Positions is ILRTA {
         uint8 spread;
     }
 
+    /// @notice Extra data needed to distinguish between debt positions
+    /// @param token0 Address of the first token
+    /// @param token1 Address of the second token
+    /// @param scalingFactor Divisor such that liquidity  / 2 ** `scalingFactor` fits in a uint128
+    /// @param strike Strike where liquidity is borrowed from
+    /// @param selector Token used for the collateral
     struct DebtID {
         address token0;
         address token1;
@@ -27,254 +117,118 @@ abstract contract Positions is ILRTA {
         Engine.TokenSelector selector;
     }
 
-    struct DebtData {
-        uint256 leverageRatioX128;
-    }
-
-    struct ILRTADataID {
-        Engine.OrderType orderType;
-        bytes data;
-    }
-
-    struct ILRTAData {
-        uint128 balance;
-        Engine.OrderType orderType;
-        bytes data;
-    }
-
-    struct ILRTATransferDetails {
-        bytes32 id;
-        Engine.OrderType orderType;
-        uint128 amount;
-    }
-
-    struct SignatureTransfer {
-        uint256 nonce;
-        uint256 deadline;
-        ILRTATransferDetails transferDetails;
-    }
-
-    struct RequestedTransfer {
-        address to;
-        ILRTATransferDetails transferDetails;
-    }
-
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                 STORAGE
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    mapping(address => mapping(bytes32 => ILRTAData)) internal _dataOf;
+    mapping(address owner => mapping(bytes32 id => ILRTAData data)) internal _dataOf;
 
-    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
-                              CONSTRUCTOR
-    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
-
-    constructor(address _superSignature)
-        ILRTA(_superSignature, "Numoen Dry Powder", "DP", "TransferDetails(bytes32 id,uint8 orderType,uint128 amount)")
-    {}
+    mapping(address owner => mapping(address spender => ILRTAApprovalDetails approvalDetails)) private _allowanceOf;
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                  LOGIC
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    function dataID(ILRTADataID memory data) public pure returns (bytes32) {
-        return keccak256(abi.encode(data));
-    }
-
-    function dataOf(address owner, bytes32 id) external view returns (ILRTAData memory) {
+    /// @notice Reads and returns the data of the position
+    /// @dev Function selector is keccak("dataOf()"")
+    function dataOf_cGJnTo(address owner, bytes32 id) external view returns (ILRTAData memory) {
         return _dataOf[owner][id];
     }
 
-    function transfer(address to, ILRTATransferDetails calldata transferDetails) external returns (bool) {
+    /// @notice Reads and returns the allowance of the position
+    /// @dev Function selector is keccak("allowanceOf()")
+    function allowanceOf_QDmnOj(
+        address owner,
+        address spender,
+        bytes32
+    )
+        external
+        view
+        returns (ILRTAApprovalDetails memory)
+    {
+        return _allowanceOf[owner][spender];
+    }
+
+    /// @notice Returns true if `requestedTransferDetails` is valid given the `signedTransferDetails`
+    /// @dev Function selector is keccak256("validateRequest()"")
+    function validateRequest_bzlHQU(
+        ILRTATransferDetails calldata signedTransferDetails,
+        ILRTATransferDetails calldata requestedTransferDetails
+    )
+        external
+        pure
+        returns (bool)
+    {
+        return (
+            requestedTransferDetails.amount > signedTransferDetails.amount
+                || requestedTransferDetails.id != signedTransferDetails.id
+                || requestedTransferDetails.orderType != signedTransferDetails.orderType
+        ) ? false : true;
+    }
+
+    /// @notice Transfer from `msg.sender` to `to` described by `transferDetails`
+    /// @dev Function selector is keccak256("transfer()")
+    function transfer_Jvpprd(address to, ILRTATransferDetails calldata transferDetails) external returns (bool) {
         return _transfer(msg.sender, to, transferDetails);
     }
 
-    function transferBySignature(
-        address from,
-        SignatureTransfer calldata signatureTransfer,
-        RequestedTransfer calldata requestedTransfer,
-        bytes calldata signature
-    )
-        external
-        returns (bool)
-    {
-        _checkTransferRequest(requestedTransfer.transferDetails, signatureTransfer.transferDetails);
+    /// @notice Allow `spender` the allowance described by `approvalDetails` on the position of  `msg.sender`
+    /// @dev Function selector is keccak256("approve()")
+    function approve_BKoIou(address spender, ILRTAApprovalDetails calldata approvalDetails) external returns (bool) {
+        _allowanceOf[msg.sender][spender] = approvalDetails;
 
-        _verifySignature(from, signatureTransfer, signature);
+        emit Approval(msg.sender, spender, abi.encode(approvalDetails));
 
-        return _transfer(from, requestedTransfer.to, requestedTransfer.transferDetails);
+        return true;
     }
 
-    function transferBySuperSignature(
+    /// @notice Transfer from `from` to `to` described by `transferDetails` if the allowance is adequate, else revert
+    /// @dev Function selector is keccak256("transferFrom()")
+    function transferFrom_jDUYFr(
         address from,
-        ILRTATransferDetails calldata transferDetails,
-        RequestedTransfer calldata requestedTransfer,
-        bytes32[] calldata dataHash
+        address to,
+        ILRTATransferDetails calldata transferDetails
     )
         external
         returns (bool)
     {
-        _checkTransferRequest(requestedTransfer.transferDetails, transferDetails);
+        ILRTAApprovalDetails memory allowed = _allowanceOf[from][msg.sender];
 
-        _verifySuperSignature(from, transferDetails, dataHash);
+        if (!allowed.approved) revert();
 
-        return _transfer(from, requestedTransfer.to, requestedTransfer.transferDetails);
+        return _transfer(from, to, transferDetails);
     }
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                              INTERNAL LOGIC
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    function _verifySignature(
-        address from,
-        SignatureTransfer calldata signatureTransfer,
-        bytes calldata signature
-    )
-        private
-    {
-        if (block.timestamp > signatureTransfer.deadline) revert SignatureExpired(signatureTransfer.deadline);
-
-        useUnorderedNonce(from, signatureTransfer.nonce);
-
-        bytes32 signatureHash = hashTypedData(
-            keccak256(
-                abi.encode(
-                    TRANSFER_TYPEHASH,
-                    keccak256(abi.encode(TRANSFER_DETAILS_TYPEHASH, signatureTransfer.transferDetails)),
-                    msg.sender,
-                    signatureTransfer.nonce,
-                    signatureTransfer.deadline
-                )
-            )
-        );
-
-        SignatureVerification.verify(signature, signatureHash, from);
-    }
-
-    function _verifySuperSignature(
-        address from,
-        ILRTATransferDetails calldata transferDetails,
-        bytes32[] calldata dataHash
-    )
-        private
-    {
-        bytes32 signatureHash = hashTypedData(
-            keccak256(
-                abi.encode(
-                    SUPER_SIGNATURE_TRANSFER_TYPEHASH,
-                    keccak256(abi.encode(TRANSFER_DETAILS_TYPEHASH, transferDetails)),
-                    msg.sender
-                )
-            )
-        );
-
-        if (dataHash[0] != signatureHash) revert DataHashMismatch();
-
-        superSignature.verifyData(from, dataHash);
-    }
-
-    function _checkTransferRequest(
-        ILRTATransferDetails memory requestedTransferDetails,
-        ILRTATransferDetails memory signatureTransferDetails
-    )
-        private
-        pure
-    {
-        if (
-            requestedTransferDetails.amount > signatureTransferDetails.amount
-                || requestedTransferDetails.id != signatureTransferDetails.id
-        ) {
-            revert InvalidRequest(abi.encode(signatureTransferDetails));
-        }
-    }
-
+    /// @notice Helper function for transfers, uses `orderType` and updates a position based on the type
     function _transfer(address from, address to, ILRTATransferDetails memory transferDetails) private returns (bool) {
-        if (transferDetails.orderType != Engine.OrderType.Debt) {
-            _dataOf[from][transferDetails.id].balance -= transferDetails.amount;
-            unchecked {
-                _dataOf[to][transferDetails.id].balance += transferDetails.amount;
-            }
+        uint128 fromBalance = _dataOf[from][transferDetails.id].balance;
 
-            emit Transfer(from, to, abi.encode(transferDetails));
-            return true;
-        } else {
-            uint128 senderBalance = _dataOf[from][transferDetails.id].balance;
-            uint128 recipientBalance = _dataOf[to][transferDetails.id].balance;
-
-            uint256 leverageRatioX128 = recipientBalance == 0
-                ? abi.decode(_dataOf[from][transferDetails.id].data, (DebtData)).leverageRatioX128
-                : addPositions(
-                    transferDetails.amount,
-                    recipientBalance,
-                    abi.decode(_dataOf[from][transferDetails.id].data, (DebtData)),
-                    abi.decode(_dataOf[to][transferDetails.id].data, (DebtData))
-                );
-
-            if (senderBalance == transferDetails.amount) delete _dataOf[from][transferDetails.id];
-            else _dataOf[from][transferDetails.id].balance = senderBalance - transferDetails.amount;
-
-            unchecked {
-                _dataOf[to][transferDetails.id].balance = recipientBalance + transferDetails.amount;
-            }
-
-            _dataOf[to][transferDetails.id].data = abi.encode(DebtData(leverageRatioX128));
-
-            emit Transfer(from, to, abi.encode(transferDetails));
-            return true;
+        _dataOf[from][transferDetails.id].balance = fromBalance - transferDetails.amount;
+        unchecked {
+            _dataOf[to][transferDetails.id].balance += transferDetails.amount;
         }
+
+        if (transferDetails.orderType == Engine.OrderType.Debt) {
+            // transfer a proportional amount of the liquidity buffer
+            uint128 liquidityBufferTransfer;
+            uint128 fromLiquidityBuffer = _dataOf[from][transferDetails.id].liquidityBuffer;
+            unchecked {
+                liquidityBufferTransfer =
+                    uint128((uint256(fromLiquidityBuffer) * uint256(transferDetails.amount)) / uint256(fromBalance));
+                _dataOf[from][transferDetails.id].liquidityBuffer = fromLiquidityBuffer - liquidityBufferTransfer;
+            }
+            _dataOf[to][transferDetails.id].liquidityBuffer += liquidityBufferTransfer;
+        }
+
+        emit Transfer(from, to, abi.encode(transferDetails));
+        return true;
     }
 
-    function _biDirectionalID(
-        address token0,
-        address token1,
-        uint8 scalingFactor,
-        int24 strike,
-        uint8 spread
-    )
-        internal
-        pure
-        returns (bytes32)
-    {
-        return dataID(
-            ILRTADataID(
-                Engine.OrderType.BiDirectional,
-                abi.encode(BiDirectionalID(token0, token1, scalingFactor, strike, spread))
-            )
-        );
-    }
-
-    function _debtID(
-        address token0,
-        address token1,
-        uint8 scalingFactor,
-        int24 strike,
-        Engine.TokenSelector selector
-    )
-        internal
-        pure
-        returns (bytes32)
-    {
-        return dataID(
-            ILRTADataID(Engine.OrderType.Debt, abi.encode(DebtID(token0, token1, scalingFactor, strike, selector)))
-        );
-    }
-
-    function _dataOfDebt(
-        address owner,
-        address token0,
-        address token1,
-        uint8 scalingFactor,
-        int24 strike,
-        Engine.TokenSelector selector
-    )
-        internal
-        view
-        returns (DebtData memory)
-    {
-        ILRTAData memory data = _dataOf[owner][_debtID(token0, token1, scalingFactor, strike, selector)];
-        return abi.decode(data.data, (DebtData));
-    }
-
+    /// @notice Mint a liquidty position
     function _mintBiDirectional(
         address to,
         address token0,
@@ -286,7 +240,7 @@ abstract contract Positions is ILRTA {
     )
         internal
     {
-        bytes32 id = _biDirectionalID(token0, token1, scalingFactor, strike, spread);
+        bytes32 id = biDirectionalID(token0, token1, scalingFactor, strike, spread);
         // change in liquidity cannot exceed the maximum liquidity in a strike
         unchecked {
             _dataOf[to][id].balance += amount;
@@ -295,6 +249,7 @@ abstract contract Positions is ILRTA {
         emit Transfer(address(0), to, abi.encode(ILRTATransferDetails(id, Engine.OrderType.BiDirectional, amount)));
     }
 
+    /// @notice Mint a debt position
     function _mintDebt(
         address to,
         address token0,
@@ -303,72 +258,30 @@ abstract contract Positions is ILRTA {
         int24 strike,
         Engine.TokenSelector selector,
         uint128 amount,
-        uint256 leverageRatioX128
+        uint128 liquidityBuffer
     )
         internal
     {
-        bytes32 id = _debtID(token0, token1, scalingFactor, strike, selector);
+        bytes32 id = debtID(token0, token1, scalingFactor, strike, selector);
         uint128 balance = _dataOf[to][id].balance;
 
         if (balance == 0) {
             _dataOf[to][id].balance = amount;
-            _dataOf[to][id].data = abi.encode(DebtData(leverageRatioX128));
+            _dataOf[to][id].liquidityBuffer = liquidityBuffer;
         } else {
-            DebtData memory debtData = abi.decode(_dataOf[to][id].data, (DebtData));
-
-            _dataOf[to][id].data =
-                abi.encode(DebtData(addPositions(amount, balance, DebtData(leverageRatioX128), debtData)));
-
             unchecked {
                 _dataOf[to][id].balance = balance + amount;
+                _dataOf[to][id].liquidityBuffer += liquidityBuffer;
             }
         }
 
         emit Transfer(address(0), to, abi.encode(ILRTATransferDetails(id, Engine.OrderType.Debt, amount)));
     }
 
-    function _burnBiDirectional(
-        address from,
-        address token0,
-        address token1,
-        uint8 scalingFactor,
-        int24 strike,
-        uint8 spread,
-        uint128 amount
-    )
-        internal
-    {
-        bytes32 id = _biDirectionalID(token0, token1, scalingFactor, strike, spread);
-
-        _dataOf[from][id].balance -= amount;
-
-        emit Transfer(from, address(0), abi.encode(ILRTATransferDetails(id, Engine.OrderType.BiDirectional, amount)));
-    }
-
+    /// @custom:team How to handle `liquidityBuffer`
     function _burn(address from, bytes32 id, uint128 amount, Engine.OrderType orderType) internal {
         _dataOf[from][id].balance -= amount;
 
         emit Transfer(from, address(0), abi.encode(ILRTATransferDetails(id, orderType, amount)));
-    }
-
-    function _burnDebt(
-        address from,
-        address token0,
-        address token1,
-        uint8 scalingFactor,
-        int24 strike,
-        Engine.TokenSelector selector,
-        uint128 amount
-    )
-        internal
-    {
-        bytes32 id = _debtID(token0, token1, scalingFactor, strike, selector);
-
-        uint128 balance = _dataOf[from][id].balance;
-
-        if (balance == amount) delete _dataOf[from][id];
-        else _dataOf[from][id].balance = balance - amount;
-
-        emit Transfer(from, address(0), abi.encode(ILRTATransferDetails(id, Engine.OrderType.Debt, amount)));
     }
 }

@@ -50,6 +50,7 @@ function getRatioAtStrike(int24 strike) pure returns (uint256 ratioX128) {
         if (x & 0x80000 > 0) ratioX128 = (ratioX128 * 0x48A170391F7DC42444E8FA2) >> 128;
         // Stop computation here since |strike| < 2**20
 
+        // square the result
         ratioX128 = (ratioX128 * ratioX128) / Q128;
         if (strike > 0) ratioX128 = type(uint256).max / ratioX128;
     }

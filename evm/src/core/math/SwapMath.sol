@@ -13,6 +13,7 @@ import {Q128} from "./StrikeMath.sol";
 /// @return amountOut The amount of tokens to be swapped out
 /// @return liquidityRemaining The amount of swappable liquidity still remaining in the strike
 /// @custom:team How to round liquidity remaining
+/// @custom:team Remove exactIn if statement for bytecode savings
 function computeSwapStep(
     uint256 ratioX128,
     uint256 liquidity,

@@ -1,5 +1,5 @@
 ds-test/=lib/forge-std/lib/ds-test/src/
 forge-std/=lib/forge-std/src/
-ilrta/=lib/ilrta/evm/src/
-solmate/=lib/ilrta/evm/lib/solmate/src/
+ilrta/=lib/ilrta/packages/evm/src/
+solmate/=lib/ilrta/packages/evm/lib/solmate/
 src/=src/

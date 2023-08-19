@@ -4,38 +4,22 @@ pragma solidity ^0.8.0;
 import {Test} from "forge-std/Test.sol";
 
 import {liquidityToBalance} from "src/core/math/PositionMath.sol";
-import {Pairs} from "src/core/Pairs.sol";
+import {Q128} from "src/core/math/StrikeMath.sol";
 
 contract LiquidityToBalanceTest is Test {
-    Pairs.Pair private pair;
-
-    function test_LiquidityToBalance_TotalSupplyZero() external {
-        assertEq(liquidityToBalance(pair, 0, 1, 1e18), 1e18);
-    }
-
     function test_LiquidityToBalance() external {
-        // setup pair
-        pair.strikes[0].totalSupply[0] = 1e18 - 1;
-        pair.strikes[0].liquidityBiDirectional[0] = 0.5e18;
-        pair.strikes[0].liquidityBorrowed[0] = 0.5e18;
-
-        assertEq(liquidityToBalance(pair, 0, 1, 1e18), 1e18 - 1);
-
-        // delete pair
-        delete pair.strikes[0].totalSupply;
-        delete pair.strikes[0].liquidityBiDirectional;
-        delete pair.strikes[0].liquidityBorrowed;
+        assertEq(liquidityToBalance(1e18, 0), 1e18);
+        assertEq(liquidityToBalance(1e18, Q128), 1e18);
+        assertEq(liquidityToBalance(1e18, Q128 + 1), 1e18);
     }
 
     function test_LiquidityToBalance_Max() external {
-        // setup pair
-        pair.strikes[0].totalSupply[0] = type(uint128).max;
-        pair.strikes[0].liquidityBiDirectional[0] = type(uint128).max;
+        assertEq(liquidityToBalance(type(uint128).max, 0), type(uint128).max);
+        assertEq(liquidityToBalance(type(uint128).max, Q128), type(uint128).max);
+    }
 
-        assertEq(liquidityToBalance(pair, 0, 1, type(uint128).max), type(uint128).max);
-
-        // delete pair
-        delete pair.strikes[0].totalSupply;
-        delete pair.strikes[0].liquidityBiDirectional;
+    function test_LiquidityToBalance_Overflow() external {
+        vm.expectRevert();
+        liquidityToBalance(type(uint128).max, Q128 * 2);
     }
 }

@@ -177,12 +177,6 @@ contract Engine is Positions {
     }
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
-                              CONSTRUCTOR
-    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
-
-    constructor(address _superSignature) Positions(_superSignature) {}
-
-    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                  LOGIC
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
@@ -210,19 +204,19 @@ contract Engine is Positions {
                     if (commands[i] == Commands.Swap) {
                         _swap(abi.decode(inputs[i], (SwapParams)), account);
                     } else {
-                        _addLiquidity(to, abi.decode(inputs[i], (AddLiquidityParams)), account);
+                        // _addLiquidity(to, abi.decode(inputs[i], (AddLiquidityParams)), account);
                     }
                 } else {
                     if (commands[i] == Commands.BorrowLiquidity) {
-                        _borrowLiquidity(to, abi.decode(inputs[i], (BorrowLiquidityParams)), account);
+                        // _borrowLiquidity(to, abi.decode(inputs[i], (BorrowLiquidityParams)), account);
                     } else {
-                        _repayLiquidity(abi.decode(inputs[i], (RepayLiquidityParams)), account);
+                        // _repayLiquidity(abi.decode(inputs[i], (RepayLiquidityParams)), account);
                     }
                 }
             } else {
                 if (commands[i] < Commands.CreatePair) {
                     if (commands[i] == Commands.RemoveLiquidity) {
-                        _removeLiquidity(abi.decode(inputs[i], (RemoveLiquidityParams)), account);
+                        // _removeLiquidity(abi.decode(inputs[i], (RemoveLiquidityParams)), account);
                     } else {
                         _accrue(abi.decode(inputs[i], (AccrueParams)));
                     }
@@ -324,169 +318,171 @@ contract Engine is Positions {
         emit Swap(pairID);
     }
 
-    function _addLiquidity(address to, AddLiquidityParams memory params, Accounts.Account memory account) private {
-        (bytes32 pairID, Pairs.Pair storage pair) =
-            pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
-        pair.accrue(params.strike);
+    // function _addLiquidity(address to, AddLiquidityParams memory params, Accounts.Account memory account) private {
+    //     (bytes32 pairID, Pairs.Pair storage pair) =
+    //         pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
+    //     pair.accrue(params.strike);
 
-        // calculate how much to add
-        int128 liquidity = toInt128(params.amountDesired);
-        int128 balance = toInt128(liquidityToBalance(pair, params.strike, params.spread, params.amountDesired));
-        (uint256 _amount0, uint256 _amount1) = getAmounts(
-            pair, scaleLiquidityUp(params.amountDesired, params.scalingFactor), params.strike, params.spread, true
-        );
-        int256 amount0 = int256(_amount0);
-        int256 amount1 = int256(_amount1);
+    //     // calculate how much to add
+    //     int128 liquidity = toInt128(params.amountDesired);
+    //     int128 balance = toInt128(liquidityToBalance(pair, params.strike, params.spread, params.amountDesired));
+    //     (uint256 _amount0, uint256 _amount1) = getAmounts(
+    //         pair, scaleLiquidityUp(params.amountDesired, params.scalingFactor), params.strike, params.spread, true
+    //     );
+    //     int256 amount0 = int256(_amount0);
+    //     int256 amount1 = int256(_amount1);
 
-        // add to pair
-        pair.updateStrike(params.strike, params.spread, balance, liquidity);
+    //     // add to pair
+    //     pair.updateStrike(params.strike, params.spread, balance, liquidity);
 
-        // update accounts
-        account.updateToken(params.token0, amount0);
-        account.updateToken(params.token1, amount1);
+    //     // update accounts
+    //     account.updateToken(params.token0, amount0);
+    //     account.updateToken(params.token1, amount1);
 
-        // mint position token
-        _mintBiDirectional(
-            to, params.token0, params.token1, params.scalingFactor, params.strike, params.spread, uint128(balance)
-        );
+    //     // mint position token
+    //     _mintBiDirectional(
+    //         to, params.token0, params.token1, params.scalingFactor, params.strike, params.spread, uint128(balance)
+    //     );
 
-        emit AddLiquidity(pairID, params.strike, params.spread, uint128(balance));
-    }
+    //     emit AddLiquidity(pairID, params.strike, params.spread, uint128(balance));
+    // }
 
-    function _borrowLiquidity(
-        address to,
-        BorrowLiquidityParams memory params,
-        Accounts.Account memory account
-    )
-        private
-    {
-        (bytes32 pairID, Pairs.Pair storage pair) =
-            pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
-        pair.accrue(params.strike);
+    // function _borrowLiquidity(
+    //     address to,
+    //     BorrowLiquidityParams memory params,
+    //     Accounts.Account memory account
+    // )
+    //     private
+    // {
+    //     (bytes32 pairID, Pairs.Pair storage pair) =
+    //         pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
+    //     pair.accrue(params.strike);
 
-        uint128 liquidityToken1 = pair.borrowLiquidity(params.strike, params.amountDesiredDebt);
+    //     uint128 liquidityToken1 = pair.borrowLiquidity(params.strike, params.amountDesiredDebt);
 
-        // calculate the the tokens that are borrowed
-        account.updateToken(
-            params.token0,
-            -toInt256(
-                getAmount0(
-                    scaleLiquidityUp(params.amountDesiredDebt - liquidityToken1, params.scalingFactor),
-                    getRatioAtStrike(params.strike),
-                    false
-                )
-            )
-        );
-        account.updateToken(
-            params.token1, -toInt256(getAmount1(scaleLiquidityUp(liquidityToken1, params.scalingFactor)))
-        );
+    //     // calculate the the tokens that are borrowed
+    //     account.updateToken(
+    //         params.token0,
+    //         -toInt256(
+    //             getAmount0(
+    //                 scaleLiquidityUp(params.amountDesiredDebt - liquidityToken1, params.scalingFactor),
+    //                 getRatioAtStrike(params.strike),
+    //                 false
+    //             )
+    //         )
+    //     );
+    //     account.updateToken(
+    //         params.token1, -toInt256(getAmount1(scaleLiquidityUp(liquidityToken1, params.scalingFactor)))
+    //     );
 
-        // add collateral to account
-        uint256 liquidityCollateral;
-        if (params.selectorCollateral == TokenSelector.Token0) {
-            account.updateToken(params.token0, toInt256(params.amountDesiredCollateral));
-            liquidityCollateral =
-                getLiquidityForAmount0(params.amountDesiredCollateral, getRatioAtStrike(params.strike));
-        } else if (params.selectorCollateral == TokenSelector.Token1) {
-            account.updateToken(params.token1, toInt256(params.amountDesiredCollateral));
-            liquidityCollateral = getLiquidityForAmount1(params.amountDesiredCollateral);
-        } else {
-            revert InvalidSelector();
-        }
+    //     // add collateral to account
+    //     uint128 liquidityCollateral;
+    //     if (params.selectorCollateral == TokenSelector.Token0) {
+    //         account.updateToken(params.token0, toInt256(params.amountDesiredCollateral));
+    //         liquidityCollateral = scaleLiquidityDown(
+    //             getLiquidityForAmount0(params.amountDesiredCollateral, getRatioAtStrike(params.strike)),
+    //             params.scalingFactor
+    //         );
+    //     } else if (params.selectorCollateral == TokenSelector.Token1) {
+    //         account.updateToken(params.token1, toInt256(params.amountDesiredCollateral));
+    //         liquidityCollateral =
+    //             scaleLiquidityDown(getLiquidityForAmount1(params.amountDesiredCollateral), params.scalingFactor);
+    //     } else {
+    //         revert InvalidSelector();
+    //     }
 
-        if (params.amountDesiredDebt > liquidityCollateral) revert InsufficientInput();
+    //     if (params.amountDesiredDebt > liquidityCollateral) revert InsufficientInput();
 
-        uint128 balance =
-            debtLiquidityToBalance(params.amountDesiredDebt, pair.strikes[params.strike].liquidityGrowthX128);
-        uint256 leverageRatioX128 = mulDiv(liquidityCollateral, Q128, balance);
+    //     uint128 balance =
+    //         debtLiquidityToBalance(params.amountDesiredDebt, pair.strikes[params.strike].liquidityGrowthExpX128);
 
-        // mint position to user
-        _mintDebt(
-            to,
-            params.token0,
-            params.token1,
-            params.scalingFactor,
-            params.strike,
-            params.selectorCollateral,
-            balance,
-            leverageRatioX128
-        );
+    //     // mint position to user
+    //     _mintDebt(
+    //         to,
+    //         params.token0,
+    //         params.token1,
+    //         params.scalingFactor,
+    //         params.strike,
+    //         params.selectorCollateral,
+    //         balance,
+    //         uint120(liquidityCollateral - params.amountDesiredDebt) // can be unchecked
+    //     );
 
-        emit BorrowLiquidity(pairID);
-    }
+    //     emit BorrowLiquidity(pairID);
+    // }
 
-    function _repayLiquidity(RepayLiquidityParams memory params, Accounts.Account memory account) private {
-        (bytes32 pairID, Pairs.Pair storage pair) =
-            pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
-        pair.accrue(params.strike);
+    // function _repayLiquidity(RepayLiquidityParams memory params, Accounts.Account memory account) private {
+    //     (bytes32 pairID, Pairs.Pair storage pair) =
+    //         pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
+    //     pair.accrue(params.strike);
 
-        uint128 liquidityDebt =
-            debtBalanceToLiquidity(params.amountDesiredDebt, pair.strikes[params.strike].liquidityGrowthX128);
+    //     uint128 liquidityDebt =
+    //         debtBalanceToLiquidity(params.amountDesiredDebt, pair.strikes[params.strike].liquidityGrowthExpX128);
 
-        pair.repayLiquidity(params.strike, liquidityDebt);
+    //     pair.repayLiquidity(params.strike, liquidityDebt);
 
-        // calculate tokens owed and add to account
-        (uint256 amount0, uint256 amount1) = getAmounts(
-            pair,
-            scaleLiquidityUp(params.amountDesiredDebt, params.scalingFactor),
-            params.strike,
-            pair.strikes[params.strike].activeSpread + 1,
-            true
-        );
-        account.updateToken(params.token0, toInt256(amount0));
-        account.updateToken(params.token1, toInt256(amount1));
+    //     // calculate tokens owed and add to account
+    //     (uint256 amount0, uint256 amount1) = getAmounts(
+    //         pair,
+    //         scaleLiquidityUp(params.amountDesiredDebt, params.scalingFactor),
+    //         params.strike,
+    //         pair.strikes[params.strike].activeSpread + 1,
+    //         true
+    //     );
+    //     account.updateToken(params.token0, toInt256(amount0));
+    //     account.updateToken(params.token1, toInt256(amount1));
 
-        // add unlocked collateral to account
-        uint256 liquidityCollateral = mulDiv(params.amountDesiredDebt, params.leverageRatioX128, Q128)
-            - 2 * (params.amountDesiredDebt - liquidityDebt);
-        if (params.selectorCollateral == TokenSelector.Token0) {
-            account.updateToken(
-                params.token0, -toInt256(getAmount0(liquidityCollateral, getRatioAtStrike(params.strike), false))
-            );
-        } else if (params.selectorCollateral == TokenSelector.Token1) {
-            account.updateToken(params.token0, -toInt256(getAmount1(liquidityCollateral)));
-        } else {
-            revert InvalidSelector();
-        }
+    //     // add unlocked collateral to account
+    //     uint256 liquidityCollateral = mulDiv(params.amountDesiredDebt, params.leverageRatioX128, Q128)
+    //         - 2 * (params.amountDesiredDebt - liquidityDebt);
+    //     if (params.selectorCollateral == TokenSelector.Token0) {
+    //         account.updateToken(
+    //             params.token0, -toInt256(getAmount0(liquidityCollateral, getRatioAtStrike(params.strike), false))
+    //         );
+    //     } else if (params.selectorCollateral == TokenSelector.Token1) {
+    //         account.updateToken(params.token0, -toInt256(getAmount1(liquidityCollateral)));
+    //     } else {
+    //         revert InvalidSelector();
+    //     }
 
-        // add burned position to account
+    //     // add burned position to account
 
-        bytes32 id =
-            _debtID(params.token0, params.token1, params.scalingFactor, params.strike, params.selectorCollateral);
-        account.updateILRTA(id, params.amountDesiredDebt, OrderType.Debt);
+    //     bytes32 id =
+    //         _debtID(params.token0, params.token1, params.scalingFactor, params.strike, params.selectorCollateral);
+    //     account.updateILRTA(id, params.amountDesiredDebt, OrderType.Debt);
 
-        emit RepayLiquidity(pairID);
-    }
+    //     emit RepayLiquidity(pairID);
+    // }
 
-    function _removeLiquidity(RemoveLiquidityParams memory params, Accounts.Account memory account) private {
-        (bytes32 pairID, Pairs.Pair storage pair) =
-            pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
-        pair.accrue(params.strike);
+    // function _removeLiquidity(RemoveLiquidityParams memory params, Accounts.Account memory account) private {
+    //     (bytes32 pairID, Pairs.Pair storage pair) =
+    //         pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
+    //     pair.accrue(params.strike);
 
-        // calculate how much to remove
-        int128 balance = -toInt128(params.amountDesired);
-        int128 liquidity =
-            -toInt128(balanceToLiquidity(pair, params.strike, params.spread, uint128(params.amountDesired)));
-        (uint256 _amount0, uint256 _amount1) = getAmounts(
-            pair, scaleLiquidityUp(uint128(-liquidity), params.scalingFactor), params.strike, params.spread, false
-        );
-        int256 amount0 = -int256(_amount0);
-        int256 amount1 = -int256(_amount1);
+    //     // calculate how much to remove
+    //     int128 balance = -toInt128(params.amountDesired);
+    //     int128 liquidity =
+    //         -toInt128(balanceToLiquidity(pair, params.strike, params.spread, uint128(params.amountDesired)));
+    //     (uint256 _amount0, uint256 _amount1) = getAmounts(
+    //         pair, scaleLiquidityUp(uint128(-liquidity), params.scalingFactor), params.strike, params.spread, false
+    //     );
+    //     int256 amount0 = -int256(_amount0);
+    //     int256 amount1 = -int256(_amount1);
 
-        // remove from pair
-        pair.updateStrike(params.strike, params.spread, balance, liquidity);
+    //     // remove from pair
+    //     pair.updateStrike(params.strike, params.spread, liquidity);
 
-        // update accounts
-        account.updateToken(params.token0, amount0);
-        account.updateToken(params.token1, amount1);
-        account.updateILRTA(
-            _biDirectionalID(params.token0, params.token1, params.scalingFactor, params.strike, params.spread),
-            uint128(-balance),
-            OrderType.BiDirectional
-        );
+    //     // update accounts
+    //     account.updateToken(params.token0, amount0);
+    //     account.updateToken(params.token1, amount1);
+    //     account.updateILRTA(
+    //         _biDirectionalID(params.token0, params.token1, params.scalingFactor, params.strike, params.spread),
+    //         uint128(-balance),
+    //         OrderType.BiDirectional
+    //     );
 
-        emit RemoveLiquidity(pairID, params.strike, params.spread, uint128(-balance));
-    }
+    //     emit RemoveLiquidity(pairID, params.strike, params.spread, uint128(-balance));
+    // }
 
     function _accrue(AccrueParams memory params) private {
         (bytes32 pairID, Pairs.Pair storage pair) =
@@ -542,38 +538,5 @@ contract Engine is Positions {
         (, Pairs.Pair storage pair) = pairs.getPairAndID(token0, token1, scalingFactor);
 
         return pair.strikes[strike];
-    }
-
-    function getPositionBiDirectional(
-        address owner,
-        address token0,
-        address token1,
-        uint8 scalingFactor,
-        int24 strike,
-        uint8 spread
-    )
-        external
-        view
-        returns (uint128 balance)
-    {
-        return _dataOf[owner][_biDirectionalID(token0, token1, scalingFactor, strike, spread)].balance;
-    }
-
-    function getPositionDebt(
-        address owner,
-        address token0,
-        address token1,
-        uint8 scalingFactor,
-        int24 strike,
-        Engine.TokenSelector selector
-    )
-        external
-        view
-        returns (uint128 balance, uint256 leverageRatioX128)
-    {
-        balance = _dataOf[owner][_debtID(token0, token1, scalingFactor, strike, selector)].balance;
-        Positions.DebtData memory debtData = _dataOfDebt(owner, token0, token1, scalingFactor, strike, selector);
-
-        return (balance, debtData.leverageRatioX128);
     }
 }

@@ -17,6 +17,8 @@ contract SwapMathFuzzTest is Test {
     )
         external
     {
+        vm.pauseGasMetering();
+
         // exact in
         vm.assume(amountDesired <= uint256(type(int256).max));
         vm.assume(amountDesired > 0);
@@ -26,12 +28,18 @@ contract SwapMathFuzzTest is Test {
 
         // amount out can fit in uint256
         vm.assume(!mulDivOverflow(amountDesired, ratioX128, Q128));
+
+        vm.resumeGasMetering();
         (uint256 amountIn, uint256 amountOut,) = computeSwapStep(ratioX128, liquidity, true, int256(amountDesired));
+        vm.pauseGasMetering();
+
         vm.assume(amountIn > 0);
 
         uint256 price = mulDivRoundingUp(amountOut, Q128, amountIn);
 
         assertLe(price, ratioX128);
+
+        vm.resumeGasMetering();
     }
 
     /// @notice token 1 exact out always has a price <= ratio, 0 => 1
@@ -42,6 +50,8 @@ contract SwapMathFuzzTest is Test {
     )
         external
     {
+        vm.pauseGasMetering();
+
         // exact in
         vm.assume(amountDesired <= uint256(type(int256).max));
         vm.assume(amountDesired > 0);
@@ -51,13 +61,18 @@ contract SwapMathFuzzTest is Test {
         // amount out can fit in uint256
         vm.assume(!mulDivOverflow(amountDesired, Q128, ratioX128));
 
+        vm.resumeGasMetering();
         (uint256 amountIn, uint256 amountOut,) = computeSwapStep(ratioX128, liquidity, false, -int256(amountDesired));
+        vm.pauseGasMetering();
+
         vm.assume(amountIn > 0);
         vm.assume(!mulDivOverflow(amountOut, Q128, amountIn));
 
         uint256 price = mulDivRoundingUp(amountOut, Q128, amountIn);
 
         assertLe(price, ratioX128);
+
+        vm.resumeGasMetering();
     }
 
     /// @notice token 0 exact out always has a price >= ratio, 1 => 0
@@ -68,6 +83,8 @@ contract SwapMathFuzzTest is Test {
     )
         external
     {
+        vm.pauseGasMetering();
+
         // exact in
         vm.assume(amountDesired <= uint256(type(int256).max));
         vm.assume(amountDesired > 0);
@@ -78,13 +95,18 @@ contract SwapMathFuzzTest is Test {
         // amount in can fit in uint256
         vm.assume(!mulDivRoundingUpOverflow(amountDesired, ratioX128, Q128));
 
+        vm.resumeGasMetering();
         (uint256 amountIn, uint256 amountOut,) = computeSwapStep(ratioX128, liquidity, true, -int256(amountDesired));
+        vm.pauseGasMetering();
+
         vm.assume(amountOut > 0);
         vm.assume(!mulDivOverflow(amountIn, Q128, amountOut));
 
         uint256 price = mulDiv(amountIn, Q128, amountOut);
 
         assertGe(price, ratioX128);
+
+        vm.resumeGasMetering();
     }
 
     /// @notice token 1 exact in always has a price >= ratio
@@ -95,6 +117,8 @@ contract SwapMathFuzzTest is Test {
     )
         external
     {
+        vm.pauseGasMetering();
+
         // exact in
         vm.assume(amountDesired <= uint256(type(int256).max));
         vm.assume(amountDesired > 0);
@@ -104,12 +128,17 @@ contract SwapMathFuzzTest is Test {
         // amount out can fit in uint256
         vm.assume(!mulDivOverflow(amountDesired, Q128, ratioX128));
 
+        vm.resumeGasMetering();
         (uint256 amountIn, uint256 amountOut,) = computeSwapStep(ratioX128, liquidity, false, int256(amountDesired));
+        vm.pauseGasMetering();
+
         vm.assume(amountOut > 0);
         vm.assume(!mulDivOverflow(amountIn, Q128, amountOut));
 
         uint256 price = mulDiv(amountIn, Q128, amountOut);
 
         assertGe(price, ratioX128);
+
+        vm.resumeGasMetering();
     }
 }
