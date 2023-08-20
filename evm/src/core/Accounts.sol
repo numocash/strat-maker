@@ -4,73 +4,110 @@ pragma solidity ^0.8.19;
 import {Engine} from "./Engine.sol";
 import {BalanceLib} from "src/libraries/BalanceLib.sol";
 
+/// @title Accounts
+/// @notice Library for storing and updating intermediate balance changes in memory
 library Accounts {
     error InvalidAccountLength();
 
+    /// @notice Data for balance change of an erc20;
+    /// @param token The address of the erc20;
+    /// @param balanceBefore This contracts balance of the token before settlement
+    /// @param balanceDelta The change in balance for the contract
+    /// @custom:team Possibly change to balanceAfter instead of balanceDelta
+    struct ERC20Data {
+        address token;
+        uint256 balanceBefore;
+        int256 balanceDelta;
+    }
+
+    /// @notice Data for burned liquidity positions
+    /// @param id Liquidity position id
+    /// @param amountBurned Balance to be burned
+    /// @param orderType What type of position does this represent
+    struct LPData {
+        bytes32 id;
+        uint128 amountBurned;
+        Engine.OrderType orderType;
+    }
+
+    /// @notice Data stored that makes up an account
+    /// @param erc20Data Data for erc20 token that are being exchanged
+    /// @param lpData Data for liquidity provider tokens that are being burned
     struct Account {
-        address[] tokens;
-        int256[] tokenDeltas;
-        uint256[] balances;
-        bytes32[] lpIDs;
-        uint128[] lpDeltas;
-        Engine.OrderType[] orderTypes;
+        ERC20Data[] erc20Data;
+        LPData[] lpData;
     }
 
-    function newAccount(uint256 numTokens, uint256 numLPs) internal pure returns (Account memory account) {
-        if (numTokens > 0) {
-            account.tokens = new address[](numTokens);
-            account.tokenDeltas = new int256[](numTokens);
-            account.balances = new uint256[](numTokens);
-        }
-
-        if (numLPs > 0) {
-            account.lpIDs = new bytes32[](numLPs);
-            account.lpDeltas = new uint128[](numLPs);
-            account.orderTypes = new Engine.OrderType[](numLPs);
-        }
+    /// @notice Create a new instance of an account with the specified sizes
+    function newAccount(uint256 numERC20, uint256 numLP) internal pure returns (Account memory account) {
+        if (numERC20 > 0) account.erc20Data = new ERC20Data[](numERC20);
+        if (numLP > 0) account.lpData = new LPData[](numLP);
     }
 
-    function updateToken(Account memory account, address token, int256 delta) internal view {
+    /// @notice Update a token's intermediate account balance, creating a new one if one doesn't already exist
+    function updateToken(Account memory account, address token, int256 delta) internal pure {
         if (delta == 0) return;
 
-        unchecked {
-            for (uint256 i = 0; i < account.tokens.length; i++) {
-                if (account.tokens[i] == token) {
-                    // change in balance cannot exceed the total supply
-                    account.tokenDeltas[i] = account.tokenDeltas[i] + delta;
-                    return;
-                } else if (account.tokens[i] == address(0)) {
-                    account.tokens[i] = token;
-                    account.tokenDeltas[i] = delta;
+        for (uint256 i = 0; i < account.erc20Data.length;) {
+            if (account.erc20Data[i].token == token) {
+                // might not need checked math
+                account.erc20Data[i].balanceDelta += delta;
+                return;
+            } else if (account.erc20Data[i].token == address(0)) {
+                account.erc20Data[i].token = token;
+                account.erc20Data[i].balanceDelta = delta;
+                return;
+            }
 
-                    if (delta > 0) account.balances[i] = BalanceLib.getBalance(token);
-                    return;
-                }
+            unchecked {
+                i++;
             }
         }
 
         revert InvalidAccountLength();
     }
 
-    /// @custom:team what if ids match but not data
-    function updateILRTA(Account memory account, bytes32 id, uint128 delta, Engine.OrderType orderType) internal pure {
-        if (delta == 0) return;
+    /// @notice Update a liquidity position's intermediate account balance, creating a new one if one doesn't already
+    /// exist
+    function updateLP(
+        Account memory account,
+        bytes32 id,
+        uint128 amountBurned,
+        Engine.OrderType orderType
+    )
+        internal
+        pure
+    {
+        if (amountBurned == 0) return;
 
-        unchecked {
-            for (uint256 i = 0; i < account.lpIDs.length; i++) {
-                if (account.lpIDs[i] == id) {
-                    // change in liquidity cannot exceed the maximum liquidity in a strike
-                    account.lpDeltas[i] = account.lpDeltas[i] + delta;
-                    return;
-                } else if (account.lpIDs[i] == bytes32(0)) {
-                    account.lpIDs[i] = id;
-                    account.lpDeltas[i] = delta;
-                    account.orderTypes[i] = orderType;
-                    return;
-                }
+        for (uint256 i = 0; i < account.lpData.length;) {
+            if (account.lpData[i].id == id) {
+                // might not need checked math
+                account.lpData[i].amountBurned += amountBurned;
+                return;
+            } else if (account.lpData[i].id == bytes32(0)) {
+                account.lpData[i].id = id;
+                account.lpData[i].amountBurned = amountBurned;
+                account.lpData[i].orderType = orderType;
+                return;
+            }
+
+            unchecked {
+                i++;
             }
         }
 
         revert InvalidAccountLength();
+    }
+
+    /// @notice Read and store the current contract balance of tokens being owed to the contract
+    function getBalances(Account memory account) internal view {
+        unchecked {
+            for (uint256 i = 0; i < account.erc20Data.length; i++) {
+                if (account.erc20Data[i].balanceDelta > 0) {
+                    account.erc20Data[i].balanceBefore = BalanceLib.getBalance(account.erc20Data[i].token);
+                }
+            }
+        }
     }
 }
