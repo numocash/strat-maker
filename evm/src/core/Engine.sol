@@ -234,13 +234,16 @@ contract Engine is Positions {
             }
         }
 
+        // record token balances
+        account.getBalances();
+
         // transfer tokens out
         for (uint256 i = 0; i < numTokens;) {
-            int256 delta = account.tokenDeltas[i];
-            address token = account.tokens[i];
+            int256 balanceDelta = account.erc20Data[i].balanceDelta;
+            address token = account.erc20Data[i].token;
 
             if (token == address(0)) break;
-            if (delta < 0) SafeTransferLib.safeTransfer(token, to, uint256(-delta));
+            if (balanceDelta < 0) SafeTransferLib.safeTransfer(token, to, uint256(-balanceDelta));
 
             unchecked {
                 i++;
@@ -249,22 +252,18 @@ contract Engine is Positions {
 
         // callback if necessary
         if (numTokens > 0 || numLPs > 0) {
-            IExecuteCallback(msg.sender).executeCallback(
-                IExecuteCallback.CallbackParams(
-                    account.tokens, account.tokenDeltas, account.lpIDs, account.lpDeltas, account.orderTypes, data
-                )
-            );
+            IExecuteCallback(msg.sender).executeCallback(IExecuteCallback.CallbackParams(account, data));
         }
 
         // check tokens in
         for (uint256 i = 0; i < numTokens;) {
-            int256 delta = account.tokenDeltas[i];
-            address token = account.tokens[i];
+            int256 balanceDelta = account.erc20Data[i].balanceDelta;
+            address token = account.erc20Data[i].token;
 
             if (token == address(0)) break;
-            if (delta > 0) {
+            if (balanceDelta > 0) {
                 uint256 balance = BalanceLib.getBalance(token);
-                if (balance < account.balances[i] + uint256(delta)) revert InsufficientInput();
+                if (balance < account.erc20Data[i].balanceBefore + uint256(balanceDelta)) revert InsufficientInput();
             }
 
             unchecked {
@@ -274,13 +273,11 @@ contract Engine is Positions {
 
         // check liquidity positions in
         for (uint256 i = 0; i < numLPs;) {
-            uint128 delta = account.lpDeltas[i];
-            bytes32 id = account.lpIDs[i];
+            uint128 amountBurned = account.lpData[i].amountBurned;
+            bytes32 id = account.lpData[i].id;
 
             if (id == bytes32(0)) break;
-            if (delta < 0) {
-                _burn(address(this), id, delta, account.orderTypes[i]);
-            }
+            _burn(address(this), id, amountBurned, account.lpData[i].orderType);
 
             unchecked {
                 i++;
@@ -302,13 +299,13 @@ contract Engine is Positions {
             (amount0, amount1) =
                 pair.swap(params.scalingFactor, params.selector == SwapTokenSelector.Token0, params.amountDesired);
         } else if (params.selector == SwapTokenSelector.Token0Account) {
-            assert(account.tokens[uint256(params.amountDesired)] == params.token0);
+            assert(account.erc20Data[uint256(params.amountDesired)].token == params.token0);
             (amount0, amount1) =
-                pair.swap(params.scalingFactor, true, -account.tokenDeltas[uint256(params.amountDesired)]);
+                pair.swap(params.scalingFactor, true, -account.erc20Data[uint256(params.amountDesired)].balanceDelta);
         } else if (params.selector == SwapTokenSelector.Token1Account) {
-            assert(account.tokens[uint256(params.amountDesired)] == params.token1);
+            assert(account.erc20Data[uint256(params.amountDesired)].token == params.token1);
             (amount0, amount1) =
-                pair.swap(params.scalingFactor, false, -account.tokenDeltas[uint256(params.amountDesired)]);
+                pair.swap(params.scalingFactor, false, -account.erc20Data[uint256(params.amountDesired)].balanceDelta);
         } else {
             revert InvalidSelector();
         }
@@ -449,7 +446,7 @@ contract Engine is Positions {
 
     //     bytes32 id =
     //         _debtID(params.token0, params.token1, params.scalingFactor, params.strike, params.selectorCollateral);
-    //     account.updateILRTA(id, params.amountDesiredDebt, OrderType.Debt);
+    //     account.updateLP(id, params.amountDesiredDebt, OrderType.Debt);
 
     //     emit RepayLiquidity(pairID);
     // }
@@ -475,7 +472,7 @@ contract Engine is Positions {
     //     // update accounts
     //     account.updateToken(params.token0, amount0);
     //     account.updateToken(params.token1, amount1);
-    //     account.updateILRTA(
+    //     account.updateLP(
     //         _biDirectionalID(params.token0, params.token1, params.scalingFactor, params.strike, params.spread),
     //         uint128(-balance),
     //         OrderType.BiDirectional
