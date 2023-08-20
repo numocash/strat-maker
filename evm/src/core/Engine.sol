@@ -252,7 +252,7 @@ contract Engine is Positions {
 
         // callback if necessary
         if (numTokens > 0 || numLPs > 0) {
-            IExecuteCallback(msg.sender).executeCallback(IExecuteCallback.CallbackParams(account, data));
+            IExecuteCallback(msg.sender).executeCallback(account, data);
         }
 
         // check tokens in

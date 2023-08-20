@@ -13,7 +13,6 @@ library Accounts {
     /// @param token The address of the erc20;
     /// @param balanceBefore This contracts balance of the token before settlement
     /// @param balanceDelta The change in balance for the contract
-    /// @custom:team Possibly change to balanceAfter instead of balanceDelta
     struct ERC20Data {
         address token;
         uint256 balanceBefore;

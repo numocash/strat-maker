@@ -3,12 +3,8 @@ pragma solidity ^0.8.19;
 
 import {Accounts} from "../Accounts.sol";
 
-/// @custom:team this should take advantage of ilrta transfer structures
+/// @notice Interface for callback that is called in the `execute` function
 interface IExecuteCallback {
-    struct CallbackParams {
-        Accounts.Account account;
-        bytes data;
-    }
-
-    function executeCallback(CallbackParams calldata params) external;
+    /// @param data Extra data passed back to the callback from the caller
+    function executeCallback(Accounts.Account calldata account, bytes calldata data) external;
 }
