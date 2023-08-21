@@ -8,7 +8,7 @@ import {Accounts} from "src/core/Accounts.sol";
 contract GetBalanceTest is Test {
     using Accounts for Accounts.Account;
 
-    function balanceOf(address owner) external returns (uint256) {
+    function balanceOf(address) external pure returns (uint256) {
         return 10 ** 18;
     }
 

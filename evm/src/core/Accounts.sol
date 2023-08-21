@@ -6,8 +6,17 @@ import {BalanceLib} from "src/libraries/BalanceLib.sol";
 
 /// @title Accounts
 /// @notice Library for storing and updating intermediate balance changes in memory
+/// @author Kyle Scott and Robert Leifke
 library Accounts {
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                                 ERRORS
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
+
     error InvalidAccountLength();
+
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                               DATA TYPES
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     /// @notice Data for balance change of an erc20;
     /// @param token The address of the erc20;
@@ -36,6 +45,10 @@ library Accounts {
         ERC20Data[] erc20Data;
         LPData[] lpData;
     }
+
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                                 LOGIC
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     /// @notice Create a new instance of an account with the specified sizes
     function newAccount(uint256 numERC20, uint256 numLP) internal pure returns (Account memory account) {

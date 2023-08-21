@@ -28,6 +28,8 @@ import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
 
 import {IExecuteCallback} from "./interfaces/IExecuteCallback.sol";
 
+/// @title Engine
+/// @notice
 /// @author Kyle Scott and Robert Leifke
 /// @custom:team return data and events
 /// @custom:team pass minted position information back to callback
@@ -514,7 +516,7 @@ contract Engine is Positions {
             uint128[NUM_SPREADS] memory composition,
             int24[NUM_SPREADS] memory strikeCurrentCached,
             int24 cachedStrikeCurrent,
-            uint8 initialized
+            bool initialized
         )
     {
         (, Pairs.Pair storage pair) = pairs.getPairAndID(token0, token1, scalingFactor);
