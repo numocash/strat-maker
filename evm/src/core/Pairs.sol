@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import {BitMaps} from "./BitMaps.sol";
-import {mulDiv, mulDivRoundingUp} from "./math/FullMath.sol";
+import {mulDiv} from "./math/FullMath.sol";
 import {
     getLiquidityForAmount0,
     getLiquidityForAmount1,
@@ -49,10 +49,12 @@ library Pairs {
     /// @param reference1To0 Number of spreads offering 1 to 0 swaps referencing this strike
     /// @param activeSpread The spread index where liquidity is actively being borrowed from
     /// @custom:team could we make reference a bitmap
+    /// @custom:team move liquidtybd and liquidityBorrowed to the same slot
+    /// @custom:team shrink blockLast
     struct Strike {
         uint256 liquidityGrowthX128;
         uint256 blockLast;
-        uint128[NUM_SPREADS] liquidityGrowthSpreadX128;
+        uint256[NUM_SPREADS] liquidityGrowthSpreadX128;
         uint128[NUM_SPREADS] liquidityBiDirectional;
         uint128[NUM_SPREADS] liquidityBorrowed;
         int24 next0To1;
@@ -413,7 +415,6 @@ library Pairs {
 
     /// @notice Add or remove liquidity from a specific strike
     /// @custom:team What if liquidity is added or removed below the active strike
-    /// @custom:team Does liquidity need to be accrued?
     function updateStrike(Pair storage pair, int24 strike, uint8 spread, int128 liquidity) internal {
         unchecked {
             if (!pair.initialized) revert Initialized();
@@ -450,7 +451,7 @@ library Pairs {
     function borrowLiquidity(
         Pair storage pair,
         int24 strike,
-        uint128 liquidity
+        uint136 liquidity
     )
         internal
         returns (uint128 liquidityToken0, uint128 liquidityToken1)
@@ -465,8 +466,8 @@ library Pairs {
                 uint128 availableLiquidity = strikeObj.liquidityBiDirectional[_activeSpread];
 
                 if (availableLiquidity >= liquidity) {
-                    strikeObj.liquidityBiDirectional[_activeSpread] = availableLiquidity - liquidity;
-                    strikeObj.liquidityBorrowed[_activeSpread] += liquidity;
+                    strikeObj.liquidityBiDirectional[_activeSpread] = availableLiquidity - uint128(liquidity);
+                    strikeObj.liquidityBorrowed[_activeSpread] += uint128(liquidity);
 
                     break;
                 }
@@ -496,7 +497,7 @@ library Pairs {
     }
 
     /// @notice Repay liquidity to a specific strike
-    function repayLiquidity(Pair storage pair, int24 strike, uint128 liquidity) internal {
+    function repayLiquidity(Pair storage pair, int24 strike, uint136 liquidity) internal {
         unchecked {
             if (!pair.initialized) revert Initialized();
 
@@ -507,8 +508,8 @@ library Pairs {
                 uint128 borrowedLiquidity = strikeObj.liquidityBorrowed[_activeSpread];
 
                 if (borrowedLiquidity >= liquidity) {
-                    strikeObj.liquidityBiDirectional[_activeSpread] += liquidity;
-                    strikeObj.liquidityBorrowed[_activeSpread] = borrowedLiquidity - liquidity;
+                    strikeObj.liquidityBiDirectional[_activeSpread] += uint128(liquidity);
+                    strikeObj.liquidityBorrowed[_activeSpread] = borrowedLiquidity - uint128(liquidity);
 
                     break;
                 }
@@ -538,34 +539,49 @@ library Pairs {
         }
     }
 
-    function accrue(Pair storage pair, int24 strike) internal {
-        uint256 _blockLast = pair.strikes[strike].blockLast;
-        uint256 blocks = block.number - _blockLast;
-        if (blocks == 0) return;
+    /// @notice Accrue liquidity for a strike and return the amount of liquidity that must be repaid
+    /// @custom:team How to handle initial block last value
+    /// @custom:team Do we need to update liquidityGrowthSpreadX128
+    function accrue(Pair storage pair, int24 strike) internal returns (uint136) {
+        unchecked {
+            if (!pair.initialized) revert Initialized();
 
-        uint128 liquidityRepaid;
-        uint128 liquidityBorrowedTotal;
+            uint256 _blockLast = pair.strikes[strike].blockLast;
+            uint256 blocks = block.number - _blockLast;
+            if (blocks == 0) return 0;
+            pair.strikes[strike].blockLast = block.number;
 
-        for (uint256 i = 0; i <= pair.strikes[strike].activeSpread; i++) {
-            uint128 liquidityBorrowed = pair.strikes[strike].liquidityBorrowed[i];
+            uint256 liquidityRepaid;
+            uint256 liquidityBorrowedTotal;
+            for (uint256 i = 0; i <= pair.strikes[strike].activeSpread; i++) {
+                uint128 liquidityBorrowed = pair.strikes[strike].liquidityBorrowed[i];
 
-            uint128 spreadGrowth = uint128(((i + 1) * blocks * liquidityBorrowed) / 10_000);
+                if (liquidityBorrowed > 0) {
+                    // can only overflow when (i + 1) * blocks > type(uint128).max
+                    uint256 fee = (i + 1) * blocks;
+                    uint256 liquidityRepaidSpread =
+                        fee >= 10_000 ? liquidityBorrowed : (fee * uint256(liquidityBorrowed)) / 10_000;
 
-            pair.strikes[strike].liquidityBiDirectional[i] += spreadGrowth; // think this is wrong
-            liquidityRepaid += spreadGrowth;
-            liquidityBorrowedTotal += liquidityBorrowed;
+                    liquidityRepaid += liquidityRepaidSpread;
+                    liquidityBorrowedTotal += liquidityBorrowed;
+                    pair.strikes[strike].liquidityBiDirectional[i] += uint128(liquidityRepaidSpread);
+                }
+            }
+
+            if (liquidityRepaid == 0) return 0;
+
+            uint256 _liquidityGrowthX128 = pair.strikes[strike].liquidityGrowthX128;
+            if (_liquidityGrowthX128 == 0) {
+                pair.strikes[strike].liquidityGrowthX128 = Q128 + mulDiv(liquidityRepaid, Q128, liquidityBorrowedTotal);
+            } else {
+                // realistically cannot overflow
+                pair.strikes[strike].liquidityGrowthX128 =
+                    _liquidityGrowthX128 + mulDiv(liquidityRepaid, Q128, liquidityBorrowedTotal);
+            }
+
+            // liquidityRepaid max value is NUM_SPREADS * type(uint128).max
+            return uint136(liquidityRepaid);
         }
-
-        if (liquidityRepaid == 0) return;
-
-        // pair.strikes[strike].liquidityGrowthExpX128 = mulDivRoundingUp(
-        //     pair.strikes[strike].liquidityGrowthExpX128 + Q128,
-        //     liquidityBorrowedTotal,
-        //     liquidityBorrowedTotal - liquidityRepaid
-        // ) - Q128; // think this is wrong
-
-        repayLiquidity(pair, strike, liquidityRepaid);
-        pair.strikes[strike].blockLast = block.number;
     }
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
