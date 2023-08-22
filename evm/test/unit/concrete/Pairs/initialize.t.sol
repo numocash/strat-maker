@@ -43,9 +43,6 @@ contract InitializeTest is Test {
         assertEq(pair.strikes[0].next0To1, MIN_STRIKE);
         assertEq(pair.strikes[0].next1To0, MAX_STRIKE);
 
-        assertEq(pair.strikes[0].reference0To1, 1);
-        assertEq(pair.strikes[0].reference1To0, 1);
-
         assertEq(pair.bitMap0To1.nextBelow(0), MIN_STRIKE);
         assertEq(pair.bitMap1To0.nextBelow(0), MIN_STRIKE);
 
@@ -68,9 +65,6 @@ contract InitializeTest is Test {
 
         assertEq(pair.strikes[1].next0To1, MIN_STRIKE);
         assertEq(pair.strikes[1].next1To0, MAX_STRIKE);
-
-        assertEq(pair.strikes[1].reference0To1, 1);
-        assertEq(pair.strikes[1].reference1To0, 1);
 
         assertEq(pair.bitMap0To1.nextBelow(-1), MIN_STRIKE);
         assertEq(pair.bitMap1To0.nextBelow(1), MIN_STRIKE);

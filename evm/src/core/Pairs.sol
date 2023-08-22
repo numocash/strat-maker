@@ -131,8 +131,6 @@ library Pairs {
         pair.strikes[MIN_STRIKE].next1To0 = strikeInitial;
         pair.strikes[strikeInitial].next0To1 = MIN_STRIKE;
         pair.strikes[strikeInitial].next1To0 = MAX_STRIKE;
-        pair.strikes[strikeInitial].reference0To1 = 1;
-        pair.strikes[strikeInitial].reference1To0 = 1;
     }
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
@@ -318,7 +316,7 @@ library Pairs {
 
                 // Remove strike from linked list and bit map if it has no liquidity
                 // Only happens when initialized or all liquidity is removed from current strike
-                if (state.liquidityTotal == 0) _removeStrike0To1(pair, strikePrev);
+                if (state.liquidityTotal == 0) _removeStrike0To1(pair, strikePrev, false);
 
                 unchecked {
                     for (uint256 i = 1; i <= NUM_SPREADS; i++) {
@@ -359,7 +357,7 @@ library Pairs {
 
                 // Remove strike from linked list and bit map if it has no liquidity
                 // Only happens when initialized or all liquidity is removed from current strike
-                if (state.liquidityTotal == 0) _removeStrike1To0(pair, strikePrev);
+                if (state.liquidityTotal == 0) _removeStrike1To0(pair, strikePrev, false);
 
                 unchecked {
                     for (uint256 i = 1; i <= NUM_SPREADS; i++) {
@@ -430,72 +428,68 @@ library Pairs {
                 int24 strike0To1 = strike - int8(spread);
                 int24 strike1To0 = strike + int8(spread);
 
-                _addStrike0To1(pair, strike0To1);
-                _addStrike1To0(pair, strike1To0);
+                int24 _strikeCurrentCached = pair.strikeCurrentCached;
+                _addStrike0To1(pair, strike0To1, _strikeCurrentCached == strike0To1);
+                _addStrike1To0(pair, strike1To0, _strikeCurrentCached == strike1To0);
             } else if (liquidity < 0 && existingLiquidity == uint128(-liquidity)) {
                 int24 strike0To1 = strike - int8(spread);
                 int24 strike1To0 = strike + int8(spread);
 
                 int24 _strikeCurrentCached = pair.strikeCurrentCached;
-                if (_strikeCurrentCached != strike0To1) _removeStrike0To1(pair, strike0To1);
-                if (_strikeCurrentCached != strike1To0) _removeStrike1To0(pair, strike1To0);
+                _removeStrike0To1(pair, strike0To1, _strikeCurrentCached == strike0To1);
+                _removeStrike1To0(pair, strike1To0, _strikeCurrentCached == strike1To0);
             }
         }
     }
 
+    /// @notice Borrow liquidity from a specific strike
+    /// @return liquidityToken0 The amount of liquidity removed in token 0
+    /// @return liquidityToken1 The amount of liquidity removed in token 1
+    /// @custom:team liquidityBorrowed + liquidityBiDirectional should be less than type(uint128).max
+    /// @custom:team Need to figure out the liqudity borrowed composition
+    /// @custom:team What does strikeCachedCurrentRepresent
+    /// @custom:team Should this lazily go to the next spread or not
     function borrowLiquidity(
         Pair storage pair,
         int24 strike,
         uint128 liquidity
     )
         internal
-        returns (uint128 liquidityToken1)
+        returns (uint128 liquidityToken0, uint128 liquidityToken1)
     {
-        if (!pair.initialized) revert Initialized();
+        unchecked {
+            if (!pair.initialized) revert Initialized();
 
-        Strike storage strikeObj = pair.strikes[strike];
-        uint8 _activeSpread = strikeObj.activeSpread;
+            Strike storage strikeObj = pair.strikes[strike];
+            uint8 _activeSpread = strikeObj.activeSpread;
 
-        while (true) {
-            uint128 availableLiquidity = strikeObj.liquidityBiDirectional[_activeSpread];
+            while (true) {
+                uint128 availableLiquidity = strikeObj.liquidityBiDirectional[_activeSpread];
 
-            // remove liquidity from pair
-            if (availableLiquidity >= liquidity) {
-                strikeObj.liquidityBiDirectional[_activeSpread] = availableLiquidity - liquidity;
-                strikeObj.liquidityBorrowed[_activeSpread] += liquidity;
+                // remove liquidity from pair
+                if (availableLiquidity >= liquidity) {
+                    strikeObj.liquidityBiDirectional[_activeSpread] = availableLiquidity - liquidity;
+                    strikeObj.liquidityBorrowed[_activeSpread] += liquidity;
 
-                // determine what token the liquidity was borrowed
-                if (pair.strikeCurrent[_activeSpread] > strike) {
-                    liquidityToken1 += liquidity;
-                } else if (pair.strikeCurrent[_activeSpread] == strike) {
-                    liquidityToken1 += uint128((liquidity * pair.composition[_activeSpread]) / Q128);
+                    break;
+                } else if (availableLiquidity > 0) {
+                    int24 strike0To1 = strike - int8(_activeSpread + 1);
+                    int24 strike1To0 = strike + int8(_activeSpread + 1);
+
+                    int24 _strikeCurrentCached = pair.strikeCurrentCached;
+                    _removeStrike0To1(pair, strike0To1, _strikeCurrentCached == strike0To1);
+                    _removeStrike1To0(pair, strike1To0, _strikeCurrentCached == strike1To0);
+
+                    strikeObj.liquidityBiDirectional[_activeSpread] = 0;
+                    strikeObj.liquidityBorrowed[_activeSpread] += availableLiquidity;
+                    liquidity -= availableLiquidity;
                 }
-
-                break;
-            } else {
-                int24 strike0To1 = strike - int8(_activeSpread);
-                int24 strike1To0 = strike + int8(_activeSpread);
-
-                int24 _strikeCurrentCached = pair.strikeCurrentCached;
-                if (_strikeCurrentCached != strike0To1) _removeStrike0To1(pair, strike0To1);
-                if (_strikeCurrentCached != strike1To0) _removeStrike1To0(pair, strike1To0);
-
-                strikeObj.liquidityBiDirectional[_activeSpread] = 0;
-                strikeObj.liquidityBorrowed[_activeSpread] += availableLiquidity;
-                liquidity -= availableLiquidity;
-
-                // determine what token the liquidity was borrowed
-                if (pair.strikeCurrent[_activeSpread] < strike) {
-                    liquidityToken1 += availableLiquidity;
-                } else if (pair.strikeCurrent[_activeSpread] == strike) {
-                    liquidityToken1 += uint128((availableLiquidity * pair.composition[_activeSpread]) / Q128);
-                }
-
                 _activeSpread++;
+                if (_activeSpread >= NUM_SPREADS) revert OutOfBounds();
             }
-        }
 
-        strikeObj.activeSpread = _activeSpread;
+            strikeObj.activeSpread = _activeSpread;
+        }
     }
 
     function repayLiquidity(Pair storage pair, int24 strike, uint128 liquidity) internal {
@@ -516,8 +510,8 @@ library Pairs {
                 liquidity -= borrowedLiquidity;
                 _activeSpread--;
 
-                _addStrike0To1(pair, strike - int8(_activeSpread + 1));
-                _addStrike1To0(pair, strike + int8(_activeSpread + 1));
+                _addStrike0To1(pair, strike - int8(_activeSpread + 1), true);
+                _addStrike1To0(pair, strike + int8(_activeSpread + 1), true);
             }
         }
 
@@ -570,13 +564,13 @@ library Pairs {
         if (spread == 0 || spread > NUM_SPREADS) revert InvalidSpread();
     }
 
-    function _addStrike0To1(Pair storage pair, int24 strike) private {
+    function _addStrike0To1(Pair storage pair, int24 strike, bool preserve) private {
         uint8 reference0To1 = pair.strikes[strike].reference0To1;
         unchecked {
             pair.strikes[strike].reference0To1 = reference0To1 + 1;
         }
 
-        if (reference0To1 == 0) {
+        if (!preserve && reference0To1 == 0) {
             int24 below = -pair.bitMap0To1.nextBelow(-strike);
             int24 above = pair.strikes[below].next0To1;
 
@@ -586,13 +580,13 @@ library Pairs {
         }
     }
 
-    function _addStrike1To0(Pair storage pair, int24 strike) private {
+    function _addStrike1To0(Pair storage pair, int24 strike, bool preserve) private {
         uint8 reference1To0 = pair.strikes[strike].reference1To0;
         unchecked {
             pair.strikes[strike].reference1To0 = reference1To0 + 1;
         }
 
-        if (reference1To0 == 0) {
+        if (!preserve && reference1To0 == 0) {
             int24 below = pair.bitMap1To0.nextBelow(strike);
             int24 above = pair.strikes[below].next1To0;
 
@@ -602,11 +596,13 @@ library Pairs {
         }
     }
 
-    function _removeStrike0To1(Pair storage pair, int24 strike) private {
+    function _removeStrike0To1(Pair storage pair, int24 strike, bool preserve) private {
         uint8 reference0To1 = pair.strikes[strike].reference0To1;
-        pair.strikes[strike].reference0To1 = reference0To1 - 1;
+        unchecked {
+            pair.strikes[strike].reference0To1 = reference0To1 - 1;
+        }
 
-        if (reference0To1 == 1) {
+        if (!preserve && reference0To1 == 1) {
             int24 below = -pair.bitMap0To1.nextBelow(-strike);
             int24 above = pair.strikes[strike].next0To1;
 
@@ -617,11 +613,13 @@ library Pairs {
         }
     }
 
-    function _removeStrike1To0(Pair storage pair, int24 strike) private {
+    function _removeStrike1To0(Pair storage pair, int24 strike, bool preserve) private {
         uint8 reference1To0 = pair.strikes[strike].reference1To0;
-        pair.strikes[strike].reference1To0 = reference1To0 - 1;
+        unchecked {
+            pair.strikes[strike].reference1To0 = reference1To0 - 1;
+        }
 
-        if (reference1To0 == 1) {
+        if (!preserve && reference1To0 == 1) {
             int24 below = pair.bitMap1To0.nextBelow(strike);
             int24 above = pair.strikes[strike].next1To0;
 
