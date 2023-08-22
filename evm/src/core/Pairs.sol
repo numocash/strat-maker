@@ -20,7 +20,7 @@ int8 constant MAX_CONSECUTIVE = int8(NUM_SPREADS);
 /// @notice Library for managing a concentrated liquidity, constant sum automated market maker with impliciting
 /// borrowing
 /// @author Robert Leifke and Kyle Scott
-/// @custom:team change what strikeCurrentCached represents to better handle flip flop trades
+/// @custom:team strikeCachedCurrent should represent the center strike
 library Pairs {
     using BitMaps for BitMaps.BitMap;
 
@@ -29,34 +29,37 @@ library Pairs {
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     error Initialized();
-    error InvalidStrike();
     error InvalidSpread();
+    error InvalidStrike();
     error OutOfBounds();
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                DATA TYPES
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
+    /// @notice Data for liquidity
+    /// @param swap Liquidity that is available to be swapped
+    /// @param borrowed Liquidity that is actively borrowed
+    struct Liquidity {
+        uint128 swap;
+        uint128 borrowed;
+    }
+
     /// @notice Data needed to represent a strike (constant sum automated market market with a fixed price)
     /// @param liquidityGrowthX128 Liquidity repaid per unit of liquidty
-    /// @param blockLast The block where liquidity was accrued last
     /// @param liquidityGrowthSpreadX128 Liquidity repaid per unit of liquidty per spread
-    /// @param liquidityBiDirectional Liquidity available to be swapper per spread
-    /// @param liquidityBorrowed Liquidity borrowed per spread
+    /// @param liquidity Liquidity available
+    /// @param blockLast The block where liquidity was accrued last
     /// @param next0To1 Strike where the next 0 to 1 swap is available, < this strike
     /// @param next1To0 Strike where the next 1 to 0 swap is available, > this strike
     /// @param reference0To1 Number of spreads offering 0 to 1 swaps referencing this strike
     /// @param reference1To0 Number of spreads offering 1 to 0 swaps referencing this strike
     /// @param activeSpread The spread index where liquidity is actively being borrowed from
-    /// @custom:team could we make reference a bitmap
-    /// @custom:team move liquidtybd and liquidityBorrowed to the same slot
-    /// @custom:team shrink blockLast
     struct Strike {
         uint256 liquidityGrowthX128;
-        uint256 blockLast;
         uint256[NUM_SPREADS] liquidityGrowthSpreadX128;
-        uint128[NUM_SPREADS] liquidityBiDirectional;
-        uint128[NUM_SPREADS] liquidityBorrowed;
+        Liquidity[NUM_SPREADS] liquidity;
+        uint184 blockLast;
         int24 next0To1;
         int24 next1To0;
         uint8 reference0To1;
@@ -183,7 +186,7 @@ library Pairs {
                 int24 spreadStrikeCurrent = state.strikeCurrent[i - 1];
 
                 if (activeStrike == spreadStrikeCurrent) {
-                    uint256 liquidityTotal = pair.strikes[activeStrike].liquidityBiDirectional[i - 1];
+                    uint256 liquidityTotal = pair.strikes[activeStrike].liquidity[i - 1].swap;
                     uint256 liquiditySwap = mulDiv(
                         isSwap0To1 ? pair.composition[i - 1] : type(uint128).max - pair.composition[i - 1],
                         liquidityTotal,
@@ -236,7 +239,7 @@ library Pairs {
                                             ),
                                             ratioX128
                                         );
-                                        pair.strikes[activeStrike].liquidityBiDirectional[i - 1] +=
+                                        pair.strikes[activeStrike].liquidity[i - 1].swap +=
                                             scaleLiquidityDown(liquidityNew, scalingFactor);
                                         state.liquidityTotal += liquidityNew;
                                     } else {
@@ -257,7 +260,7 @@ library Pairs {
                                                 state.liquiditySwap * 10_000
                                             )
                                         );
-                                        pair.strikes[activeStrike].liquidityBiDirectional[i - 1] +=
+                                        pair.strikes[activeStrike].liquidity[i - 1].swap +=
                                             scaleLiquidityDown(liquidityNew, scalingFactor);
                                         state.liquidityTotal += liquidityNew;
                                     } else {
@@ -327,7 +330,7 @@ library Pairs {
                         if (state.strikeCurrent[i - 1] > activeStrike) {
                             state.strikeCurrent[i - 1] = activeStrike;
 
-                            uint256 liquidity = pair.strikes[activeStrike].liquidityBiDirectional[i - 1];
+                            uint256 liquidity = pair.strikes[activeStrike].liquidity[i - 1].swap;
 
                             state.liquidityTotal += liquidity;
                             state.liquiditySwap += liquidity;
@@ -335,7 +338,7 @@ library Pairs {
                             state.liquiditySwapSpread[i - 1] = liquidity;
                             // TODO: can liquiditySpread ever have dirty bits
                         } else if (state.strikeCurrent[i - 1] == activeStrike) {
-                            uint256 liquidity = pair.strikes[activeStrike].liquidityBiDirectional[i - 1];
+                            uint256 liquidity = pair.strikes[activeStrike].liquidity[i - 1].swap;
                             uint128 composition = pair.composition[i - 1];
                             uint256 liquiditySwap = mulDiv(liquidity, composition, Q128);
 
@@ -369,14 +372,14 @@ library Pairs {
                         if (state.strikeCurrent[i - 1] < activeStrike) {
                             state.strikeCurrent[i - 1] = activeStrike;
 
-                            uint256 liquidity = pair.strikes[activeStrike].liquidityBiDirectional[i - 1];
+                            uint256 liquidity = pair.strikes[activeStrike].liquidity[i - 1].swap;
 
                             state.liquidityTotal += liquidity;
                             state.liquiditySwap += liquidity;
                             state.liquidityTotalSpread[i - 1] = liquidity;
                             state.liquiditySwapSpread[i - 1] = liquidity;
                         } else if (state.strikeCurrent[i - 1] == activeStrike) {
-                            uint256 liquidity = pair.strikes[activeStrike].liquidityBiDirectional[i - 1];
+                            uint256 liquidity = pair.strikes[activeStrike].liquidity[i - 1].swap;
                             uint128 composition = type(uint128).max - pair.composition[i - 1];
                             uint256 liquiditySwap = mulDiv(liquidity, composition, Q128);
 
@@ -426,8 +429,8 @@ library Pairs {
             _checkStrike(strike0To1);
             _checkStrike(strike1To0);
 
-            uint128 existingLiquidity = pair.strikes[strike].liquidityBiDirectional[spread - 1];
-            pair.strikes[strike].liquidityBiDirectional[spread - 1] = addDelta(existingLiquidity, liquidity);
+            uint128 existingLiquidity = pair.strikes[strike].liquidity[spread - 1].swap;
+            pair.strikes[strike].liquidity[spread - 1].swap = addDelta(existingLiquidity, liquidity);
 
             if (existingLiquidity == 0 && liquidity > 0) {
                 int24 _strikeCurrentCached = pair.strikeCurrentCached;
@@ -444,7 +447,7 @@ library Pairs {
     /// @notice Borrow liquidity from a specific strike
     /// @return liquidityToken0 The amount of liquidity removed in token 0
     /// @return liquidityToken1 The amount of liquidity removed in token 1
-    /// @custom:team liquidityBorrowed + liquidityBiDirectional should be less than type(uint128).max
+    /// @custom:team liquidity.swap + liquidity.borrowed should be less than type(uint128).max
     /// @custom:team Need to figure out the liqudity borrowed composition
     /// @custom:team What does strikeCachedCurrent represent
     /// @custom:team Should this lazily go to the next spread or not
@@ -463,19 +466,19 @@ library Pairs {
             uint8 _activeSpread = strikeObj.activeSpread;
 
             while (true) {
-                uint128 availableLiquidity = strikeObj.liquidityBiDirectional[_activeSpread];
+                uint128 availableLiquidity = strikeObj.liquidity[_activeSpread].swap;
 
                 if (availableLiquidity >= liquidity) {
-                    strikeObj.liquidityBiDirectional[_activeSpread] = availableLiquidity - uint128(liquidity);
-                    strikeObj.liquidityBorrowed[_activeSpread] += uint128(liquidity);
+                    strikeObj.liquidity[_activeSpread].swap = availableLiquidity - uint128(liquidity);
+                    strikeObj.liquidity[_activeSpread].borrowed += uint128(liquidity);
 
                     break;
                 }
 
                 if (availableLiquidity > 0) {
                     // update current spread
-                    strikeObj.liquidityBiDirectional[_activeSpread] = 0;
-                    strikeObj.liquidityBorrowed[_activeSpread] += availableLiquidity;
+                    strikeObj.liquidity[_activeSpread].swap = 0;
+                    strikeObj.liquidity[_activeSpread].borrowed += availableLiquidity;
                     liquidity -= availableLiquidity;
 
                     // remove spread from strike order
@@ -505,19 +508,19 @@ library Pairs {
             uint8 _activeSpread = strikeObj.activeSpread;
 
             while (true) {
-                uint128 borrowedLiquidity = strikeObj.liquidityBorrowed[_activeSpread];
+                uint128 borrowedLiquidity = strikeObj.liquidity[_activeSpread].borrowed;
 
                 if (borrowedLiquidity >= liquidity) {
-                    strikeObj.liquidityBiDirectional[_activeSpread] += uint128(liquidity);
-                    strikeObj.liquidityBorrowed[_activeSpread] = borrowedLiquidity - uint128(liquidity);
+                    strikeObj.liquidity[_activeSpread].swap += uint128(liquidity);
+                    strikeObj.liquidity[_activeSpread].borrowed = borrowedLiquidity - uint128(liquidity);
 
                     break;
                 }
 
                 if (borrowedLiquidity > 0) {
                     // update current spread
-                    strikeObj.liquidityBiDirectional[_activeSpread] += borrowedLiquidity;
-                    strikeObj.liquidityBorrowed[_activeSpread] = 0;
+                    strikeObj.liquidity[_activeSpread].swap += borrowedLiquidity;
+                    strikeObj.liquidity[_activeSpread].borrowed = 0;
                     liquidity -= borrowedLiquidity;
 
                     // add next spread into strike order
@@ -549,12 +552,12 @@ library Pairs {
             uint256 _blockLast = pair.strikes[strike].blockLast;
             uint256 blocks = block.number - _blockLast;
             if (blocks == 0) return 0;
-            pair.strikes[strike].blockLast = block.number;
+            pair.strikes[strike].blockLast = uint184(block.number);
 
             uint256 liquidityRepaid;
             uint256 liquidityBorrowedTotal;
             for (uint256 i = 0; i <= pair.strikes[strike].activeSpread; i++) {
-                uint128 liquidityBorrowed = pair.strikes[strike].liquidityBorrowed[i];
+                uint128 liquidityBorrowed = pair.strikes[strike].liquidity[i].borrowed;
 
                 if (liquidityBorrowed > 0) {
                     // can only overflow when (i + 1) * blocks > type(uint128).max
@@ -564,7 +567,7 @@ library Pairs {
 
                     liquidityRepaid += liquidityRepaidSpread;
                     liquidityBorrowedTotal += liquidityBorrowed;
-                    pair.strikes[strike].liquidityBiDirectional[i] += uint128(liquidityRepaidSpread);
+                    pair.strikes[strike].liquidity[i].swap += uint128(liquidityRepaidSpread);
                 }
             }
 

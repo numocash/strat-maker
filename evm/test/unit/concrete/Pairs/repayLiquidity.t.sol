@@ -33,8 +33,8 @@ contract BorrowLiquidityTest is Test {
 
         vm.pauseGasMetering();
 
-        assertEq(pair.strikes[2].liquidityBiDirectional[0], 0.5e18);
-        assertEq(pair.strikes[2].liquidityBorrowed[0], 0.5e18);
+        assertEq(pair.strikes[2].liquidity[0].swap, 0.5e18);
+        assertEq(pair.strikes[2].liquidity[0].borrowed, 0.5e18);
         assertEq(pair.strikes[2].activeSpread, 0);
 
         vm.resumeGasMetering();
@@ -54,8 +54,8 @@ contract BorrowLiquidityTest is Test {
 
         vm.pauseGasMetering();
 
-        assertEq(pair.strikes[2].liquidityBiDirectional[0], 1e18);
-        assertEq(pair.strikes[2].liquidityBorrowed[0], 0);
+        assertEq(pair.strikes[2].liquidity[0].swap, 1e18);
+        assertEq(pair.strikes[2].liquidity[0].borrowed, 0);
         assertEq(pair.strikes[2].activeSpread, 0);
 
         vm.resumeGasMetering();
@@ -79,11 +79,11 @@ contract BorrowLiquidityTest is Test {
 
         vm.pauseGasMetering();
 
-        assertEq(pair.strikes[3].liquidityBiDirectional[0], 1e18);
-        assertEq(pair.strikes[3].liquidityBorrowed[0], 0);
+        assertEq(pair.strikes[3].liquidity[0].swap, 1e18);
+        assertEq(pair.strikes[3].liquidity[0].borrowed, 0);
 
-        assertEq(pair.strikes[3].liquidityBiDirectional[1], 1e18);
-        assertEq(pair.strikes[3].liquidityBorrowed[1], 0);
+        assertEq(pair.strikes[3].liquidity[1].swap, 1e18);
+        assertEq(pair.strikes[3].liquidity[1].borrowed, 0);
 
         assertEq(pair.strikes[3].activeSpread, 0);
 
@@ -130,8 +130,8 @@ contract BorrowLiquidityTest is Test {
 
         vm.pauseGasMetering();
 
-        assertEq(pair.strikes[3].liquidityBiDirectional[1], 1e18);
-        assertEq(pair.strikes[3].liquidityBorrowed[1], 0);
+        assertEq(pair.strikes[3].liquidity[1].swap, 1e18);
+        assertEq(pair.strikes[3].liquidity[1].borrowed, 0);
 
         assertEq(pair.strikes[3].activeSpread, 1);
 
@@ -174,11 +174,11 @@ contract BorrowLiquidityTest is Test {
 
         vm.pauseGasMetering();
 
-        assertEq(pair.strikes[1].liquidityBiDirectional[0], 1e18);
-        assertEq(pair.strikes[1].liquidityBorrowed[0], 0);
+        assertEq(pair.strikes[1].liquidity[0].swap, 1e18);
+        assertEq(pair.strikes[1].liquidity[0].borrowed, 0);
 
-        assertEq(pair.strikes[1].liquidityBiDirectional[1], 1e18);
-        assertEq(pair.strikes[1].liquidityBorrowed[1], 0);
+        assertEq(pair.strikes[1].liquidity[1].swap, 1e18);
+        assertEq(pair.strikes[1].liquidity[1].borrowed, 0);
 
         assertEq(pair.strikes[1].activeSpread, 0);
 

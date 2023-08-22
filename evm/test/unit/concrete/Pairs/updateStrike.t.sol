@@ -59,7 +59,7 @@ contract UpdateStrikeTest is Test {
 
         vm.pauseGasMetering();
 
-        assertEq(pair.strikes[2].liquidityBiDirectional[0], 1e18);
+        assertEq(pair.strikes[2].liquidity[0].swap, 1e18);
 
         // 0 to 1 strike order
         assertEq(pair.strikes[MAX_STRIKE].next0To1, 1);
@@ -98,8 +98,8 @@ contract UpdateStrikeTest is Test {
 
         vm.pauseGasMetering();
 
-        assertEq(pair.strikes[1].liquidityBiDirectional[1], 1e18);
-        assertEq(pair.strikes[2].liquidityBiDirectional[0], 1e18);
+        assertEq(pair.strikes[1].liquidity[1].swap, 1e18);
+        assertEq(pair.strikes[2].liquidity[0].swap, 1e18);
 
         // 0 to 1 strike order
         assertEq(pair.strikes[MAX_STRIKE].next0To1, 1);
@@ -142,7 +142,7 @@ contract UpdateStrikeTest is Test {
 
         vm.pauseGasMetering();
 
-        assertEq(pair.strikes[2].liquidityBiDirectional[0], 2e18);
+        assertEq(pair.strikes[2].liquidity[0].swap, 2e18);
 
         // 0 to 1 strike order
         assertEq(pair.strikes[MAX_STRIKE].next0To1, 1);
@@ -178,7 +178,7 @@ contract UpdateStrikeTest is Test {
 
         vm.pauseGasMetering();
 
-        assertEq(pair.strikes[1].liquidityBiDirectional[0], 1e18);
+        assertEq(pair.strikes[1].liquidity[0].swap, 1e18);
 
         // 0 to 1 strike order
         assertEq(pair.strikes[MAX_STRIKE].next0To1, 0);
@@ -235,7 +235,7 @@ contract UpdateStrikeTest is Test {
 
         vm.pauseGasMetering();
 
-        assertEq(pair.strikes[2].liquidityBiDirectional[0], 1e18);
+        assertEq(pair.strikes[2].liquidity[0].swap, 1e18);
 
         vm.resumeGasMetering();
     }
@@ -254,7 +254,7 @@ contract UpdateStrikeTest is Test {
 
         vm.pauseGasMetering();
 
-        assertEq(pair.strikes[2].liquidityBiDirectional[0], 0);
+        assertEq(pair.strikes[2].liquidity[0].swap, 0);
 
         // 0 to 1 strike order
         assertEq(pair.strikes[MAX_STRIKE].next0To1, 0);
@@ -292,7 +292,7 @@ contract UpdateStrikeTest is Test {
 
         vm.pauseGasMetering();
 
-        assertEq(pair.strikes[1].liquidityBiDirectional[0], 0);
+        assertEq(pair.strikes[1].liquidity[0].swap, 0);
 
         // 0 to 1 strike order
         assertEq(pair.strikes[MAX_STRIKE].next0To1, 0);
