@@ -31,6 +31,7 @@ library Pairs {
     error InvalidSpread();
     error InvalidStrike();
     error OutOfBounds();
+    error Overflow();
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                DATA TYPES
@@ -421,9 +422,35 @@ library Pairs {
                             LIQUIDITY LOGIC
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    /// @notice Add or remove liquidity from a specific strike
-    /// @custom:team What if liquidity is added or removed below the active strike
-    function updateStrike(Pair storage pair, int24 strike, uint8 spread, int128 liquidity) internal {
+    /// @notice Add liquidity to a specific strike
+    /// @dev liquidity > 0
+    function addSwapLiquidity(Pair storage pair, int24 strike, uint8 spread, uint128 liquidity) internal {
+        unchecked {
+            if (!pair.initialized) revert Initialized();
+            _checkSpread(spread);
+
+            int24 strike0To1 = strike - int8(spread);
+            int24 strike1To0 = strike + int8(spread);
+
+            _checkStrike(strike0To1);
+            _checkStrike(strike1To0);
+
+            uint256 existingLiquidity = pair.strikes[strike].liquidity[spread - 1].swap;
+            uint256 borrowedLiquidity = pair.strikes[strike].liquidity[spread - 1].borrowed;
+            if (existingLiquidity + borrowedLiquidity + uint256(liquidity) > type(uint128).max) revert Overflow();
+            pair.strikes[strike].liquidity[spread - 1].swap = uint128(existingLiquidity) + liquidity;
+
+            if (existingLiquidity == 0) {
+                int24 _strikeCurrentCached = pair.strikeCurrentCached;
+                _addStrike0To1(pair, strike0To1, _strikeCurrentCached == strike0To1);
+                _addStrike1To0(pair, strike1To0, _strikeCurrentCached == strike1To0);
+            }
+        }
+    }
+
+    /// @notice Remove liquidity from a specific strike
+    /// @dev liquidity > 0
+    function removeSwapLiquidity(Pair storage pair, int24 strike, uint8 spread, uint128 liquidity) internal {
         unchecked {
             if (!pair.initialized) revert Initialized();
             _checkSpread(spread);
@@ -435,13 +462,10 @@ library Pairs {
             _checkStrike(strike1To0);
 
             uint128 existingLiquidity = pair.strikes[strike].liquidity[spread - 1].swap;
-            pair.strikes[strike].liquidity[spread - 1].swap = addDelta(existingLiquidity, liquidity);
+            if (liquidity > existingLiquidity) revert Overflow();
+            pair.strikes[strike].liquidity[spread - 1].swap = existingLiquidity - liquidity;
 
-            if (existingLiquidity == 0 && liquidity > 0) {
-                int24 _strikeCurrentCached = pair.strikeCurrentCached;
-                _addStrike0To1(pair, strike0To1, _strikeCurrentCached == strike0To1);
-                _addStrike1To0(pair, strike1To0, _strikeCurrentCached == strike1To0);
-            } else if (liquidity < 0 && existingLiquidity == uint128(-liquidity)) {
+            if (existingLiquidity == liquidity) {
                 int24 _strikeCurrentCached = pair.strikeCurrentCached;
                 _removeStrike0To1(pair, strike0To1, _strikeCurrentCached == strike0To1);
                 _removeStrike1To0(pair, strike1To0, _strikeCurrentCached == strike1To0);
@@ -456,7 +480,7 @@ library Pairs {
     /// @custom:team Need to figure out the liqudity borrowed composition
     /// @custom:team What does strikeCachedCurrent represent
     /// @custom:team Should this lazily go to the next spread or not
-    function borrowLiquidity(
+    function addBorrowedLiquidity(
         Pair storage pair,
         int24 strike,
         uint136 liquidity
@@ -505,7 +529,7 @@ library Pairs {
     }
 
     /// @notice Repay liquidity to a specific strike
-    function repayLiquidity(Pair storage pair, int24 strike, uint136 liquidity) internal {
+    function removeBorrowedLiquidity(Pair storage pair, int24 strike, uint136 liquidity) internal {
         unchecked {
             if (!pair.initialized) revert Initialized();
 
@@ -549,7 +573,6 @@ library Pairs {
 
     /// @notice Accrue liquidity for a strike and return the amount of liquidity that must be repaid
     /// @custom:team How to handle initial block last value
-    /// @custom:team Do we need to update liquidityGrowthSpreadX128
     function accrue(Pair storage pair, int24 strike) internal returns (uint136) {
         unchecked {
             if (!pair.initialized) revert Initialized();

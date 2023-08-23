@@ -7,29 +7,29 @@ import {Pairs} from "src/core/Pairs.sol";
 import {BitMaps} from "src/core/BitMaps.sol";
 import {MAX_STRIKE, MIN_STRIKE} from "src/core/math/StrikeMath.sol";
 
-contract BorrowLiquidityTest is Test {
+contract RemoveBorrowedLiquidityTest is Test {
     using Pairs for Pairs.Pair;
     using BitMaps for BitMaps.BitMap;
 
     Pairs.Pair private pair;
 
     /// @notice Test repaying liquidity for a pair that is not initialized
-    function test_RepayLiquidity_NotInitialized() external {
+    function test_RemoveBorrowedLiquidity_NotInitialized() external {
         vm.expectRevert(Pairs.Initialized.selector);
-        pair.repayLiquidity(0, 1);
+        pair.removeBorrowedLiquidity(0, 1);
     }
 
     /// @notice Test repaying partial liquidity to a spread
-    function test_RepayLiquidity_PartialSpread() external {
+    function test_RemoveBorrowedLiquidity_PartialSpread() external {
         vm.pauseGasMetering();
 
         pair.initialize(0);
-        pair.updateStrike(2, 1, 1e18);
-        pair.borrowLiquidity(2, 1e18);
+        pair.addSwapLiquidity(2, 1, 1e18);
+        pair.addBorrowedLiquidity(2, 1e18);
 
         vm.resumeGasMetering();
 
-        pair.repayLiquidity(2, 0.5e18);
+        pair.removeBorrowedLiquidity(2, 0.5e18);
 
         vm.pauseGasMetering();
 
@@ -41,16 +41,16 @@ contract BorrowLiquidityTest is Test {
     }
 
     /// @notice Test repaying full liquidity to a spread
-    function test_RepayLiquidity_FullSpread() external {
+    function test_RemoveBorrowedLiquidity_FullSpread() external {
         vm.pauseGasMetering();
 
         pair.initialize(0);
-        pair.updateStrike(2, 1, 1e18);
-        pair.borrowLiquidity(2, 1e18);
+        pair.addSwapLiquidity(2, 1, 1e18);
+        pair.addBorrowedLiquidity(2, 1e18);
 
         vm.resumeGasMetering();
 
-        pair.repayLiquidity(2, 1e18);
+        pair.removeBorrowedLiquidity(2, 1e18);
 
         vm.pauseGasMetering();
 
@@ -65,17 +65,17 @@ contract BorrowLiquidityTest is Test {
     /// @dev Should add strike 2 from 0 to 1 strike order and strike 4 from 1 to 0 strike order
     /// @dev 0 to 1 strike order is MAX_STRIKE -> 2 -> 1 -> 0 -> MIN_STRIKE
     /// @dev 1 to 0 strike order is MIN_STRIKE -> 0 -> 4 -> 5 -> MAX_STRIKE
-    function test_RepayLiquidity_NextSpread() external {
+    function test_RemoveBorrowedLiquidity_NextSpread() external {
         vm.pauseGasMetering();
 
         pair.initialize(0);
-        pair.updateStrike(3, 1, 1e18);
-        pair.updateStrike(3, 2, 1e18);
-        pair.borrowLiquidity(3, 1.5e18);
+        pair.addSwapLiquidity(3, 1, 1e18);
+        pair.addSwapLiquidity(3, 2, 1e18);
+        pair.addBorrowedLiquidity(3, 1.5e18);
 
         vm.resumeGasMetering();
 
-        pair.repayLiquidity(3, 1.5e18);
+        pair.removeBorrowedLiquidity(3, 1.5e18);
 
         vm.pauseGasMetering();
 
@@ -117,16 +117,16 @@ contract BorrowLiquidityTest is Test {
     /// @notice Test borrowing liquidity when there is an empty spread in the middle before a spread with liquidity
     /// @dev 0 to 1 strike order is MAX_STRIKE -> 1 -> 0 -> MIN_STRIKE
     /// @dev 1 to 0 strike order is MIN_STRIKE -> 0 -> 5 -> MAX_STRIKE
-    function test_RepayLiquidity_NextSpreadZero() external {
+    function test_RemoveBorrowedLiquidity_NextSpreadZero() external {
         vm.pauseGasMetering();
 
         pair.initialize(0);
-        pair.updateStrike(3, 2, 1e18);
-        pair.borrowLiquidity(3, 0.5e18);
+        pair.addSwapLiquidity(3, 2, 1e18);
+        pair.addBorrowedLiquidity(3, 0.5e18);
 
         vm.resumeGasMetering();
 
-        pair.repayLiquidity(3, 0.5e18);
+        pair.removeBorrowedLiquidity(3, 0.5e18);
 
         vm.pauseGasMetering();
 
@@ -160,17 +160,17 @@ contract BorrowLiquidityTest is Test {
     /// swap is offered must be preserved
     /// @dev 0 to 1 strike order is MAX_STRIKE -> 0 -> -1 -> MIN_STRIKE
     /// @dev 1 to 0 strike order is MIN_STRIKE -> 0 -> 2 -> 3 -> MAX_STRIKE
-    function test_RepayLiquidity_NextSpreadPreserve() external {
+    function test_RemoveBorrowedLiquidity_NextSpreadPreserve() external {
         vm.pauseGasMetering();
 
         pair.initialize(0);
-        pair.updateStrike(1, 1, 1e18);
-        pair.updateStrike(1, 2, 1e18);
-        pair.borrowLiquidity(1, 1.5e18);
+        pair.addSwapLiquidity(1, 1, 1e18);
+        pair.addSwapLiquidity(1, 2, 1e18);
+        pair.addBorrowedLiquidity(1, 1.5e18);
 
         vm.resumeGasMetering();
 
-        pair.repayLiquidity(1, 1.5e18);
+        pair.removeBorrowedLiquidity(1, 1.5e18);
 
         vm.pauseGasMetering();
 
@@ -207,7 +207,7 @@ contract BorrowLiquidityTest is Test {
         vm.resumeGasMetering();
     }
 
-    function test_RepayLiquidity_OutOfBounds() external {
+    function test_RemoveBorrowedLiquidity_OutOfBounds() external {
         vm.pauseGasMetering();
 
         pair.initialize(0);
@@ -215,6 +215,6 @@ contract BorrowLiquidityTest is Test {
         vm.resumeGasMetering();
 
         vm.expectRevert(Pairs.OutOfBounds.selector);
-        pair.repayLiquidity(1, 1);
+        pair.removeBorrowedLiquidity(1, 1);
     }
 }
