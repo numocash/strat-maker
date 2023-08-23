@@ -17,8 +17,7 @@ uint8 constant NUM_SPREADS = 5;
 int8 constant MAX_CONSECUTIVE = int8(NUM_SPREADS);
 
 /// @title Pairs
-/// @notice Library for managing a concentrated liquidity, constant sum automated market maker with impliciting
-/// borrowing
+/// @notice Library for managing a series of constant sum automated market makers with impliciting borrowing
 /// @author Robert Leifke and Kyle Scott
 /// @custom:team strikeCachedCurrent should represent the center strike
 library Pairs {
@@ -45,6 +44,12 @@ library Pairs {
         uint128 borrowed;
     }
 
+    /// @notice Data for liquidity repaid per unit of liquidity
+    /// @dev Needed because solidity doesn't let you get storage pointers to value types
+    struct LiquidityGrowth {
+        uint256 liquidityGrowthX128;
+    }
+
     /// @notice Data needed to represent a strike (constant sum automated market market with a fixed price)
     /// @param liquidityGrowthX128 Liquidity repaid per unit of liquidty
     /// @param liquidityGrowthSpreadX128 Liquidity repaid per unit of liquidty per spread
@@ -56,8 +61,8 @@ library Pairs {
     /// @param reference1To0 Number of spreads offering 1 to 0 swaps referencing this strike
     /// @param activeSpread The spread index where liquidity is actively being borrowed from
     struct Strike {
-        uint256 liquidityGrowthX128;
-        uint256[NUM_SPREADS] liquidityGrowthSpreadX128;
+        LiquidityGrowth liquidityGrowthX128;
+        LiquidityGrowth[NUM_SPREADS] liquidityGrowthSpreadX128;
         Liquidity[NUM_SPREADS] liquidity;
         uint184 blockLast;
         int24 next0To1;
@@ -567,20 +572,16 @@ library Pairs {
 
                     liquidityRepaid += liquidityRepaidSpread;
                     liquidityBorrowedTotal += liquidityBorrowed;
-                    pair.strikes[strike].liquidity[i].swap += uint128(liquidityRepaidSpread);
+
+                    _updateLiqudityGrowth(
+                        pair.strikes[strike].liquidityGrowthSpreadX128[i], liquidityRepaidSpread, liquidityBorrowed
+                    );
                 }
             }
 
             if (liquidityRepaid == 0) return 0;
 
-            uint256 _liquidityGrowthX128 = pair.strikes[strike].liquidityGrowthX128;
-            if (_liquidityGrowthX128 == 0) {
-                pair.strikes[strike].liquidityGrowthX128 = Q128 + mulDiv(liquidityRepaid, Q128, liquidityBorrowedTotal);
-            } else {
-                // realistically cannot overflow
-                pair.strikes[strike].liquidityGrowthX128 =
-                    _liquidityGrowthX128 + mulDiv(liquidityRepaid, Q128, liquidityBorrowedTotal);
-            }
+            _updateLiqudityGrowth(pair.strikes[strike].liquidityGrowthX128, liquidityRepaid, liquidityBorrowedTotal);
 
             // liquidityRepaid max value is NUM_SPREADS * type(uint128).max
             return uint136(liquidityRepaid);
@@ -601,6 +602,24 @@ library Pairs {
     /// @notice Check the validity of the spread
     function _checkSpread(uint8 spread) private pure {
         if (spread == 0 || spread > NUM_SPREADS) revert InvalidSpread();
+    }
+
+    /// @notice Computes and stores the amount of liquidity repaid per unit of liquidity
+    function _updateLiqudityGrowth(
+        LiquidityGrowth storage liquidityGrowth,
+        uint256 liquidityRepaid,
+        uint256 liquidityBorrowed
+    )
+        private
+    {
+        uint256 _liquidityGrowthX128 = liquidityGrowth.liquidityGrowthX128;
+        if (_liquidityGrowthX128 == 0) {
+            liquidityGrowth.liquidityGrowthX128 = Q128 + mulDiv(liquidityRepaid, Q128, liquidityBorrowed);
+        } else {
+            // realistically cannot overflow
+            liquidityGrowth.liquidityGrowthX128 =
+                _liquidityGrowthX128 + mulDiv(liquidityRepaid, Q128, liquidityBorrowed);
+        }
     }
 
     function _addStrike0To1(Pair storage pair, int24 strike, bool preserve) private {

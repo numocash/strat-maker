@@ -70,8 +70,8 @@ contract AccrueTest is Test {
         vm.pauseGasMetering();
 
         assertEq(liquidity, 1e18 / 10_000);
-        assertEq(pair.strikes[0].liquidity[0].swap, 1e18 / 10_000);
-        assertEq(pair.strikes[0].liquidityGrowthX128, Q128 + Q128 / 10_000);
+        assertEq(pair.strikes[0].liquidityGrowthSpreadX128[0].liquidityGrowthX128, Q128 + Q128 / 10_000);
+        assertEq(pair.strikes[0].liquidityGrowthX128.liquidityGrowthX128, Q128 + Q128 / 10_000);
 
         vm.resumeGasMetering();
     }
@@ -94,8 +94,8 @@ contract AccrueTest is Test {
         vm.pauseGasMetering();
 
         assertEq(liquidity, 1e18);
-        assertEq(pair.strikes[0].liquidity[0].swap, 1e18);
-        assertEq(pair.strikes[0].liquidityGrowthX128, Q128 * 2);
+        assertEq(pair.strikes[0].liquidityGrowthSpreadX128[0].liquidityGrowthX128, Q128 * 2);
+        assertEq(pair.strikes[0].liquidityGrowthX128.liquidityGrowthX128, Q128 * 2);
 
         vm.resumeGasMetering();
     }
@@ -121,8 +121,8 @@ contract AccrueTest is Test {
         vm.pauseGasMetering();
 
         assertEq(liquidity, 1e18 / 10_000);
-        assertEq(pair.strikes[0].liquidity[0].swap, 1e18 / 5000);
-        assertEq(pair.strikes[0].liquidityGrowthX128, Q128 + 2 * (Q128 / 10_000));
+        assertEq(pair.strikes[0].liquidityGrowthSpreadX128[0].liquidityGrowthX128, Q128 + 2 * (Q128 / 10_000));
+        assertEq(pair.strikes[0].liquidityGrowthX128.liquidityGrowthX128, Q128 + 2 * (Q128 / 10_000));
 
         vm.resumeGasMetering();
     }
@@ -147,9 +147,9 @@ contract AccrueTest is Test {
         vm.pauseGasMetering();
 
         assertEq(liquidity, 1e18 / 5000);
-        assertEq(pair.strikes[0].liquidity[0].swap, 1e18 / 10_000);
-        assertEq(pair.strikes[0].liquidity[1].swap, 0.5e18 + 1e18 / 10_000);
-        assertEq(pair.strikes[0].liquidityGrowthX128, Q128 + (Q128 * (1e18 / 5000)) / 1.5e18);
+        assertEq(pair.strikes[0].liquidityGrowthSpreadX128[0].liquidityGrowthX128, Q128 + Q128 / 10_000);
+        assertEq(pair.strikes[0].liquidityGrowthSpreadX128[1].liquidityGrowthX128, Q128 + Q128 / 5000);
+        assertEq(pair.strikes[0].liquidityGrowthX128.liquidityGrowthX128, Q128 + (Q128 * (1e18 / 5000)) / 1.5e18);
 
         vm.resumeGasMetering();
     }
@@ -172,8 +172,8 @@ contract AccrueTest is Test {
         vm.pauseGasMetering();
 
         assertEq(liquidity, 1e18 / 5000);
-        assertEq(pair.strikes[0].liquidity[1].swap, 1e18 / 5000);
-        assertEq(pair.strikes[0].liquidityGrowthX128, Q128 + Q128 / 5000);
+        assertEq(pair.strikes[0].liquidityGrowthSpreadX128[1].liquidityGrowthX128, Q128 + Q128 / 5000);
+        assertEq(pair.strikes[0].liquidityGrowthX128.liquidityGrowthX128, Q128 + Q128 / 5000);
 
         vm.resumeGasMetering();
     }

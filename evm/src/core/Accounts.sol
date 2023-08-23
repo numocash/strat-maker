@@ -6,7 +6,7 @@ import {BalanceLib} from "src/libraries/BalanceLib.sol";
 
 /// @title Accounts
 /// @notice Library for storing and updating intermediate balance changes in memory
-/// @author Kyle Scott and Robert Leifke
+/// @author Robert Leifke and Kyle Scott
 library Accounts {
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                  ERRORS
