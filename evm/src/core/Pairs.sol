@@ -59,8 +59,8 @@ library Pairs {
     /// @param blockLast The block where liquidity was accrued last
     /// @param next0To1 Strike where the next 0 to 1 swap is available, < this strike
     /// @param next1To0 Strike where the next 1 to 0 swap is available, > this strike
-    /// @param reference0To1 Number of spreads offering 0 to 1 swaps at the price of this strike
-    /// @param reference1To0 Number of spreads offering 1 to 0 swaps at the price of this strike
+    /// @param reference0To1 Bitmap of spreads offering 0 to 1 swaps at the price of this strike
+    /// @param reference1To0 Bitmap of spreads offering 1 to 0 swaps at the price of this strike
     /// @param activeSpread The spread index where liquidity is actively being borrowed from
     struct Strike {
         LiquidityGrowth liquidityGrowthX128;
@@ -342,7 +342,7 @@ library Pairs {
                 // Remove strike from linked list and bit map if it has no liquidity
                 // Only happens when initialized or all liquidity is removed from current strike
                 // TODO: this is wrong
-                if (state.liquidityTotal == 0) _removeStrike0To1(pair, strikePrev, false);
+                // if (state.liquidityTotal == 0) _removeStrike0To1(pair, strikePrev, false);
 
                 unchecked {
                     for (uint256 i = state.activeSpread; i < NUM_SPREADS; i++) {
@@ -385,7 +385,7 @@ library Pairs {
                 // Remove strike from linked list and bit map if it has no liquidity
                 // Only happens when initialized or all liquidity is removed from current strike
                 // TODO: this is wrong
-                if (state.liquidityTotal == 0) _removeStrike1To0(pair, strikePrev, false);
+                // if (state.liquidityTotal == 0) _removeStrike1To0(pair, strikePrev, false);
 
                 unchecked {
                     for (uint256 i = state.activeSpread; i < NUM_SPREADS; i++) {
@@ -457,8 +457,8 @@ library Pairs {
 
             if (existingLiquidity == 0) {
                 int24 _strikeCurrentCached = pair.strikeCurrentCached;
-                _addStrike0To1(pair, strike0To1, _strikeCurrentCached == strike0To1);
-                _addStrike1To0(pair, strike1To0, _strikeCurrentCached == strike1To0);
+                _addStrike0To1(pair, strike0To1, spread, _strikeCurrentCached == strike0To1);
+                _addStrike1To0(pair, strike1To0, spread, _strikeCurrentCached == strike1To0);
             }
         }
     }
@@ -482,26 +482,17 @@ library Pairs {
 
             if (existingLiquidity == liquidity) {
                 int24 _strikeCurrentCached = pair.strikeCurrentCached;
-                _removeStrike0To1(pair, strike0To1, _strikeCurrentCached == strike0To1);
-                _removeStrike1To0(pair, strike1To0, _strikeCurrentCached == strike1To0);
+                _removeStrike0To1(pair, strike0To1, spread, _strikeCurrentCached == strike0To1);
+                _removeStrike1To0(pair, strike1To0, spread, _strikeCurrentCached == strike1To0);
             }
         }
     }
 
     /// @notice Borrow liquidity from a specific strike
-    /// @return liquidityToken0 The amount of liquidity removed in token 0
-    /// @return liquidityToken1 The amount of liquidity removed in token 1
     /// @custom:team Need to figure out the liqudity borrowed composition
     /// @custom:team What does strikeCachedCurrent represent
     /// @custom:team Should this lazily go to the next spread or not
-    function addBorrowedLiquidity(
-        Pair storage pair,
-        int24 strike,
-        uint136 liquidity
-    )
-        internal
-        returns (uint128 liquidityToken0, uint128 liquidityToken1)
-    {
+    function addBorrowedLiquidity(Pair storage pair, int24 strike, uint136 liquidity) internal {
         unchecked {
             if (!pair.initialized) revert Initialized();
 
@@ -529,8 +520,8 @@ library Pairs {
                     int24 strike1To0 = strike + int8(_activeSpread + 1);
 
                     int24 _strikeCurrentCached = pair.strikeCurrentCached;
-                    _removeStrike0To1(pair, strike0To1, _strikeCurrentCached == strike0To1);
-                    _removeStrike1To0(pair, strike1To0, _strikeCurrentCached == strike1To0);
+                    _removeStrike0To1(pair, strike0To1, _activeSpread + 1, _strikeCurrentCached == strike0To1);
+                    _removeStrike1To0(pair, strike1To0, _activeSpread + 1, _strikeCurrentCached == strike1To0);
                 }
 
                 // move to next spread
@@ -572,8 +563,8 @@ library Pairs {
                     int24 strike1To0 = strike + int8(_activeSpread);
 
                     int24 _strikeCurrentCached = pair.strikeCurrentCached;
-                    _addStrike0To1(pair, strike0To1, _strikeCurrentCached == strike0To1);
-                    _addStrike1To0(pair, strike1To0, _strikeCurrentCached == strike1To0);
+                    _addStrike0To1(pair, strike0To1, _activeSpread, _strikeCurrentCached == strike0To1);
+                    _addStrike1To0(pair, strike1To0, _activeSpread, _strikeCurrentCached == strike1To0);
                 }
 
                 // move to next spread
@@ -659,10 +650,10 @@ library Pairs {
         }
     }
 
-    function _addStrike0To1(Pair storage pair, int24 strike, bool preserve) private {
+    function _addStrike0To1(Pair storage pair, int24 strike, uint8 spread, bool preserve) private {
         uint8 reference0To1 = pair.strikes[strike].reference0To1;
         unchecked {
-            pair.strikes[strike].reference0To1 = reference0To1 + 1;
+            pair.strikes[strike].reference0To1 = reference0To1 | uint8(1 << (spread - 1));
         }
 
         if (!preserve && reference0To1 == 0) {
@@ -675,10 +666,10 @@ library Pairs {
         }
     }
 
-    function _addStrike1To0(Pair storage pair, int24 strike, bool preserve) private {
+    function _addStrike1To0(Pair storage pair, int24 strike, uint8 spread, bool preserve) private {
         uint8 reference1To0 = pair.strikes[strike].reference1To0;
         unchecked {
-            pair.strikes[strike].reference1To0 = reference1To0 + 1;
+            pair.strikes[strike].reference1To0 = reference1To0 | uint8(1 << (spread - 1));
         }
 
         if (!preserve && reference1To0 == 0) {
@@ -691,13 +682,14 @@ library Pairs {
         }
     }
 
-    function _removeStrike0To1(Pair storage pair, int24 strike, bool preserve) private {
+    function _removeStrike0To1(Pair storage pair, int24 strike, uint8 spread, bool preserve) private {
         uint8 reference0To1 = pair.strikes[strike].reference0To1;
         unchecked {
-            pair.strikes[strike].reference0To1 = reference0To1 - 1;
+            reference0To1 &= ~uint8(1 << (spread - 1));
+            pair.strikes[strike].reference0To1 = reference0To1;
         }
 
-        if (!preserve && reference0To1 == 1) {
+        if (!preserve && reference0To1 == 0) {
             int24 below = -pair.bitMap0To1.nextBelow(-strike);
             int24 above = pair.strikes[strike].next0To1;
 
@@ -708,13 +700,14 @@ library Pairs {
         }
     }
 
-    function _removeStrike1To0(Pair storage pair, int24 strike, bool preserve) private {
+    function _removeStrike1To0(Pair storage pair, int24 strike, uint8 spread, bool preserve) private {
         uint8 reference1To0 = pair.strikes[strike].reference1To0;
         unchecked {
-            pair.strikes[strike].reference1To0 = reference1To0 - 1;
+            reference1To0 &= ~uint8(1 << (spread - 1));
+            pair.strikes[strike].reference1To0 = reference1To0;
         }
 
-        if (!preserve && reference1To0 == 1) {
+        if (!preserve && reference1To0 == 0) {
             int24 below = pair.bitMap1To0.nextBelow(strike);
             int24 above = pair.strikes[strike].next1To0;
 
