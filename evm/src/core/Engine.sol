@@ -298,16 +298,13 @@ contract Engine is Positions {
         int256 amount0;
         int256 amount1;
         if (params.selector < SwapTokenSelector.Token0Account) {
-            (amount0, amount1) =
-                pair.swap(params.scalingFactor, params.selector == SwapTokenSelector.Token0, params.amountDesired);
+            (amount0, amount1) = pair.swap(params.selector == SwapTokenSelector.Token0, params.amountDesired);
         } else if (params.selector == SwapTokenSelector.Token0Account) {
             assert(account.erc20Data[uint256(params.amountDesired)].token == params.token0);
-            (amount0, amount1) =
-                pair.swap(params.scalingFactor, true, -account.erc20Data[uint256(params.amountDesired)].balanceDelta);
+            (amount0, amount1) = pair.swap(true, -account.erc20Data[uint256(params.amountDesired)].balanceDelta);
         } else if (params.selector == SwapTokenSelector.Token1Account) {
             assert(account.erc20Data[uint256(params.amountDesired)].token == params.token1);
-            (amount0, amount1) =
-                pair.swap(params.scalingFactor, false, -account.erc20Data[uint256(params.amountDesired)].balanceDelta);
+            (amount0, amount1) = pair.swap(false, -account.erc20Data[uint256(params.amountDesired)].balanceDelta);
         } else {
             revert InvalidSelector();
         }
