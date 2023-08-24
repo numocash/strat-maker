@@ -7,6 +7,8 @@ import {toInt256} from "./math/LiquidityMath.sol";
 import {getRatioAtStrike, MAX_STRIKE, MIN_STRIKE, Q128} from "./math/StrikeMath.sol";
 import {computeSwapStep} from "./math/SwapMath.sol";
 
+import {console2} from "forge-std/console2.sol";
+
 uint8 constant NUM_SPREADS = 5;
 
 /// @title Pairs
@@ -73,6 +75,7 @@ library Pairs {
     /// @param composition Percentage of liquidity held in token 1 per spread
     /// @param strikeCurrent Active strike index per spread
     /// @param strikeCurrentCached Strike index that was last used for a swap
+    /// @param minSpreadLastUsedIndex
     /// @param initialized True if the pair has been initialized
     struct Pair {
         mapping(int24 => Strike) strikes;
@@ -81,6 +84,7 @@ library Pairs {
         uint128[NUM_SPREADS] composition;
         int24[NUM_SPREADS] strikeCurrent;
         int24 strikeCurrentCached;
+        uint8 minSpreadLastUsedIndex;
         bool initialized;
     }
 
@@ -153,6 +157,7 @@ library Pairs {
     /// @param strike Swap is being offered at the price of this strike
     /// @param strikeStart First `strike` a swap was offered at
     /// @param spreadBitMap Bit map with positive representing a spread that is offering a swap at `strike`
+    /// @custom:team copy pair variables to memory
     struct SwapState {
         uint256 liquiditySwap;
         uint256 liquidityTotal;
@@ -167,23 +172,26 @@ library Pairs {
     }
 
     /// @notice Swap between the two tokens in the pair
-    /// @param isToken0 True if amountDesired refers to token0
+    /// @param isToken0 True if amountDesired refers to token 0
     /// @param amountDesired The desired amount change on the pair
-    /// @return amount0 The delta of the balance of token0 of the pair
-    /// @return amount1 The delta of the balance of token1 of the pair
+    /// @return amount0 The delta of the balance of token 0 of the pair
+    /// @return amount1 The delta of the balance of token 1 of the pair
     /// @custom:team Account for liquidity growth
+    /// @custom:team Does amountDesired need to be more than zero
     function swap(Pair storage pair, bool isToken0, int256 amountDesired) internal returns (int256, int256) {
         if (!pair.initialized) revert Initialized();
         bool isSwap0To1 = isToken0 == amountDesired > 0;
 
         // Find the closest strike offering a swap and set initial swap state
         SwapState memory state;
-        {
+        unchecked {
+            int24 _strikeCurrentCached = pair.strikeCurrentCached;
             int24 strike = isSwap0To1
-                ? -pair.bitMap0To1.nextBelow(pair.strikeCurrentCached)
-                : pair.bitMap1To0.nextBelow(pair.strikeCurrentCached);
+                ? _strikeCurrentCached - int24(uint24(pair.minSpreadLastUsedIndex + 1))
+                : _strikeCurrentCached + int24(uint24(pair.minSpreadLastUsedIndex + 1));
+
             state.strike = strike;
-            state.strikeStart = pair.strikeCurrentCached;
+            state.strikeStart = _strikeCurrentCached;
             state.spreadBitMap = isSwap0To1 ? pair.strikes[strike].reference0To1 : pair.strikes[strike].reference1To0;
         }
 
@@ -205,7 +213,8 @@ library Pairs {
                         state.liquidityTotal += liquidityTotal;
                         state.liquiditySwap += liquiditySwap;
                     } else {
-                        state.spreadBitMap &= uint8(1 << (i + 1)) - 1;
+                        // mask bits below this spread
+                        state.spreadBitMap &= uint8(1 << i) - 1;
                         break;
                     }
                 }
@@ -237,41 +246,23 @@ library Pairs {
             }
 
             // calculate and store liquidity gained from fees
+            // fee is taken as a percentage of liquidity used
             unchecked {
-                if (isSwap0To1) {
-                    for (uint256 i = _lsb(state.spreadBitMap); i <= _msb(state.spreadBitMap); i++) {
-                        if ((state.spreadBitMap & (1 << i)) > 0) {
-                            int24 spreadStrike = state.strike - int24(uint24(i + 1));
+                for (uint256 i = _lsb(state.spreadBitMap); i <= _msb(state.spreadBitMap); i++) {
+                    if ((state.spreadBitMap & (1 << i)) > 0) {
+                        int24 spreadStrike =
+                            isSwap0To1 ? state.strike + int24(uint24(i + 1)) : state.strike - int24(uint24(i + 1));
 
-                            uint256 _liquiditySwapSpread = state.liquiditySwapSpread[i];
-                            uint256 liquidityRemainingSpread =
-                                mulDiv(state.liquidityRemaining, _liquiditySwapSpread, state.liquidityTotal);
-                            uint256 liquidityNew =
-                                ((i + 1) * (_liquiditySwapSpread - liquidityRemainingSpread)) / 10_000;
+                        uint256 _liquiditySwapSpread = state.liquiditySwapSpread[i];
+                        uint256 liquidityRemainingSpread =
+                            mulDiv(state.liquidityRemaining, _liquiditySwapSpread, state.liquidityTotal);
+                        uint256 liquidityNew = ((i + 1) * (_liquiditySwapSpread - liquidityRemainingSpread)) / 10_000;
 
-                            _updateLiqudityGrowth(
-                                pair.strikes[spreadStrike].liquidityGrowthSpreadX128[i],
-                                liquidityNew,
-                                _liquiditySwapSpread
-                            );
-                        }
-                    }
-                } else {
-                    for (uint256 i = _lsb(state.spreadBitMap); i <= _msb(state.spreadBitMap); i++) {
-                        if ((state.spreadBitMap & (1 << i)) > 0) {
-                            int24 spreadStrike = state.strike + int24(uint24(i + 1));
-                            uint256 _liquiditySwapSpread = state.liquiditySwapSpread[i];
-                            uint256 liquidityRemainingSpread =
-                                mulDiv(state.liquidityRemaining, _liquiditySwapSpread, state.liquidityTotal);
-                            uint256 liquidityNew =
-                                ((i + 1) * (_liquiditySwapSpread - liquidityRemainingSpread)) / 10_000;
-
-                            _updateLiqudityGrowth(
-                                pair.strikes[spreadStrike].liquidityGrowthSpreadX128[i],
-                                liquidityNew,
-                                _liquiditySwapSpread
-                            );
-                        }
+                        _updateLiqudityGrowth(
+                            pair.strikes[spreadStrike].liquidityGrowthSpreadX128[i],
+                            liquidityNew,
+                            state.liquidityTotalSpread[i]
+                        );
                     }
                 }
             }
@@ -325,7 +316,8 @@ library Pairs {
                                 state.liquidityTotalSpread[i] = liquidity;
                                 state.liquiditySwapSpread[i] = liquiditySwap;
                             } else {
-                                state.spreadBitMap &= uint8(1 << (i + 1)) - 1;
+                                // mask bits below this spread
+                                state.spreadBitMap &= uint8(1 << i) - 1;
                                 break;
                             }
                         }
@@ -378,7 +370,8 @@ library Pairs {
                                 state.liquidityTotalSpread[i] = liquidity;
                                 state.liquiditySwapSpread[i] = liquiditySwap;
                             } else {
-                                state.spreadBitMap &= uint8(1 << (i + 1)) - 1;
+                                // mask bits below this spread
+                                state.spreadBitMap &= uint8(1 << i) - 1;
                                 break;
                             }
                         }
@@ -388,19 +381,20 @@ library Pairs {
         }
 
         // Save updated pair state to storage
+        pair.minSpreadLastUsedIndex = _lsb(state.spreadBitMap);
         unchecked {
             if (isSwap0To1) {
-                pair.strikeCurrentCached = state.strike + int24(uint24(_lsb(state.spreadBitMap)));
+                pair.strikeCurrentCached = state.strike + int24(uint24(_lsb(state.spreadBitMap) + 1));
                 uint128 composition = uint128(mulDiv(state.liquidityRemaining, Q128, state.liquidityTotal));
-                for (uint256 i = 0; i < _msb(state.spreadBitMap); i++) {
+                for (uint256 i = 0; i <= _msb(state.spreadBitMap); i++) {
                     pair.strikeCurrent[i] = state.strike + int24(uint24(1 << i));
                     pair.composition[i] = composition;
                 }
             } else {
-                pair.strikeCurrentCached = state.strike - int24(uint24(_lsb(state.spreadBitMap)));
+                pair.strikeCurrentCached = state.strike - int24(uint24(_lsb(state.spreadBitMap) + 1));
                 uint128 composition =
                     type(uint128).max - uint128(mulDiv(state.liquidityRemaining, Q128, state.liquidityTotal));
-                for (uint256 i = 0; i < _msb(state.spreadBitMap); i++) {
+                for (uint256 i = 0; i <= _msb(state.spreadBitMap); i++) {
                     pair.strikeCurrent[i] = state.strike - int24(uint24(1 << i));
                     pair.composition[i] = composition;
                 }
