@@ -102,15 +102,6 @@ function getAmounts(
     }
 }
 
-/// @notice Add signed liquidity delta to liquidity
-function addDelta(uint128 x, int128 y) pure returns (uint128 z) {
-    if (y < 0) {
-        return x - uint128(-y);
-    } else {
-        return x + uint128(y);
-    }
-}
-
 /// @notice cast uint128 to int128, revert on overflow
 function toInt128(uint128 x) pure returns (int128 z) {
     assert(x <= uint128(type(int128).max));

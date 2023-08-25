@@ -5,7 +5,7 @@ import {MIN_STRIKE} from "./math/StrikeMath.sol";
 
 /// @title Bit Maps
 /// @notice Manage a bit map where positive bits represent active strikes
-/// @dev From Muffin (https://github.com/muffinfi/muffin/blob/master/contracts/libraries/TickMaps.sol)
+/// @author Muffin (https://github.com/muffinfi/muffin/blob/master/contracts/libraries/TickMaps.sol)
 library BitMaps {
     struct BitMap {
         uint256 blockMap; //                    stores which blocks are initialized

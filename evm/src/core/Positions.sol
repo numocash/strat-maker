@@ -47,6 +47,7 @@ function debtID(
 
 /// @title Positions
 /// @notice Representation of a position on the exchange
+/// @author Robert Leifke and Kyle Scott
 abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                DATA TYPES
