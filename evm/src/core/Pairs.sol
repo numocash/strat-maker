@@ -7,8 +7,6 @@ import {toInt256} from "./math/LiquidityMath.sol";
 import {getRatioAtStrike, MAX_STRIKE, MIN_STRIKE, Q128} from "./math/StrikeMath.sol";
 import {computeSwapStep} from "./math/SwapMath.sol";
 
-import {console2} from "forge-std/console2.sol";
-
 uint8 constant NUM_SPREADS = 5;
 
 /// @title Pairs
@@ -75,7 +73,6 @@ library Pairs {
     /// @param composition Percentage of liquidity held in token 1 per spread
     /// @param strikeCurrent Active strike index per spread
     /// @param strikeCurrentCached Strike index that was last used for a swap
-    /// @param minSpreadLastUsedIndex
     /// @param initialized True if the pair has been initialized
     struct Pair {
         mapping(int24 => Strike) strikes;
@@ -84,7 +81,6 @@ library Pairs {
         uint128[NUM_SPREADS] composition;
         int24[NUM_SPREADS] strikeCurrent;
         int24 strikeCurrentCached;
-        uint8 minSpreadLastUsedIndex;
         bool initialized;
     }
 
@@ -180,15 +176,16 @@ library Pairs {
     /// @custom:team Does amountDesired need to be more than zero
     function swap(Pair storage pair, bool isToken0, int256 amountDesired) internal returns (int256, int256) {
         if (!pair.initialized) revert Initialized();
-        bool isSwap0To1 = isToken0 == amountDesired > 0;
+
+        bool isSwap0To1 = isToken0 == (amountDesired > 0);
 
         // Find the closest strike offering a swap and set initial swap state
         SwapState memory state;
-        unchecked {
+        {
             int24 _strikeCurrentCached = pair.strikeCurrentCached;
             int24 strike = isSwap0To1
-                ? _strikeCurrentCached - int24(uint24(pair.minSpreadLastUsedIndex + 1))
-                : _strikeCurrentCached + int24(uint24(pair.minSpreadLastUsedIndex + 1));
+                ? pair.strikes[-pair.bitMap0To1.nextBelow(-_strikeCurrentCached)].next0To1
+                : pair.strikes[pair.bitMap1To0.nextBelow(_strikeCurrentCached)].next1To0;
 
             state.strike = strike;
             state.strikeStart = _strikeCurrentCached;
@@ -204,7 +201,7 @@ library Pairs {
                     if (spreadStrike == pair.strikeCurrent[i]) {
                         uint256 liquidityTotal = pair.strikes[spreadStrike].liquidity[i].swap;
                         uint256 liquiditySwap = (
-                            (isSwap0To1 ? pair.composition[i] : type(uint128).max - pair.composition[i])
+                            (isSwap0To1 ? type(uint128).max - pair.composition[i] : pair.composition[i])
                                 * liquidityTotal
                         ) / Q128;
 
@@ -297,7 +294,7 @@ library Pairs {
                     for (uint256 i = _lsb(state.spreadBitMap); i <= _msb(state.spreadBitMap); i++) {
                         if ((state.spreadBitMap & (1 << i)) > 0) {
                             int24 spreadStrike = state.strike + int24(uint24(i + 1));
-                            uint24 strikeDelta = uint24(state.strikeStart - state.strike);
+                            uint24 strikeDelta = uint24(state.strikeStart - state.strike) - 1;
 
                             if (i < strikeDelta) {
                                 uint256 liquidity = pair.strikes[spreadStrike].liquidity[i].swap;
@@ -351,7 +348,7 @@ library Pairs {
                     for (uint256 i = _lsb(state.spreadBitMap); i <= _msb(state.spreadBitMap); i++) {
                         if ((state.spreadBitMap & (1 << i)) > 0) {
                             int24 spreadStrike = state.strike - int24(uint24(i + 1));
-                            uint24 strikeDelta = uint24(state.strike - state.strikeStart);
+                            uint24 strikeDelta = uint24(state.strike - state.strikeStart) - 1;
 
                             if (i < strikeDelta) {
                                 uint256 liquidity = pair.strikes[spreadStrike].liquidity[i].swap;
@@ -381,13 +378,12 @@ library Pairs {
         }
 
         // Save updated pair state to storage
-        pair.minSpreadLastUsedIndex = _lsb(state.spreadBitMap);
         unchecked {
             if (isSwap0To1) {
                 pair.strikeCurrentCached = state.strike + int24(uint24(_lsb(state.spreadBitMap) + 1));
                 uint128 composition = uint128(mulDiv(state.liquidityRemaining, Q128, state.liquidityTotal));
                 for (uint256 i = 0; i <= _msb(state.spreadBitMap); i++) {
-                    pair.strikeCurrent[i] = state.strike + int24(uint24(1 << i));
+                    pair.strikeCurrent[i] = state.strike + int24(uint24(i + 1));
                     pair.composition[i] = composition;
                 }
             } else {
@@ -395,17 +391,13 @@ library Pairs {
                 uint128 composition =
                     type(uint128).max - uint128(mulDiv(state.liquidityRemaining, Q128, state.liquidityTotal));
                 for (uint256 i = 0; i <= _msb(state.spreadBitMap); i++) {
-                    pair.strikeCurrent[i] = state.strike - int24(uint24(1 << i));
+                    pair.strikeCurrent[i] = state.strike - int24(uint24(i + 1));
                     pair.composition[i] = composition;
                 }
             }
         }
 
-        if (isToken0) {
-            return (state.amountA, state.amountB);
-        } else {
-            return (state.amountB, state.amountA);
-        }
+        return isToken0 ? (state.amountA, state.amountB) : (state.amountB, state.amountA);
     }
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
@@ -465,6 +457,7 @@ library Pairs {
 
     /// @notice Borrow liquidity from a specific strike
     /// @custom:team Should this lazily go to the next spread or not
+    /// @custom:team Should we charge 1 block on borrowing liquidity
     function addBorrowedLiquidity(Pair storage pair, int24 strike, uint136 liquidity) internal {
         unchecked {
             if (!pair.initialized) revert Initialized();
@@ -594,7 +587,6 @@ library Pairs {
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     function _msb(uint8 x) private pure returns (uint8 r) {
-        require(x > 0);
         unchecked {
             if (x >= 0x10) {
                 x >>= 4;
@@ -609,7 +601,6 @@ library Pairs {
     }
 
     function _lsb(uint8 x) private pure returns (uint8 r) {
-        require(x > 0);
         unchecked {
             r = 7;
 
