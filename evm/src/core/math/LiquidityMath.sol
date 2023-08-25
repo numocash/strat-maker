@@ -102,12 +102,6 @@ function getAmounts(
     }
 }
 
-/// @notice cast uint128 to int128, revert on overflow
-function toInt128(uint128 x) pure returns (int128 z) {
-    assert(x <= uint128(type(int128).max));
-    z = int128(x);
-}
-
 /// @notice cast uint256 to int256, revert on overflow
 function toInt256(uint256 x) pure returns (int256 z) {
     assert(x <= uint256(type(int256).max));

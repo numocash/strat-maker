@@ -153,7 +153,6 @@ library Pairs {
     /// @param strike Swap is being offered at the price of this strike
     /// @param strikeStart First `strike` a swap was offered at
     /// @param spreadBitMap Bit map with positive representing a spread that is offering a swap at `strike`
-    /// @custom:team copy pair variables to memory
     struct SwapState {
         uint256 liquiditySwap;
         uint256 liquidityTotal;
