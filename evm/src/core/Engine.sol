@@ -28,11 +28,12 @@ import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
 
 import {IExecuteCallback} from "./interfaces/IExecuteCallback.sol";
 
+import {console2} from "forge-std/console2.sol";
+
 /// @title Engine
 /// @notice ERC20 exchange
 /// @author Kyle Scott and Robert Leifke
-/// @custom:team return data and events
-/// @custom:team pass minted position information back to callback
+/// @custom:team Add minted position info to account
 contract Engine is Positions {
     using Accounts for Accounts.Account;
     using Pairs for Pairs.Pair;
@@ -53,7 +54,6 @@ contract Engine is Positions {
     );
     event BorrowLiquidity(bytes32 indexed pairID, int24 indexed strike, uint128 liquidity);
     event RepayLiquidity(bytes32 indexed pairID, int24 indexed strike, uint128 liquidity);
-    event Accrue(bytes32 indexed pairID, uint256 liquidityAccrued);
     event RemoveLiquidity(
         bytes32 indexed pairID,
         int24 indexed strike,
@@ -62,13 +62,13 @@ contract Engine is Positions {
         uint256 amount0,
         uint256 amount1
     );
+    event Accrue(bytes32 indexed pairID, int24 indexed strike, uint136 liquidityAccrued);
     event PairCreated(address indexed token0, address indexed token1, uint8 scalingFactor, int24 strikeInitial);
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                  ERRORS
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    error CommandLengthMismatch();
     error InsufficientInput();
     error InvalidAmountDesired();
     error InvalidCommand();
@@ -89,6 +89,12 @@ contract Engine is Positions {
         RemoveLiquidity,
         Accrue,
         CreatePair
+    }
+
+    /// @notice Type of command with input to that command
+    struct CommandInput {
+        Commands command;
+        bytes input;
     }
 
     /// @notice Type to describe which token in the pair is being referred to
@@ -247,52 +253,47 @@ contract Engine is Positions {
 
     /// @notice Execute an action on the exchange
     /// @param to Address to send the output to
-    /// @param commands List of commands
-    /// @param inputs List of inputs to the corresponding command
+    /// @param commandInputs List of command inputs
     /// @param data Untouched data passed back to the callback
     function execute(
         address to,
-        Commands[] calldata commands,
-        bytes[] calldata inputs,
+        CommandInput[] calldata commandInputs,
         uint256 numTokens,
         uint256 numLPs,
         bytes calldata data
     )
         external
         nonReentrant
+        returns (Accounts.Account memory)
     {
-        if (commands.length != inputs.length) {
-            revert CommandLengthMismatch();
-        }
-
         Accounts.Account memory account = Accounts.newAccount(numTokens, numLPs);
 
         // find command helper with binary search
-        for (uint256 i = 0; i < commands.length;) {
-            if (commands[i] < Commands.RemoveLiquidity) {
-                if (commands[i] < Commands.BorrowLiquidity) {
-                    if (commands[i] == Commands.Swap) {
-                        _swap(abi.decode(inputs[i], (SwapParams)), account);
+        for (uint256 i = 0; i < commandInputs.length;) {
+            if (commandInputs[i].command < Commands.RemoveLiquidity) {
+                if (commandInputs[i].command < Commands.BorrowLiquidity) {
+                    if (commandInputs[i].command == Commands.Swap) {
+                        _swap(abi.decode(commandInputs[i].input, (SwapParams)), account);
                     } else {
-                        _addLiquidity(to, abi.decode(inputs[i], (AddLiquidityParams)), account);
+                        _addLiquidity(to, abi.decode(commandInputs[i].input, (AddLiquidityParams)), account);
                     }
                 } else {
-                    if (commands[i] == Commands.BorrowLiquidity) {
-                        _borrowLiquidity(to, abi.decode(inputs[i], (BorrowLiquidityParams)), account);
+                    if (commandInputs[i].command == Commands.BorrowLiquidity) {
+                        _borrowLiquidity(to, abi.decode(commandInputs[i].input, (BorrowLiquidityParams)), account);
                     } else {
-                        _repayLiquidity(abi.decode(inputs[i], (RepayLiquidityParams)), account);
+                        _repayLiquidity(abi.decode(commandInputs[i].input, (RepayLiquidityParams)), account);
                     }
                 }
             } else {
-                if (commands[i] < Commands.CreatePair) {
-                    if (commands[i] == Commands.RemoveLiquidity) {
-                        _removeLiquidity(abi.decode(inputs[i], (RemoveLiquidityParams)), account);
+                if (commandInputs[i].command < Commands.CreatePair) {
+                    if (commandInputs[i].command == Commands.RemoveLiquidity) {
+                        _removeLiquidity(abi.decode(commandInputs[i].input, (RemoveLiquidityParams)), account);
                     } else {
-                        _accrue(abi.decode(inputs[i], (AccrueParams)));
+                        _accrue(abi.decode(commandInputs[i].input, (AccrueParams)));
                     }
                 } else {
-                    if (commands[i] == Commands.CreatePair) {
-                        _createPair(abi.decode(inputs[i], (CreatePairParams)));
+                    if (commandInputs[i].command == Commands.CreatePair) {
+                        _createPair(abi.decode(commandInputs[i].input, (CreatePairParams)));
                     } else {
                         revert InvalidCommand();
                     }
@@ -353,6 +354,8 @@ contract Engine is Positions {
                 i++;
             }
         }
+
+        return account;
     }
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
@@ -384,11 +387,12 @@ contract Engine is Positions {
     }
 
     /// @notice Helper add liquidity function
+    /// @custom:team How to know if strike current is correct in get amounts
     function _addLiquidity(address to, AddLiquidityParams memory params, Accounts.Account memory account) private {
         (bytes32 pairID, Pairs.Pair storage pair) =
             pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
 
-        pair.accrue(params.strike);
+        uint136 liquidityAccrued = pair.accrue(params.strike);
 
         // Calculate how much tokens to add
         // Note: subtraction can underflow, will be invalid index error
@@ -400,8 +404,8 @@ contract Engine is Positions {
             );
         }
 
+        pair.removeBorrowedLiquidity(params.strike, liquidityAccrued);
         pair.addSwapLiquidity(params.strike, params.spread, params.amountDesired);
-        // TODO: remove liquidity below the active spread
 
         (uint256 _amount0, uint256 _amount1) = getAmounts(
             pair, scaleLiquidityUp(params.amountDesired, params.scalingFactor), params.strike, params.spread, true
@@ -422,6 +426,7 @@ contract Engine is Positions {
     }
 
     /// @notice Helper borrow liquidity function
+    /// @custom:team Should we do the intermediate calculation of removing borrowed liquidity
     function _borrowLiquidity(
         address to,
         BorrowLiquidityParams memory params,
@@ -432,10 +437,17 @@ contract Engine is Positions {
         (bytes32 pairID, Pairs.Pair storage pair) =
             pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
 
-        pair.accrue(params.strike);
-        pair.addBorrowedLiquidity(params.strike, params.amountDesiredDebt);
+        uint136 liquidityAccrued = pair.accrue(params.strike);
 
-        // TODO:calculate the the tokens that are borrowed
+        unchecked {
+            if (liquidityAccrued > params.amountDesiredDebt) {
+                pair.removeBorrowedLiquidity(params.strike, liquidityAccrued - params.amountDesiredDebt);
+            } else if (params.amountDesiredDebt > liquidityAccrued) {
+                pair.addBorrowedLiquidity(params.strike, params.amountDesiredDebt - liquidityAccrued);
+            }
+        }
+
+        // TODO: calculate the the tokens that are borrowed
 
         // add collateral to account
         uint128 liquidityCollateral;
@@ -480,17 +492,20 @@ contract Engine is Positions {
     }
 
     /// @notice Helper repay liquidity function
+    /// @custom:team remove borrowed liquidity at the same time
     function _repayLiquidity(RepayLiquidityParams memory params, Accounts.Account memory account) private {
         (bytes32 pairID, Pairs.Pair storage pair) =
             pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
 
-        pair.accrue(params.strike);
+        uint136 liquidityAccrued = pair.accrue(params.strike);
 
         uint128 liquidityDebt = debtBalanceToLiquidity(
             params.amountDesired, pair.strikes[params.strike].liquidityGrowthX128.liquidityGrowthX128
         );
 
-        pair.removeBorrowedLiquidity(params.strike, liquidityDebt);
+        unchecked {
+            pair.removeBorrowedLiquidity(params.strike, liquidityAccrued + liquidityDebt);
+        }
 
         // TODO: calculate tokens owed and add to account
         // (uint256 amount0, uint256 amount1) = getAmounts(
@@ -531,7 +546,8 @@ contract Engine is Positions {
         (bytes32 pairID, Pairs.Pair storage pair) =
             pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
 
-        pair.accrue(params.strike);
+        uint136 liquidityAccrued = pair.accrue(params.strike);
+        pair.removeBorrowedLiquidity(params.strike, liquidityAccrued);
 
         // Calculate how much to remove
         // Note: subtraction can underflow, will be invalid index error
@@ -568,9 +584,10 @@ contract Engine is Positions {
         (bytes32 pairID, Pairs.Pair storage pair) =
             pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
 
-        uint256 liquidityAccrued = pair.accrue(params.strike);
+        uint136 liquidityAccrued = pair.accrue(params.strike);
+        pair.removeBorrowedLiquidity(params.strike, liquidityAccrued);
 
-        emit Accrue(pairID, liquidityAccrued);
+        emit Accrue(pairID, params.strike, liquidityAccrued);
     }
 
     /// @notice Helper create pair function

@@ -74,6 +74,7 @@ library Pairs {
     /// @param strikeCurrent Active strike index per spread
     /// @param strikeCurrentCached Strike index that was last used for a swap
     /// @param initialized True if the pair has been initialized
+    /// @custom:team could we remove strike current cached
     struct Pair {
         mapping(int24 => Strike) strikes;
         BitMaps.BitMap bitMap0To1;
@@ -405,6 +406,7 @@ library Pairs {
 
     /// @notice Add liquidity to a specific strike
     /// @dev liquidity > 0
+    /// @custom:team Handle liquidity under the activeSpread differently
     function addSwapLiquidity(Pair storage pair, int24 strike, uint8 spread, uint128 liquidity) internal {
         unchecked {
             if (!pair.initialized) revert Initialized();
@@ -431,6 +433,7 @@ library Pairs {
 
     /// @notice Remove liquidity from a specific strike
     /// @dev liquidity > 0
+    /// @custom:team Handle liquidity under the activeSpread differently
     function removeSwapLiquidity(Pair storage pair, int24 strike, uint8 spread, uint128 liquidity) internal {
         unchecked {
             if (!pair.initialized) revert Initialized();
@@ -552,7 +555,7 @@ library Pairs {
             if (blocks == 0) return 0;
             pair.strikes[strike].blockLast = uint184(block.number);
 
-            uint256 liquidityRepaid;
+            uint256 liquidityAccrued;
             uint256 liquidityBorrowedTotal;
             for (uint256 i = 0; i <= pair.strikes[strike].activeSpread; i++) {
                 uint128 liquidityBorrowed = pair.strikes[strike].liquidity[i].borrowed;
@@ -560,24 +563,24 @@ library Pairs {
                 if (liquidityBorrowed > 0) {
                     // can only overflow when (i + 1) * blocks > type(uint128).max
                     uint256 fee = (i + 1) * blocks;
-                    uint256 liquidityRepaidSpread =
+                    uint256 liquidityAccruedSpread =
                         fee >= 10_000 ? liquidityBorrowed : (fee * uint256(liquidityBorrowed)) / 10_000;
 
-                    liquidityRepaid += liquidityRepaidSpread;
+                    liquidityAccrued += liquidityAccruedSpread;
                     liquidityBorrowedTotal += liquidityBorrowed;
 
                     _updateLiqudityGrowth(
-                        pair.strikes[strike].liquidityGrowthSpreadX128[i], liquidityRepaidSpread, liquidityBorrowed
+                        pair.strikes[strike].liquidityGrowthSpreadX128[i], liquidityAccruedSpread, liquidityBorrowed
                     );
                 }
             }
 
-            if (liquidityRepaid == 0) return 0;
+            if (liquidityAccrued == 0) return 0;
 
-            _updateLiqudityGrowth(pair.strikes[strike].liquidityGrowthX128, liquidityRepaid, liquidityBorrowedTotal);
+            _updateLiqudityGrowth(pair.strikes[strike].liquidityGrowthX128, liquidityAccrued, liquidityBorrowedTotal);
 
-            // liquidityRepaid max value is NUM_SPREADS * type(uint128).max
-            return uint136(liquidityRepaid);
+            // liquidityAccrued max value is NUM_SPREADS * type(uint128).max
+            return uint136(liquidityAccrued);
         }
     }
 
