@@ -79,9 +79,9 @@ contract SwapTest is Test {
         vm.pauseGasMetering();
 
         pair.initialize(0);
-        pair.addSwapLiquidity(-4, 1, 1e18);
-        pair.strikeCurrent[0] = -4;
-        pair.strikeCurrentCached = -2;
+        pair.addSwapLiquidity(-3, 2, 1e18);
+        pair.strikeCurrent[0] = -1;
+        pair.strikeCurrent[1] = -3;
 
         vm.resumeGasMetering();
 
@@ -89,8 +89,8 @@ contract SwapTest is Test {
 
         vm.pauseGasMetering();
 
-        assertEq(pair.strikeCurrentCached, -4);
         assertEq(pair.strikeCurrent[0], -4);
+        assertEq(pair.strikeCurrent[1], -3);
 
         vm.resumeGasMetering();
     }
@@ -101,10 +101,10 @@ contract SwapTest is Test {
         vm.pauseGasMetering();
 
         pair.initialize(0);
-        pair.addSwapLiquidity(4, 1, 1e18);
-        pair.strikeCurrent[0] = 4;
-        pair.composition[0] = type(uint128).max;
-        pair.strikeCurrentCached = 3;
+        pair.addSwapLiquidity(3, 2, 1e18);
+        pair.strikeCurrent[0] = 2;
+        pair.strikeCurrent[1] = 3;
+        pair.composition[1] = type(uint128).max;
 
         vm.resumeGasMetering();
 
@@ -112,8 +112,8 @@ contract SwapTest is Test {
 
         vm.pauseGasMetering();
 
-        assertEq(pair.strikeCurrentCached, 4);
         assertEq(pair.strikeCurrent[0], 4);
+        assertEq(pair.strikeCurrent[1], 3);
 
         vm.resumeGasMetering();
     }
@@ -126,7 +126,6 @@ contract SwapTest is Test {
         pair.initialize(0);
         pair.addSwapLiquidity(1, 1, 1e18);
         pair.strikeCurrent[0] = 1;
-        pair.strikeCurrentCached = 1;
 
         vm.resumeGasMetering();
 
@@ -134,7 +133,6 @@ contract SwapTest is Test {
 
         vm.pauseGasMetering();
 
-        assertEq(pair.strikeCurrentCached, 1);
         assertEq(pair.strikeCurrent[0], 1);
 
         vm.resumeGasMetering();
@@ -149,7 +147,6 @@ contract SwapTest is Test {
         pair.addSwapLiquidity(1, 1, 1e18);
         pair.strikeCurrent[0] = 1;
         pair.composition[0] = type(uint128).max;
-        pair.strikeCurrentCached = 1;
 
         vm.resumeGasMetering();
 
@@ -157,7 +154,6 @@ contract SwapTest is Test {
 
         vm.pauseGasMetering();
 
-        assertEq(pair.strikeCurrentCached, 1);
         assertEq(pair.strikeCurrent[0], 1);
 
         vm.resumeGasMetering();
@@ -180,15 +176,12 @@ contract SwapTest is Test {
         pair.composition[0] = type(uint128).max;
         pair.composition[1] = type(uint128).max;
 
-        pair.strikeCurrentCached = -1;
-
         vm.resumeGasMetering();
 
         pair.swap(false, 1.5e18);
 
         vm.pauseGasMetering();
 
-        assertEq(pair.strikeCurrentCached, -1);
         assertEq(pair.strikeCurrent[0], -1);
         assertEq(pair.strikeCurrent[1], -2);
 
@@ -212,8 +205,6 @@ contract SwapTest is Test {
         pair.composition[0] = type(uint128).max;
         pair.composition[1] = type(uint128).max;
 
-        pair.strikeCurrentCached = -1;
-
         vm.resumeGasMetering();
 
         vm.expectRevert(Pairs.OutOfBounds.selector);
@@ -227,7 +218,6 @@ contract SwapTest is Test {
         pair.initialize(0);
         pair.addSwapLiquidity(1, 1, 1e18);
         pair.strikeCurrent[0] = 1;
-        pair.strikeCurrentCached = 1;
 
         vm.resumeGasMetering();
 
@@ -252,7 +242,6 @@ contract SwapTest is Test {
         pair.addSwapLiquidity(1, 1, 1e18);
         pair.strikeCurrent[0] = 1;
         pair.composition[0] = type(uint128).max;
-        pair.strikeCurrentCached = 1;
 
         vm.resumeGasMetering();
 
@@ -284,8 +273,6 @@ contract SwapTest is Test {
         pair.composition[0] = type(uint128).max;
         pair.composition[1] = type(uint128).max;
 
-        pair.strikeCurrentCached = -1;
-
         vm.resumeGasMetering();
 
         pair.swap(false, 1.5e18);
@@ -313,7 +300,6 @@ contract SwapTest is Test {
         pair.initialize(0);
         pair.addSwapLiquidity(1, 1, 1e18);
         pair.strikeCurrent[0] = 1;
-        pair.strikeCurrentCached = 1;
 
         vm.resumeGasMetering();
 
@@ -341,7 +327,6 @@ contract SwapTest is Test {
         pair.initialize(0);
         pair.addSwapLiquidity(1, 1, 1e18);
         pair.strikeCurrent[0] = 1;
-        pair.strikeCurrentCached = 1;
 
         vm.resumeGasMetering();
 
@@ -369,7 +354,6 @@ contract SwapTest is Test {
         pair.initialize(0);
         pair.addSwapLiquidity(-1, 1, 1e18);
         pair.strikeCurrent[0] = -1;
-        pair.strikeCurrentCached = -1;
         pair.composition[0] = type(uint128).max;
 
         vm.resumeGasMetering();
@@ -399,7 +383,6 @@ contract SwapTest is Test {
         pair.initialize(0);
         pair.addSwapLiquidity(-1, 1, 1e18);
         pair.strikeCurrent[0] = -1;
-        pair.strikeCurrentCached = -1;
         pair.composition[0] = type(uint128).max;
 
         vm.resumeGasMetering();
@@ -437,7 +420,6 @@ contract SwapTest is Test {
 
         vm.pauseGasMetering();
 
-        assertEq(pair.strikeCurrentCached, -1);
         assertEq(pair.strikeCurrent[0], -1);
 
         vm.resumeGasMetering();
@@ -458,7 +440,6 @@ contract SwapTest is Test {
 
         vm.pauseGasMetering();
 
-        assertEq(pair.strikeCurrentCached, 1);
         assertEq(pair.strikeCurrent[0], 1);
 
         vm.resumeGasMetering();
@@ -483,7 +464,6 @@ contract SwapTest is Test {
 
         vm.pauseGasMetering();
 
-        assertEq(pair.strikeCurrentCached, -1);
         assertEq(pair.strikeCurrent[0], -1);
         assertEq(pair.strikeCurrent[1], 0);
 
@@ -506,7 +486,6 @@ contract SwapTest is Test {
 
         vm.pauseGasMetering();
 
-        assertEq(pair.strikeCurrentCached, 1);
         assertEq(pair.strikeCurrent[0], 1);
         assertEq(pair.strikeCurrent[1], 0);
 
@@ -566,7 +545,6 @@ contract SwapTest is Test {
 
         vm.pauseGasMetering();
 
-        assertEq(pair.strikeCurrentCached, 0);
         assertEq(pair.strikeCurrent[0], 1);
         assertEq(pair.strikeCurrent[1], 0);
         assertEq(pair.strikeCurrent[2], 0);
@@ -583,8 +561,6 @@ contract SwapTest is Test {
         pair.addSwapLiquidity(1, 1, 1e18);
         pair.addSwapLiquidity(3, 3, 1e18);
 
-        pair.strikeCurrentCached = 1;
-
         pair.strikeCurrent[0] = 1;
         pair.strikeCurrent[2] = 3;
 
@@ -594,7 +570,6 @@ contract SwapTest is Test {
 
         vm.pauseGasMetering();
 
-        assertEq(pair.strikeCurrentCached, 1);
         assertEq(pair.strikeCurrent[0], 1);
         assertEq(pair.strikeCurrent[1], 2);
         assertEq(pair.strikeCurrent[2], 3);

@@ -612,17 +612,11 @@ contract Engine is Positions {
     )
         external
         view
-        returns (
-            uint128[NUM_SPREADS] memory composition,
-            int24[NUM_SPREADS] memory strikeCurrent,
-            int24 strikeCurrentCached,
-            bool initialized
-        )
+        returns (uint128[NUM_SPREADS] memory composition, int24[NUM_SPREADS] memory strikeCurrent, bool initialized)
     {
         (, Pairs.Pair storage pair) = pairs.getPairAndID(token0, token1, scalingFactor);
 
-        (composition, strikeCurrent, strikeCurrentCached, initialized) =
-            (pair.composition, pair.strikeCurrent, pair.strikeCurrentCached, pair.initialized);
+        (composition, strikeCurrent, initialized) = (pair.composition, pair.strikeCurrent, pair.initialized);
     }
 
     /// @notice Return the state of the strike

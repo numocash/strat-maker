@@ -6,6 +6,7 @@ import {createCommand, createCommandInput, pushCommandInputs} from "../../../uti
 
 import {Engine} from "src/core/Engine.sol";
 import {Accounts} from "src/core/Accounts.sol";
+import {NUM_SPREADS} from "src/core/Pairs.sol";
 
 contract CreatePairTest is Test {
     event PairCreated(address indexed token0, address indexed token1, uint8 scalingFactor, int24 strikeInitial);
@@ -56,9 +57,9 @@ contract CreatePairTest is Test {
         assertEq(account.erc20Data.length, 0);
         assertEq(account.lpData.length, 0);
 
-        (,, int24 strikeCurrentCached, bool initialized) = engine.getPair(address(1), address(2), 0);
+        (, int24[NUM_SPREADS] memory strikeCurrent, bool initialized) = engine.getPair(address(1), address(2), 0);
 
-        assertEq(strikeCurrentCached, 0);
+        assertEq(strikeCurrent[0], 0);
         assertEq(initialized, true);
 
         vm.resumeGasMetering();

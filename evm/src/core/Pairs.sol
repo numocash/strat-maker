@@ -74,16 +74,14 @@ library Pairs {
     /// @param bitMap1To0 Bit map of strikes supporting 1 to 0 swaps
     /// @param composition Percentage of liquidity held in token 1 per spread
     /// @param strikeCurrent Active strike index per spread
-    /// @param strikeCurrentCached Strike index that was last used for a swap
     /// @param initialized True if the pair has been initialized
-    /// @custom:team could we remove strike current cached
+    /// @custom:team could we remove strike current cached and initialized
     struct Pair {
         mapping(int24 => Strike) strikes;
         BitMaps.BitMap bitMap0To1;
         BitMaps.BitMap bitMap1To0;
         uint128[NUM_SPREADS] composition;
         int24[NUM_SPREADS] strikeCurrent;
-        int24 strikeCurrentCached;
         bool initialized;
     }
 
@@ -121,7 +119,6 @@ library Pairs {
 
         _checkStrike(strikeInitial);
 
-        pair.strikeCurrentCached = strikeInitial;
         pair.initialized = true;
 
         // strike order when swapping 0 -> 1
@@ -190,13 +187,13 @@ library Pairs {
         // Find the closest strike offering a swap and set initial swap state
         SwapState memory state;
         unchecked {
-            int24 _strikeCurrentCached = pair.strikeCurrentCached;
+            int24 _strikeCurrent = pair.strikeCurrent[0];
             int24 strike = isSwap0To1
-                ? pair.strikes[-pair.bitMap0To1.nextBelow(-_strikeCurrentCached)].next0To1
-                : pair.strikes[pair.bitMap1To0.nextBelow(_strikeCurrentCached)].next1To0;
+                ? pair.strikes[-pair.bitMap0To1.nextBelow(-_strikeCurrent)].next0To1
+                : pair.strikes[pair.bitMap1To0.nextBelow(_strikeCurrent)].next1To0;
 
             state.strike = strike;
-            state.strikeStart = isSwap0To1 ? _strikeCurrentCached - 1 : _strikeCurrentCached + 1;
+            state.strikeStart = isSwap0To1 ? _strikeCurrent - 1 : _strikeCurrent + 1;
             state.spreadBitMap = isSwap0To1 ? pair.strikes[strike].reference0To1 : pair.strikes[strike].reference1To0;
         }
 
@@ -388,7 +385,6 @@ library Pairs {
         // Save updated pair state to storage
         unchecked {
             if (isSwap0To1) {
-                pair.strikeCurrentCached = state.strike + int24(uint24(_lsb(state.spreadBitMap) + 1));
                 uint128 composition = uint128(mulDiv(state.liquidityRemaining, Q128, state.liquidityTotal));
                 uint256 strikeDelta = uint24(state.strikeStart - state.strike);
                 uint256 consecutiveSpreads = strikeDelta > NUM_SPREADS ? NUM_SPREADS : strikeDelta;
@@ -398,7 +394,6 @@ library Pairs {
                     pair.composition[i] = composition;
                 }
             } else {
-                pair.strikeCurrentCached = state.strike - int24(uint24(_lsb(state.spreadBitMap) + 1));
                 uint128 composition =
                     type(uint128).max - uint128(mulDiv(state.liquidityRemaining, Q128, state.liquidityTotal));
                 uint24 strikeDelta = uint24(state.strike - state.strikeStart);
@@ -452,9 +447,9 @@ library Pairs {
                 _checkStrike(strike1To0);
 
                 if (existingLiquidity == 0) {
-                    int24 _strikeCurrentCached = pair.strikeCurrentCached;
-                    _addStrike0To1(pair, strike0To1, spread, _strikeCurrentCached == strike0To1);
-                    _addStrike1To0(pair, strike1To0, spread, _strikeCurrentCached == strike1To0);
+                    int24 _strikeCurrent = pair.strikeCurrent[0];
+                    _addStrike0To1(pair, strike0To1, spread, _strikeCurrent == strike0To1);
+                    _addStrike1To0(pair, strike1To0, spread, _strikeCurrent == strike1To0);
                 }
 
                 return 0;
@@ -494,9 +489,9 @@ library Pairs {
                         int24 strike0To1 = strike - int8(spread);
                         int24 strike1To0 = strike + int8(spread);
 
-                        int24 _strikeCurrentCached = pair.strikeCurrentCached;
-                        _removeStrike0To1(pair, strike0To1, spread, _strikeCurrentCached == strike0To1);
-                        _removeStrike1To0(pair, strike1To0, spread, _strikeCurrentCached == strike1To0);
+                        int24 _strikeCurrent = pair.strikeCurrent[0];
+                        _removeStrike0To1(pair, strike0To1, spread, _strikeCurrent == strike0To1);
+                        _removeStrike1To0(pair, strike1To0, spread, _strikeCurrent == strike1To0);
                     }
 
                     uint128 remainingLiquidity = liquidity - existingLiquidity;
@@ -540,9 +535,9 @@ library Pairs {
                     int24 strike0To1 = strike - int8(_activeSpread + 1);
                     int24 strike1To0 = strike + int8(_activeSpread + 1);
 
-                    int24 _strikeCurrentCached = pair.strikeCurrentCached;
-                    _removeStrike0To1(pair, strike0To1, _activeSpread + 1, _strikeCurrentCached == strike0To1);
-                    _removeStrike1To0(pair, strike1To0, _activeSpread + 1, _strikeCurrentCached == strike1To0);
+                    int24 _strikeCurrent = pair.strikeCurrent[0];
+                    _removeStrike0To1(pair, strike0To1, _activeSpread + 1, _strikeCurrent == strike0To1);
+                    _removeStrike1To0(pair, strike1To0, _activeSpread + 1, _strikeCurrent == strike1To0);
                 }
 
                 // move to next spread
@@ -583,9 +578,9 @@ library Pairs {
                     int24 strike0To1 = strike - int8(_activeSpread);
                     int24 strike1To0 = strike + int8(_activeSpread);
 
-                    int24 _strikeCurrentCached = pair.strikeCurrentCached;
-                    _addStrike0To1(pair, strike0To1, _activeSpread, _strikeCurrentCached == strike0To1);
-                    _addStrike1To0(pair, strike1To0, _activeSpread, _strikeCurrentCached == strike1To0);
+                    int24 _strikeCurrent = pair.strikeCurrent[0];
+                    _addStrike0To1(pair, strike0To1, _activeSpread, _strikeCurrent == strike0To1);
+                    _addStrike1To0(pair, strike1To0, _activeSpread, _strikeCurrent == strike1To0);
                 }
 
                 // move to next spread
