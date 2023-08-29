@@ -55,10 +55,11 @@ contract AddSwapLiquidityTest is Test {
 
         vm.resumeGasMetering();
 
-        pair.addSwapLiquidity(2, 1, 1e18);
+        uint128 displacedLiquidity = pair.addSwapLiquidity(2, 1, 1e18);
 
         vm.pauseGasMetering();
 
+        assertEq(displacedLiquidity, 0);
         assertEq(pair.strikes[2].liquidity[0].swap, 1e18);
 
         // 0 to 1 strike order
@@ -138,10 +139,11 @@ contract AddSwapLiquidityTest is Test {
 
         vm.resumeGasMetering();
 
-        pair.addSwapLiquidity(2, 1, 1e18);
+        uint128 displacedLiquidity = pair.addSwapLiquidity(2, 1, 1e18);
 
         vm.pauseGasMetering();
 
+        assertEq(displacedLiquidity, 0);
         assertEq(pair.strikes[2].liquidity[0].swap, 2e18);
 
         // 0 to 1 strike order
@@ -212,5 +214,24 @@ contract AddSwapLiquidityTest is Test {
 
         vm.expectRevert(Pairs.Overflow.selector);
         pair.addSwapLiquidity(2, 1, 1);
+    }
+
+    /// @notice Test adding swap liquidity under the current active spread;
+    function test_AddSwapLiquidity_UnderActiveSpread() external {
+        vm.pauseGasMetering();
+
+        pair.initialize(0);
+        pair.strikes[2].activeSpread = 1;
+
+        vm.resumeGasMetering();
+
+        uint128 displacedLiquidity = pair.addSwapLiquidity(2, 1, 1e18);
+
+        vm.pauseGasMetering();
+
+        assertEq(displacedLiquidity, 1e18);
+        assertEq(pair.strikes[2].liquidity[0].borrowed, 1e18);
+
+        vm.resumeGasMetering();
     }
 }

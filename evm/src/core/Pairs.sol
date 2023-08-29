@@ -406,53 +406,92 @@ library Pairs {
 
     /// @notice Add liquidity to a specific strike
     /// @dev liquidity > 0
-    /// @custom:team Handle liquidity under the activeSpread differently
-    function addSwapLiquidity(Pair storage pair, int24 strike, uint8 spread, uint128 liquidity) internal {
+    function addSwapLiquidity(
+        Pair storage pair,
+        int24 strike,
+        uint8 spread,
+        uint128 liquidity
+    )
+        internal
+        returns (uint128)
+    {
         unchecked {
             if (!pair.initialized) revert Initialized();
             _checkSpread(spread);
 
-            int24 strike0To1 = strike - int8(spread);
-            int24 strike1To0 = strike + int8(spread);
-
-            _checkStrike(strike0To1);
-            _checkStrike(strike1To0);
-
             uint256 existingLiquidity = pair.strikes[strike].liquidity[spread - 1].swap;
             uint256 borrowedLiquidity = pair.strikes[strike].liquidity[spread - 1].borrowed;
-            if (existingLiquidity + borrowedLiquidity + uint256(liquidity) > type(uint128).max) revert Overflow();
-            pair.strikes[strike].liquidity[spread - 1].swap = uint128(existingLiquidity) + liquidity;
 
-            if (existingLiquidity == 0) {
-                int24 _strikeCurrentCached = pair.strikeCurrentCached;
-                _addStrike0To1(pair, strike0To1, spread, _strikeCurrentCached == strike0To1);
-                _addStrike1To0(pair, strike1To0, spread, _strikeCurrentCached == strike1To0);
+            if (existingLiquidity + borrowedLiquidity + uint256(liquidity) > type(uint128).max) revert Overflow();
+
+            if (spread - 1 < pair.strikes[strike].activeSpread) {
+                pair.strikes[strike].liquidity[spread - 1].borrowed = uint128(borrowedLiquidity) + liquidity;
+
+                return liquidity;
+            } else {
+                pair.strikes[strike].liquidity[spread - 1].swap = uint128(existingLiquidity) + liquidity;
+
+                int24 strike0To1 = strike - int8(spread);
+                int24 strike1To0 = strike + int8(spread);
+
+                _checkStrike(strike0To1);
+                _checkStrike(strike1To0);
+
+                if (existingLiquidity == 0) {
+                    int24 _strikeCurrentCached = pair.strikeCurrentCached;
+                    _addStrike0To1(pair, strike0To1, spread, _strikeCurrentCached == strike0To1);
+                    _addStrike1To0(pair, strike1To0, spread, _strikeCurrentCached == strike1To0);
+                }
+
+                return 0;
             }
         }
     }
 
     /// @notice Remove liquidity from a specific strike
     /// @dev liquidity > 0
-    /// @custom:team Handle liquidity under the activeSpread differently
-    function removeSwapLiquidity(Pair storage pair, int24 strike, uint8 spread, uint128 liquidity) internal {
+    function removeSwapLiquidity(
+        Pair storage pair,
+        int24 strike,
+        uint8 spread,
+        uint128 liquidity
+    )
+        internal
+        returns (uint128)
+    {
         unchecked {
             if (!pair.initialized) revert Initialized();
             _checkSpread(spread);
 
-            int24 strike0To1 = strike - int8(spread);
-            int24 strike1To0 = strike + int8(spread);
+            uint256 _activeSpread = pair.strikes[strike].activeSpread;
 
-            _checkStrike(strike0To1);
-            _checkStrike(strike1To0);
+            if (spread - 1 < _activeSpread) {
+                pair.strikes[strike].liquidity[spread - 1].borrowed -= liquidity;
 
-            uint128 existingLiquidity = pair.strikes[strike].liquidity[spread - 1].swap;
-            if (liquidity > existingLiquidity) revert Overflow();
-            pair.strikes[strike].liquidity[spread - 1].swap = existingLiquidity - liquidity;
+                return liquidity;
+            } else {
+                uint128 existingLiquidity = pair.strikes[strike].liquidity[spread - 1].swap;
 
-            if (existingLiquidity == liquidity) {
-                int24 _strikeCurrentCached = pair.strikeCurrentCached;
-                _removeStrike0To1(pair, strike0To1, spread, _strikeCurrentCached == strike0To1);
-                _removeStrike1To0(pair, strike1To0, spread, _strikeCurrentCached == strike1To0);
+                if (liquidity < existingLiquidity) {
+                    pair.strikes[strike].liquidity[spread - 1].swap = existingLiquidity - liquidity;
+                    return 0;
+                } else {
+                    if (liquidity >= existingLiquidity) {
+                        int24 strike0To1 = strike - int8(spread);
+                        int24 strike1To0 = strike + int8(spread);
+
+                        int24 _strikeCurrentCached = pair.strikeCurrentCached;
+                        _removeStrike0To1(pair, strike0To1, spread, _strikeCurrentCached == strike0To1);
+                        _removeStrike1To0(pair, strike1To0, spread, _strikeCurrentCached == strike1To0);
+                    }
+
+                    uint128 remainingLiquidity = liquidity - existingLiquidity;
+
+                    if (spread - 1 == _activeSpread) pair.strikes[strike].liquidity[spread - 1].swap = 0;
+                    pair.strikes[strike].liquidity[spread - 1].borrowed -= remainingLiquidity;
+
+                    return remainingLiquidity;
+                }
             }
         }
     }
