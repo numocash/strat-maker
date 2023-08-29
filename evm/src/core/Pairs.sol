@@ -7,6 +7,8 @@ import {toInt256} from "./math/LiquidityMath.sol";
 import {getRatioAtStrike, MAX_STRIKE, MIN_STRIKE, Q128} from "./math/StrikeMath.sol";
 import {computeSwapStep} from "./math/SwapMath.sol";
 
+import {console2} from "forge-std/console2.sol";
+
 uint8 constant NUM_SPREADS = 5;
 
 /// @title Pairs
@@ -136,6 +138,12 @@ library Pairs {
         pair.strikes[MIN_STRIKE].next1To0 = strikeInitial;
         pair.strikes[strikeInitial].next0To1 = MIN_STRIKE;
         pair.strikes[strikeInitial].next1To0 = MAX_STRIKE;
+
+        unchecked {
+            for (uint256 i = 0; i < NUM_SPREADS; i++) {
+                pair.strikeCurrent[i] = strikeInitial;
+            }
+        }
     }
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
@@ -181,14 +189,14 @@ library Pairs {
 
         // Find the closest strike offering a swap and set initial swap state
         SwapState memory state;
-        {
+        unchecked {
             int24 _strikeCurrentCached = pair.strikeCurrentCached;
             int24 strike = isSwap0To1
                 ? pair.strikes[-pair.bitMap0To1.nextBelow(-_strikeCurrentCached)].next0To1
                 : pair.strikes[pair.bitMap1To0.nextBelow(_strikeCurrentCached)].next1To0;
 
             state.strike = strike;
-            state.strikeStart = _strikeCurrentCached;
+            state.strikeStart = isSwap0To1 ? _strikeCurrentCached - 1 : _strikeCurrentCached + 1;
             state.spreadBitMap = isSwap0To1 ? pair.strikes[strike].reference0To1 : pair.strikes[strike].reference1To0;
         }
 
@@ -294,7 +302,7 @@ library Pairs {
                     for (uint256 i = _lsb(state.spreadBitMap); i <= _msb(state.spreadBitMap); i++) {
                         if ((state.spreadBitMap & (1 << i)) > 0) {
                             int24 spreadStrike = state.strike + int24(uint24(i + 1));
-                            uint24 strikeDelta = uint24(state.strikeStart - state.strike) - 1;
+                            uint24 strikeDelta = uint24(state.strikeStart - state.strike);
 
                             if (i < strikeDelta) {
                                 uint256 liquidity = pair.strikes[spreadStrike].liquidity[i].swap;
@@ -348,7 +356,7 @@ library Pairs {
                     for (uint256 i = _lsb(state.spreadBitMap); i <= _msb(state.spreadBitMap); i++) {
                         if ((state.spreadBitMap & (1 << i)) > 0) {
                             int24 spreadStrike = state.strike - int24(uint24(i + 1));
-                            uint24 strikeDelta = uint24(state.strike - state.strikeStart) - 1;
+                            uint24 strikeDelta = uint24(state.strike - state.strikeStart);
 
                             if (i < strikeDelta) {
                                 uint256 liquidity = pair.strikes[spreadStrike].liquidity[i].swap;
@@ -382,7 +390,10 @@ library Pairs {
             if (isSwap0To1) {
                 pair.strikeCurrentCached = state.strike + int24(uint24(_lsb(state.spreadBitMap) + 1));
                 uint128 composition = uint128(mulDiv(state.liquidityRemaining, Q128, state.liquidityTotal));
-                for (uint256 i = 0; i <= _msb(state.spreadBitMap); i++) {
+                uint256 strikeDelta = uint24(state.strikeStart - state.strike);
+                uint256 consecutiveSpreads = strikeDelta > NUM_SPREADS ? NUM_SPREADS : strikeDelta;
+                uint8 msb = _msb(state.spreadBitMap);
+                for (uint256 i = 0; i <= (msb > consecutiveSpreads ? msb : consecutiveSpreads); i++) {
                     pair.strikeCurrent[i] = state.strike + int24(uint24(i + 1));
                     pair.composition[i] = composition;
                 }
@@ -390,7 +401,10 @@ library Pairs {
                 pair.strikeCurrentCached = state.strike - int24(uint24(_lsb(state.spreadBitMap) + 1));
                 uint128 composition =
                     type(uint128).max - uint128(mulDiv(state.liquidityRemaining, Q128, state.liquidityTotal));
-                for (uint256 i = 0; i <= _msb(state.spreadBitMap); i++) {
+                uint24 strikeDelta = uint24(state.strike - state.strikeStart);
+                uint256 consecutiveSpreads = strikeDelta > NUM_SPREADS ? NUM_SPREADS : strikeDelta;
+                uint8 msb = _msb(state.spreadBitMap);
+                for (uint256 i = 0; i <= (msb > consecutiveSpreads ? msb : consecutiveSpreads); i++) {
                     pair.strikeCurrent[i] = state.strike - int24(uint24(i + 1));
                     pair.composition[i] = composition;
                 }

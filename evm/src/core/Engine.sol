@@ -382,7 +382,6 @@ contract Engine is Positions {
     }
 
     /// @notice Helper add liquidity function
-    /// @custom:team How to know if strike current is correct in get amounts
     function _addLiquidity(address to, AddLiquidityParams memory params, Accounts.Account memory account) private {
         (bytes32 pairID, Pairs.Pair storage pair) =
             pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
@@ -400,17 +399,20 @@ contract Engine is Positions {
         }
 
         pair.removeBorrowedLiquidity(params.strike, liquidityAccrued);
-        pair.addSwapLiquidity(params.strike, params.spread, params.amountDesired);
+        uint256 displacedLiquidity = pair.addSwapLiquidity(params.strike, params.spread, params.amountDesired);
 
         (uint256 _amount0, uint256 _amount1) = getAmounts(
             pair, scaleLiquidityUp(params.amountDesired, params.scalingFactor), params.strike, params.spread, true
         );
-        int256 amount0 = toInt256(_amount0);
-        int256 amount1 = toInt256(_amount1);
 
-        // update accounts
-        account.updateToken(params.token0, amount0);
-        account.updateToken(params.token1, amount1);
+        {
+            int256 amount0 = toInt256(_amount0);
+            int256 amount1 = toInt256(_amount1);
+
+            // update accounts
+            account.updateToken(params.token0, amount0);
+            account.updateToken(params.token1, amount1);
+        }
 
         // mint position token
         _mintBiDirectional(
@@ -554,17 +556,21 @@ contract Engine is Positions {
             );
         }
 
-        pair.removeSwapLiquidity(params.strike, params.spread, liquidity);
-        // TODO: remove liquidity below the active spread
+        uint256 displacedLiquidity = pair.removeSwapLiquidity(params.strike, params.spread, liquidity);
 
         (uint256 _amount0, uint256 _amount1) =
             getAmounts(pair, scaleLiquidityUp(liquidity, params.scalingFactor), params.strike, params.spread, false);
-        int256 amount0 = -toInt256(_amount0);
-        int256 amount1 = -toInt256(_amount1);
 
-        // update accounts
-        account.updateToken(params.token0, amount0);
-        account.updateToken(params.token1, amount1);
+        {
+            int256 amount0 = -toInt256(_amount0);
+            int256 amount1 = -toInt256(_amount1);
+
+            // update accounts
+            account.updateToken(params.token0, amount0);
+            account.updateToken(params.token1, amount1);
+        }
+
+        // update position token
         account.updateLP(
             biDirectionalID(params.token0, params.token1, params.scalingFactor, params.strike, params.spread),
             params.amountDesired,

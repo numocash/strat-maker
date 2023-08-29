@@ -192,7 +192,7 @@ contract SwapTest is Test {
         assertEq(pair.strikeCurrent[0], -1);
         assertEq(pair.strikeCurrent[1], -2);
 
-        assertEq(pair.composition[0], pair.composition[1]);
+        assertEq(pair.composition[0], pair.composition[1], "composition");
 
         vm.resumeGasMetering();
     }
