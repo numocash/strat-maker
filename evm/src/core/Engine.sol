@@ -28,8 +28,6 @@ import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
 
 import {IExecuteCallback} from "./interfaces/IExecuteCallback.sol";
 
-import {console2} from "forge-std/console2.sol";
-
 /// @title Engine
 /// @notice ERC20 exchange
 /// @author Kyle Scott and Robert Leifke
@@ -201,14 +199,10 @@ contract Engine is Positions {
     }
 
     /// @notice Data to pass to an accrue action
-    /// @param token0 Token in the 0 position of the pair
-    /// @param token1 Token in the 1 position of the pair
-    /// @param scalingFactor Amount to divide liquidity by to make it fit in a uint128
+    /// @param pairID ID of the pair
     /// @param strike The strike to accrue interest to
     struct AccrueParams {
-        address token0;
-        address token1;
-        uint8 scalingFactor;
+        bytes32 pairID;
         int24 strike;
     }
 
@@ -255,6 +249,7 @@ contract Engine is Positions {
     /// @param to Address to send the output to
     /// @param commandInputs List of command inputs
     /// @param data Untouched data passed back to the callback
+    /// @custom:team Try changing commandInputs to memory
     function execute(
         address to,
         CommandInput[] calldata commandInputs,
@@ -581,13 +576,12 @@ contract Engine is Positions {
 
     /// @notice Helper accrue function
     function _accrue(AccrueParams memory params) private {
-        (bytes32 pairID, Pairs.Pair storage pair) =
-            pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
+        Pairs.Pair storage pair = pairs[params.pairID];
 
         uint136 liquidityAccrued = pair.accrue(params.strike);
-        pair.removeBorrowedLiquidity(params.strike, liquidityAccrued);
+        if (liquidityAccrued > 0) pair.removeBorrowedLiquidity(params.strike, liquidityAccrued);
 
-        emit Accrue(pairID, params.strike, liquidityAccrued);
+        emit Accrue(params.pairID, params.strike, liquidityAccrued);
     }
 
     /// @notice Helper create pair function

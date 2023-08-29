@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {Engine} from "src/core/Engine.sol";
+import {Pairs} from "src/core/Pairs.sol";
 
 function createCommand(
     address token0,
@@ -89,6 +90,20 @@ function removeLiquidityCommand(
     return Engine.CommandInput(
         Engine.Commands.RemoveLiquidity,
         abi.encode(Engine.RemoveLiquidityParams(token0, token1, scalingFactor, strike, spread, amountDesired))
+    );
+}
+
+function accrueCommand(
+    address token0,
+    address token1,
+    uint8 scalingFactor,
+    int24 strike
+)
+    pure
+    returns (Engine.CommandInput memory commandInput)
+{
+    return Engine.CommandInput(
+        Engine.Commands.Accrue, abi.encode(Engine.AccrueParams(Pairs.getPairID(token0, token1, scalingFactor), strike))
     );
 }
 
