@@ -358,7 +358,7 @@ contract Engine is Positions {
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     /// @notice Helper swap function
-    /// @custom:team Should we admit the to address
+    /// @custom:team Should we admit the `to` address
     function _swap(SwapParams memory params, Accounts.Account memory account) private {
         (bytes32 pairID, Pairs.Pair storage pair) =
             pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
@@ -388,31 +388,28 @@ contract Engine is Positions {
 
         uint136 liquidityAccrued = pair.accrue(params.strike);
 
-        // Calculate how much tokens to add
-        // Note: subtraction can underflow, will be invalid index error
         uint128 balance;
         unchecked {
+            // Note: subtraction can underflow, will be invalid index error
             balance = liquidityToBalance(
                 params.amountDesired,
                 pair.strikes[params.strike].liquidityGrowthSpreadX128[params.spread - 1].liquidityGrowthX128
             );
+
+            // add liquidity to pair
+            uint136 liquidityDisplaced = pair.addSwapLiquidity(params.strike, params.spread, params.amountDesired);
+            uint136 liquidityRemove = liquidityAccrued + liquidityDisplaced;
+            if (liquidityRemove > 0) pair.removeBorrowedLiquidity(params.strike, liquidityRemove);
         }
 
-        pair.removeBorrowedLiquidity(params.strike, liquidityAccrued);
-        uint256 displacedLiquidity = pair.addSwapLiquidity(params.strike, params.spread, params.amountDesired);
-
+        // Calculate how much tokens to add
         (uint256 _amount0, uint256 _amount1) = getAmounts(
             pair, scaleLiquidityUp(params.amountDesired, params.scalingFactor), params.strike, params.spread, true
         );
 
-        {
-            int256 amount0 = toInt256(_amount0);
-            int256 amount1 = toInt256(_amount1);
-
-            // update accounts
-            account.updateToken(params.token0, amount0);
-            account.updateToken(params.token1, amount1);
-        }
+        // update accounts
+        account.updateToken(params.token0, toInt256(_amount0));
+        account.updateToken(params.token1, toInt256(_amount1));
 
         // mint position token
         _mintBiDirectional(
@@ -423,7 +420,6 @@ contract Engine is Positions {
     }
 
     /// @notice Helper borrow liquidity function
-    /// @custom:team Should we do the intermediate calculation of removing borrowed liquidity
     function _borrowLiquidity(
         address to,
         BorrowLiquidityParams memory params,
@@ -544,7 +540,6 @@ contract Engine is Positions {
             pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
 
         uint136 liquidityAccrued = pair.accrue(params.strike);
-        pair.removeBorrowedLiquidity(params.strike, liquidityAccrued);
 
         // Calculate how much to remove
         // Note: subtraction can underflow, will be invalid index error
@@ -554,21 +549,20 @@ contract Engine is Positions {
                 params.amountDesired,
                 pair.strikes[params.strike].liquidityGrowthSpreadX128[params.spread - 1].liquidityGrowthX128
             );
+            uint136 liquidityDisplaced = pair.removeSwapLiquidity(params.strike, params.spread, liquidity);
+            if (liquidityDisplaced > liquidityAccrued) {
+                pair.addBorrowedLiquidity(params.strike, liquidityDisplaced - liquidityAccrued);
+            } else if (liquidityDisplaced < liquidityAccrued) {
+                pair.removeBorrowedLiquidity(params.strike, liquidityAccrued - liquidityDisplaced);
+            }
         }
-
-        uint256 displacedLiquidity = pair.removeSwapLiquidity(params.strike, params.spread, liquidity);
 
         (uint256 _amount0, uint256 _amount1) =
             getAmounts(pair, scaleLiquidityUp(liquidity, params.scalingFactor), params.strike, params.spread, false);
 
-        {
-            int256 amount0 = -toInt256(_amount0);
-            int256 amount1 = -toInt256(_amount1);
-
-            // update accounts
-            account.updateToken(params.token0, amount0);
-            account.updateToken(params.token1, amount1);
-        }
+        // update accounts
+        account.updateToken(params.token0, -toInt256(_amount0));
+        account.updateToken(params.token1, -toInt256(_amount1));
 
         // update position token
         account.updateLP(

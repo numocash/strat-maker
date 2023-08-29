@@ -7,8 +7,6 @@ import {toInt256} from "./math/LiquidityMath.sol";
 import {getRatioAtStrike, MAX_STRIKE, MIN_STRIKE, Q128} from "./math/StrikeMath.sol";
 import {computeSwapStep} from "./math/SwapMath.sol";
 
-import {console2} from "forge-std/console2.sol";
-
 uint8 constant NUM_SPREADS = 5;
 
 /// @title Pairs
@@ -75,7 +73,6 @@ library Pairs {
     /// @param composition Percentage of liquidity held in token 1 per spread
     /// @param strikeCurrent Active strike index per spread
     /// @param initialized True if the pair has been initialized
-    /// @custom:team could we remove strike current cached and initialized
     struct Pair {
         mapping(int24 => Strike) strikes;
         BitMaps.BitMap bitMap0To1;

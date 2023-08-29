@@ -8,8 +8,6 @@ import {Engine} from "src/core/Engine.sol";
 import {Accounts} from "src/core/Accounts.sol";
 import {Pairs} from "src/core/Pairs.sol";
 
-import {console2} from "forge-std/console2.sol";
-
 contract AccrueTest is Test {
     event Accrue(bytes32 indexed pairID, int24 indexed strike, uint136 liquidityAccrued);
 
