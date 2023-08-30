@@ -16,7 +16,7 @@ contract AddBorrowedLiquidityTest is Test {
     /// @notice Test borrowing for a pair that is not initialized
     function test_BorrowLiquidity_NotInitialized() external {
         vm.expectRevert();
-        pair.addBorrowedLiquidity(0, 1e18, false);
+        pair.addBorrowedLiquidity(0, 1e18);
     }
 
     /// @notice Test borrowing partial liquidity from a spread
@@ -28,7 +28,7 @@ contract AddBorrowedLiquidityTest is Test {
 
         vm.resumeGasMetering();
 
-        pair.addBorrowedLiquidity(2, 0.5e18, false);
+        pair.addBorrowedLiquidity(2, 0.5e18);
 
         vm.pauseGasMetering();
 
@@ -48,7 +48,7 @@ contract AddBorrowedLiquidityTest is Test {
 
         vm.resumeGasMetering();
 
-        pair.addBorrowedLiquidity(2, 1e18, false);
+        pair.addBorrowedLiquidity(2, 1e18);
 
         vm.pauseGasMetering();
 
@@ -68,7 +68,7 @@ contract AddBorrowedLiquidityTest is Test {
 
         vm.resumeGasMetering();
 
-        pair.addBorrowedLiquidity(3, 0.5e18, false);
+        pair.addBorrowedLiquidity(3, 0.5e18);
 
         vm.pauseGasMetering();
 
@@ -95,7 +95,7 @@ contract AddBorrowedLiquidityTest is Test {
 
         vm.resumeGasMetering();
 
-        pair.addBorrowedLiquidity(3, 1.5e18, false);
+        pair.addBorrowedLiquidity(3, 1.5e18);
 
         vm.pauseGasMetering();
 
@@ -141,7 +141,7 @@ contract AddBorrowedLiquidityTest is Test {
 
         vm.resumeGasMetering();
 
-        pair.addBorrowedLiquidity(1, 1.5e18, false);
+        pair.addBorrowedLiquidity(1, 1.5e18);
 
         vm.pauseGasMetering();
 
@@ -183,6 +183,6 @@ contract AddBorrowedLiquidityTest is Test {
         vm.resumeGasMetering();
 
         vm.expectRevert(Pairs.OutOfBounds.selector);
-        pair.addBorrowedLiquidity(1, 1, false);
+        pair.addBorrowedLiquidity(1, 1);
     }
 }

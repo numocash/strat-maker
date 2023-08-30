@@ -22,11 +22,11 @@ contract PositionMathFuzzTest is Test {
         assertGe(liquidity, balanceToLiquidity(liquidityToBalance(liquidity, liquidityGrowthX128), liquidityGrowthX128));
     }
 
-    /// @notice balanceToLiquidity cannot overflow because balance >= liquidity for liquidity positions
-    function testFuzz_BalanceToLiquidity_Overflow(uint128 liquidity, uint256 liquidityGrowthX128) external {
+    /// @notice liquidityToBalance cannot overflow because liquidity >= balance for liquidity positions
+    function testFuzz_LiquidityToBalance_Overflow(uint128 liquidity, uint256 liquidityGrowthX128) external {
         vm.assume(liquidityGrowthX128 == 0 || liquidityGrowthX128 >= Q128);
 
-        assertGe(liquidity, balanceToLiquidity(liquidity, liquidityGrowthX128));
+        assertGe(liquidity, liquidityToBalance(liquidity, liquidityGrowthX128));
     }
 
     /// @notice liquidity to balance back to liquidity is alwasy greater than the original amount

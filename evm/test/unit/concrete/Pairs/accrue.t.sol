@@ -59,7 +59,7 @@ contract AccrueTest is Test {
         pair.initialize(0);
         pair.accrue(0);
         pair.addSwapLiquidity(0, 1, 1e18);
-        pair.addBorrowedLiquidity(0, 1e18, false);
+        pair.addBorrowedLiquidity(0, 1e18);
 
         vm.roll(block.number + 1);
 
@@ -83,7 +83,7 @@ contract AccrueTest is Test {
         pair.initialize(0);
         pair.accrue(0);
         pair.addSwapLiquidity(0, 1, 1e18);
-        pair.addBorrowedLiquidity(0, 1e18, false);
+        pair.addBorrowedLiquidity(0, 1e18);
 
         vm.roll(block.number + 10_001);
 
@@ -106,7 +106,7 @@ contract AccrueTest is Test {
 
         pair.initialize(0);
         pair.addSwapLiquidity(0, 1, 1e18);
-        pair.addBorrowedLiquidity(0, 1e18, false);
+        pair.addBorrowedLiquidity(0, 1e18);
 
         pair.accrue(0);
 
@@ -136,7 +136,7 @@ contract AccrueTest is Test {
         pair.addSwapLiquidity(0, 1, 1e18);
         pair.addSwapLiquidity(0, 2, 1e18);
 
-        pair.addBorrowedLiquidity(0, 1.5e18, false);
+        pair.addBorrowedLiquidity(0, 1.5e18);
 
         vm.roll(block.number + 1);
 
@@ -161,7 +161,7 @@ contract AccrueTest is Test {
         pair.initialize(0);
         pair.accrue(0);
         pair.addSwapLiquidity(0, 2, 1e18);
-        pair.addBorrowedLiquidity(0, 1e18, false);
+        pair.addBorrowedLiquidity(0, 1e18);
 
         vm.roll(block.number + 1);
 

@@ -505,15 +505,7 @@ library Pairs {
     /// @notice Borrow liquidity from a specific strike
     /// @custom:team Should this lazily go to the next spread or not
     /// @custom:team Should we charge 1 block on borrowing liquidity
-    function addBorrowedLiquidity(
-        Pair storage pair,
-        int24 strike,
-        uint136 liquidity,
-        bool record
-    )
-        internal
-        returns (uint136 liquidity0, uint136 liquidity1)
-    {
+    function addBorrowedLiquidity(Pair storage pair, int24 strike, uint136 liquidity) internal {
         unchecked {
             if (!pair.initialized) revert Initialized();
 
@@ -526,13 +518,6 @@ library Pairs {
                 if (availableLiquidity >= liquidity) {
                     strikeObj.liquidity[_activeSpread].swap = availableLiquidity - uint128(liquidity);
                     strikeObj.liquidity[_activeSpread].borrowed += uint128(liquidity);
-
-                    if (record) {
-                        uint128 _liquidity1 =
-                            uint128((uint256(liquidity) * uint256(pair.composition[_activeSpread])) / Q128);
-                        liquidity1 += uint136(_liquidity1);
-                        liquidity0 += uint136(liquidity - _liquidity1);
-                    }
 
                     break;
                 }
@@ -550,13 +535,6 @@ library Pairs {
                     int24 _strikeCurrent = pair.strikeCurrent[0];
                     _removeStrike0To1(pair, strike0To1, _activeSpread + 1, _strikeCurrent == strike0To1);
                     _removeStrike1To0(pair, strike1To0, _activeSpread + 1, _strikeCurrent == strike1To0);
-
-                    if (record) {
-                        uint128 _liquidity1 =
-                            uint128((uint256(availableLiquidity) * uint256(pair.composition[_activeSpread])) / Q128);
-                        liquidity1 += uint136(_liquidity1);
-                        liquidity0 += uint136(availableLiquidity - _liquidity1);
-                    }
                 }
 
                 // move to next spread
@@ -569,15 +547,7 @@ library Pairs {
     }
 
     /// @notice Repay liquidity to a specific strike
-    function removeBorrowedLiquidity(
-        Pair storage pair,
-        int24 strike,
-        uint136 liquidity,
-        bool record
-    )
-        internal
-        returns (uint136 liquidity0, uint136 liquidity1)
-    {
+    function removeBorrowedLiquidity(Pair storage pair, int24 strike, uint136 liquidity) internal {
         unchecked {
             if (!pair.initialized) revert Initialized();
 
@@ -591,13 +561,6 @@ library Pairs {
                     strikeObj.liquidity[_activeSpread].swap += uint128(liquidity);
                     strikeObj.liquidity[_activeSpread].borrowed = borrowedLiquidity - uint128(liquidity);
 
-                    if (record) {
-                        uint128 _liquidity1 =
-                            uint128((uint256(liquidity) * uint256(pair.composition[_activeSpread])) / Q128);
-                        liquidity1 += uint136(_liquidity1);
-                        liquidity0 += uint136(liquidity - _liquidity1);
-                    }
-
                     break;
                 }
 
@@ -606,13 +569,6 @@ library Pairs {
                     strikeObj.liquidity[_activeSpread].swap += borrowedLiquidity;
                     strikeObj.liquidity[_activeSpread].borrowed = 0;
                     liquidity -= borrowedLiquidity;
-
-                    if (record) {
-                        uint128 _liquidity1 =
-                            uint128((uint256(borrowedLiquidity) * uint256(pair.composition[_activeSpread])) / Q128);
-                        liquidity1 += uint136(_liquidity1);
-                        liquidity0 += uint136(borrowedLiquidity - _liquidity1);
-                    }
 
                     // add next spread into strike order
                     // subtract 1 from spread implicitly

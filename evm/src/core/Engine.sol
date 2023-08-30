@@ -223,7 +223,7 @@ contract Engine is Positions {
                                 STORAGE
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    mapping(bytes32 => Pairs.Pair) private pairs;
+    mapping(bytes32 => Pairs.Pair) internal pairs;
 
     uint256 public locked = 1;
 
@@ -385,40 +385,42 @@ contract Engine is Positions {
 
     /// @notice Helper add liquidity function
     function _addLiquidity(address to, AddLiquidityParams memory params, Accounts.Account memory account) internal {
-        (bytes32 pairID, Pairs.Pair storage pair) =
-            pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
-
-        uint136 liquidityAccrued = pair.accrue(params.strike);
-
-        uint128 balance;
         unchecked {
-            // Note: subtraction can underflow, will be invalid index error
-            balance = liquidityToBalance(
+            if (params.amountDesired == 0) revert InsufficientInput();
+
+            (bytes32 pairID, Pairs.Pair storage pair) =
+                pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
+
+            {
+                uint136 liquidityAccrued = pair.accrue(params.strike);
+                if (liquidityAccrued > 0) pair.removeBorrowedLiquidity(params.strike, liquidityAccrued);
+            }
+
+            // add liquidity to pair
+            uint136 liquidityDisplaced = pair.addSwapLiquidity(params.strike, params.spread, params.amountDesired);
+            if (liquidityDisplaced > 0) pair.removeBorrowedLiquidity(params.strike, liquidityDisplaced);
+
+            // Calculate how much tokens to add
+            (uint256 _amount0, uint256 _amount1) = getAmounts(
+                pair, scaleLiquidityUp(params.amountDesired, params.scalingFactor), params.strike, params.spread, true
+            );
+
+            // update accounts
+            account.updateToken(params.token0, toInt256(_amount0));
+            account.updateToken(params.token1, toInt256(_amount1));
+
+            // mint position token
+            uint128 balance = liquidityToBalance(
                 params.amountDesired,
                 pair.strikes[params.strike].liquidityGrowthSpreadX128[params.spread - 1].liquidityGrowthX128
             );
 
-            // add liquidity to pair
-            uint136 liquidityDisplaced = pair.addSwapLiquidity(params.strike, params.spread, params.amountDesired);
-            uint136 liquidityRemove = liquidityAccrued + liquidityDisplaced;
-            if (liquidityRemove > 0) pair.removeBorrowedLiquidity(params.strike, liquidityRemove, false);
+            _mintBiDirectional(
+                to, params.token0, params.token1, params.scalingFactor, params.strike, params.spread, balance
+            );
+
+            emit AddLiquidity(pairID, params.strike, params.spread, params.amountDesired, _amount0, _amount1);
         }
-
-        // Calculate how much tokens to add
-        (uint256 _amount0, uint256 _amount1) = getAmounts(
-            pair, scaleLiquidityUp(params.amountDesired, params.scalingFactor), params.strike, params.spread, true
-        );
-
-        // update accounts
-        account.updateToken(params.token0, toInt256(_amount0));
-        account.updateToken(params.token1, toInt256(_amount1));
-
-        // mint position token
-        _mintBiDirectional(
-            to, params.token0, params.token1, params.scalingFactor, params.strike, params.spread, balance
-        );
-
-        emit AddLiquidity(pairID, params.strike, params.spread, params.amountDesired, _amount0, _amount1);
     }
 
     /// @notice Helper borrow liquidity function
@@ -434,20 +436,12 @@ contract Engine is Positions {
             (bytes32 pairID, Pairs.Pair storage pair) =
                 pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
 
-            uint136 liquidityAccrued = pair.accrue(params.strike);
-            pair.removeBorrowedLiquidity(params.strike, liquidityAccrued, false);
-
             {
-                // borrow liquidity and add borrowed amounts to account
-                (uint136 liquidity0, uint256 liquidity1) =
-                    pair.addBorrowedLiquidity(params.strike, params.amountDesiredDebt, true);
-
-                uint256 amount0 = getAmount0(liquidity0, getRatioAtStrike(params.strike), false);
-                uint256 amount1 = getAmount1(liquidity1);
-
-                account.updateToken(params.token0, -toInt256(amount0));
-                account.updateToken(params.token1, -toInt256(amount1));
+                uint136 liquidityAccrued = pair.accrue(params.strike);
+                pair.removeBorrowedLiquidity(params.strike, liquidityAccrued);
             }
+
+            pair.addBorrowedLiquidity(params.strike, params.amountDesiredDebt);
 
             // add collateral to account
             uint128 liquidityCollateral;
@@ -497,25 +491,13 @@ contract Engine is Positions {
 
             {
                 uint136 liquidityAccrued = pair.accrue(params.strike);
-                pair.removeBorrowedLiquidity(params.strike, liquidityAccrued, false);
+                pair.removeBorrowedLiquidity(params.strike, liquidityAccrued);
             }
 
             uint256 _liquidityGrowthX128 = pair.strikes[params.strike].liquidityGrowthX128.liquidityGrowthX128;
             uint128 liquidityDebt = debtBalanceToLiquidity(params.amountDesired, _liquidityGrowthX128);
 
-            pair.removeBorrowedLiquidity(params.strike, liquidityDebt, true);
-
-            {
-                // borrow liquidity and add borrowed amounts to account
-                (uint136 liquidity0, uint256 liquidity1) =
-                    pair.removeBorrowedLiquidity(params.strike, liquidityDebt, true);
-
-                uint256 amount0 = getAmount0(liquidity0, getRatioAtStrike(params.strike), false);
-                uint256 amount1 = getAmount1(liquidity1);
-
-                account.updateToken(params.token0, toInt256(amount0));
-                account.updateToken(params.token1, toInt256(amount1));
-            }
+            pair.removeBorrowedLiquidity(params.strike, liquidityDebt);
 
             // unlock collateral
             uint256 liquidityCollateral =
@@ -560,9 +542,9 @@ contract Engine is Positions {
             );
             uint136 liquidityDisplaced = pair.removeSwapLiquidity(params.strike, params.spread, liquidity);
             if (liquidityDisplaced > liquidityAccrued) {
-                pair.addBorrowedLiquidity(params.strike, liquidityDisplaced - liquidityAccrued, false);
+                pair.addBorrowedLiquidity(params.strike, liquidityDisplaced - liquidityAccrued);
             } else if (liquidityDisplaced < liquidityAccrued) {
-                pair.removeBorrowedLiquidity(params.strike, liquidityAccrued - liquidityDisplaced, false);
+                pair.removeBorrowedLiquidity(params.strike, liquidityAccrued - liquidityDisplaced);
             }
         }
 
@@ -589,7 +571,7 @@ contract Engine is Positions {
         Pairs.Pair storage pair = pairs[params.pairID];
 
         uint136 liquidityAccrued = pair.accrue(params.strike);
-        if (liquidityAccrued > 0) pair.removeBorrowedLiquidity(params.strike, liquidityAccrued, false);
+        if (liquidityAccrued > 0) pair.removeBorrowedLiquidity(params.strike, liquidityAccrued);
 
         emit Accrue(params.pairID, params.strike, liquidityAccrued);
     }
