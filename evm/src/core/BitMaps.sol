@@ -1,96 +1,81 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
 import {MIN_STRIKE} from "./math/StrikeMath.sol";
 
 /// @title Bit Maps
 /// @notice Manage a bit map where positive bits represent active strikes
-/// @author Muffin (https://github.com/muffinfi/muffin/blob/master/contracts/libraries/TickMaps.sol)
+/// @author Robert Leifke and Kyle Scott
 library BitMaps {
+    /// @notice Data structure of a three-level bitmap
     struct BitMap {
-        uint256 blockMap; //                    stores which blocks are initialized
-        mapping(uint256 => uint256) blocks; //  stores which words are initialized
-        mapping(uint256 => uint256) words; //   stores which strikes are initialized
+        uint256 level0;
+        mapping(uint256 => uint256) level1;
+        mapping(uint256 => uint256) level2;
     }
 
-    /// @dev Compress and convert strike into an unsigned integer, then compute the indices of the block and word that
-    /// the compressed strike uses. Assume strike >= MIN_STRIKE
-    function _indices(int24 strike) internal pure returns (uint256 blockIdx, uint256 wordIdx, uint256 compressed) {
-        unchecked {
-            compressed = uint256(int256((strike - MIN_STRIKE)));
-            blockIdx = compressed >> 16;
-            wordIdx = compressed >> 8;
-            assert(blockIdx < 256);
+    /// @notice Recover the indicies into the data structure from a strike
+    /// @custom:team Could mask level 2 index
+    function _indices(int24 strike)
+        internal
+        pure
+        returns (uint256 level0Index, uint256 level1Index, uint256 level2Index)
+    {
+        assembly {
+            let index := sub(strike, MIN_STRIKE)
+            level0Index := shr(16, index)
+            level1Index := shr(8, index)
+            level2Index := index
         }
     }
 
-    /// @dev Convert the unsigned integer back to a strike. Assume "compressed" is a valid value, computed by _indices
-    /// function.
-    function _decompress(uint256 compressed) internal pure returns (int24 strike) {
-        unchecked {
-            strike = int24(int256(compressed) + MIN_STRIKE);
-        }
-    }
-
+    /// @notice Turn on a bit in the bitmap
     function set(BitMap storage self, int24 strike) internal {
-        (uint256 blockIdx, uint256 wordIdx, uint256 compressed) = _indices(strike);
+        (uint256 level0Index, uint256 level1Index, uint256 level2Index) = _indices(strike);
 
-        self.words[wordIdx] |= 1 << (compressed & 0xFF);
-        self.blocks[blockIdx] |= 1 << (wordIdx & 0xFF);
-        self.blockMap |= 1 << blockIdx;
+        self.level0 |= 1 << level0Index;
+        self.level1[level0Index] |= 1 << (level1Index & 0xff);
+        self.level2[level1Index] |= 1 << (level2Index & 0xff);
     }
 
+    /// @notice Turn off a bit in the bitmap
     function unset(BitMap storage self, int24 strike) internal {
-        (uint256 blockIdx, uint256 wordIdx, uint256 compressed) = _indices(strike);
+        (uint256 level0Index, uint256 level1Index, uint256 level2Index) = _indices(strike);
 
-        self.words[wordIdx] &= ~(1 << (compressed & 0xFF));
-        if (self.words[wordIdx] == 0) {
-            self.blocks[blockIdx] &= ~(1 << (wordIdx & 0xFF));
-            if (self.blocks[blockIdx] == 0) {
-                self.blockMap &= ~(1 << blockIdx);
+        self.level2[level1Index] &= ~(1 << (level2Index & 0xff));
+        if (self.level2[level1Index] == 0) {
+            self.level1[level0Index] &= ~(1 << (level1Index & 0xff));
+            if (self.level1[level0Index] == 0) {
+                self.level0 &= ~(1 << level0Index);
             }
         }
     }
 
-    /// @dev Find the next initialized strike below the given strike. Assume strike >= MIN_STRIKE
-    // How to find the next initialized bit below the i-th bit inside a word (e.g. i = 8)?
-    // 1)  Mask _off_ the word from the 8th bit to the 255th bit (zero-indexed)
-    // 2)  Find the most significant bit of the masked word
-    //                  8th bit
-    //                     ↓
-    //     word:   0001 1101 0010 1100
-    //     mask:   0000 0000 1111 1111      i.e. (1 << i) - 1
-    //     masked: 0000 0000 0010 1100
-    //                         ↑
-    //                  msb(masked) = 5
-    function nextBelow(BitMap storage self, int24 strike) internal view returns (int24 strikeBelow) {
+    /// @notice Calculate the next highest flipped bit under `strike`
+    /// @dev First search bits on the same level 2, then search bits on the same level 1, then search level 0
+    function nextBelow(BitMap storage self, int24 strike) internal view returns (int24) {
         unchecked {
-            (uint256 blockIdx, uint256 wordIdx, uint256 compressed) = _indices(strike);
+            (uint256 level0Index, uint256 level1Index, uint256 level2Index) = _indices(strike);
 
-            uint256 word = self.words[wordIdx] & ((1 << (compressed & 0xFF)) - 1);
-            if (word == 0) {
-                uint256 block_ = self.blocks[blockIdx] & ((1 << (wordIdx & 0xFF)) - 1);
-                if (block_ == 0) {
-                    uint256 blockMap = self.blockMap & ((1 << blockIdx) - 1);
-                    assert(blockMap != 0);
+            uint256 _level2 = self.level2[level1Index] & ((1 << (level2Index & 0xff)) - 1);
+            if (_level2 == 0) {
+                uint256 _level1 = self.level1[level0Index] & ((1 << (level1Index & 0xff)) - 1);
+                if (_level1 == 0) {
+                    uint256 _level0 = self.level0 & ((1 << level0Index) - 1);
+                    assert(_level0 != 0);
 
-                    blockIdx = _msb(blockMap);
-                    block_ = self.blocks[blockIdx];
+                    level0Index = _msb(_level0);
+                    _level1 = self.level1[level0Index];
                 }
-                wordIdx = (blockIdx << 8) | _msb(block_);
-                word = self.words[wordIdx];
+                level1Index = (level0Index << 8) | _msb(_level1);
+                _level2 = self.level2[level1Index];
             }
 
-            strikeBelow = _decompress((wordIdx << 8) | _msb(word));
+            return int24(int256((level1Index << 8) | _msb(_level2)) + MIN_STRIKE);
         }
     }
 
-    /// @notice Returns the index of the most significant bit of the number, where the least significant bit is at index
-    /// 0
-    /// and the most significant bit is at index 255
-    /// @dev The function satisfies the property: x >= 2**mostSignificantBit(x) and x < 2**(mostSignificantBit(x)+1)
-    /// @param x the value for which to compute the most significant bit, must be greater than 0
-    /// @return r the index of the most significant bit
+    /// @notice Recover the most significant bit
     function _msb(uint256 x) internal pure returns (uint8 r) {
         unchecked {
             assert(x > 0);
