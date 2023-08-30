@@ -11,8 +11,28 @@ contract UnsetTest is Test {
     BitMaps.BitMap private bitmap;
 
     /// @notice Test turning off a bit that was on
-    function test_Unset_Hot() external {}
+    function test_Unset_Hot() external {
+        vm.pauseGasMetering();
+
+        bitmap.set(0);
+
+        vm.resumeGasMetering();
+
+        bitmap.unset(0);
+
+        vm.expectRevert();
+        bitmap.nextBelow(1);
+    }
 
     /// @notice Test turning off a bit that was already off
-    function test_Unset_Cold() external {}
+    function test_Unset_Cold() external {
+        bitmap.unset(0);
+
+        vm.pauseGasMetering();
+
+        vm.expectRevert();
+        bitmap.nextBelow(1);
+
+        vm.resumeGasMetering();
+    }
 }

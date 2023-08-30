@@ -7,12 +7,15 @@ import {MIN_STRIKE} from "./math/StrikeMath.sol";
 /// @notice Manage a bit map where positive bits represent active strikes
 /// @author Robert Leifke and Kyle Scott
 library BitMaps {
+    /// @notice Data structure of a three-level bitmap
     struct BitMap {
         uint256 level0;
         mapping(uint256 => uint256) level1;
         mapping(uint256 => uint256) level2;
     }
 
+    /// @notice Recover the indicies into the data structure from a strike
+    /// @custom:team Could mask level 2 index
     function _indices(int24 strike)
         internal
         pure
@@ -26,6 +29,7 @@ library BitMaps {
         }
     }
 
+    /// @notice Turn on a bit in the bitmap
     function set(BitMap storage self, int24 strike) internal {
         (uint256 level0Index, uint256 level1Index, uint256 level2Index) = _indices(strike);
 
@@ -34,6 +38,7 @@ library BitMaps {
         self.level2[level1Index] |= 1 << (level2Index & 0xff);
     }
 
+    /// @notice Turn off a bit in the bitmap
     function unset(BitMap storage self, int24 strike) internal {
         (uint256 level0Index, uint256 level1Index, uint256 level2Index) = _indices(strike);
 
@@ -46,6 +51,8 @@ library BitMaps {
         }
     }
 
+    /// @notice Calculate the next highest flipped bit under `strike`
+    /// @dev First search bits on the same level 2, then search bits on the same level 1, then search level 0
     function nextBelow(BitMap storage self, int24 strike) internal view returns (int24) {
         unchecked {
             (uint256 level0Index, uint256 level1Index, uint256 level2Index) = _indices(strike);
@@ -68,6 +75,7 @@ library BitMaps {
         }
     }
 
+    /// @notice Recover the most significant bit
     function _msb(uint256 x) internal pure returns (uint8 r) {
         unchecked {
             assert(x > 0);
