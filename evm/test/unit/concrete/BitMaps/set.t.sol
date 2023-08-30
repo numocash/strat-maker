@@ -12,19 +12,11 @@ contract SetTest is Test {
 
     /// @notice Test turning on a bit that was off
     function test_Set_Cold() external {
-        // action you want to test
-
-        bitmap.unset(1); //off
+        bitmap.set(0);
 
         vm.pauseGasMetering();
 
-        // assertions
-
-        bitmap.set(1); //on
-
-        vm.resumeGasMetering();
-
-        assertEq(bitmap.nextBelow(2), 1);
+        assertEq(bitmap.nextBelow(1), 0);
 
         vm.resumeGasMetering();
     }
@@ -33,21 +25,15 @@ contract SetTest is Test {
     function test_Set_Hot() external {
         vm.pauseGasMetering();
 
-        // setup test
-
-        bitmap.set(1);
+        bitmap.set(0);
 
         vm.resumeGasMetering();
 
-        // action you want to test
-
-        bitmap.set(1);
+        bitmap.set(0);
 
         vm.pauseGasMetering();
 
-        // assertions
-
-        assertEq(bitmap.nextBelow(2), 1);
+        assertEq(bitmap.nextBelow(1), 0);
 
         vm.resumeGasMetering();
     }
