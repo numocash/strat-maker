@@ -11,7 +11,23 @@ contract SetTest is Test {
     BitMaps.BitMap private bitmap;
 
     /// @notice Test turning on a bit that was off
-    function test_Set_Cold() external {}
+    function test_Set_Cold() external {
+        // action you want to test
+
+        bitmap.unset(1); //off
+
+        vm.pauseGasMetering();
+
+        // assertions
+
+        bitmap.set(1); //on
+
+        vm.resumeGasMetering();
+
+        assertEq(bitmap.nextBelow(2), 1);
+
+        vm.resumeGasMetering();
+    }
 
     /// @notice Test turning on a bit that was already on
     function test_Set_Hot() external {

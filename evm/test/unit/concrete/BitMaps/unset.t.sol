@@ -14,11 +14,11 @@ contract UnsetTest is Test {
     function test_Unset_Hot() external {
         vm.pauseGasMetering();
 
-        bitmap.set(1);
+        bitmap.set(1); //on
 
         vm.resumeGasMetering();
 
-        bitmap.unset(1);
+        bitmap.unset(1); //off
 
         vm.pauseGasMetering();
 
@@ -31,5 +31,23 @@ contract UnsetTest is Test {
     }
 
     /// @notice Test turning off a bit that was already off
-    function test_Unset_Cold() external {}
+    function test_Unset_Cold() external {
+
+        vm.pauseGasMetering();
+
+        bitmap.unset(1); //off
+
+        vm.resumeGasMetering();
+
+        bitmap.unset(1); //off
+
+        vm.pauseGasMetering();
+
+        //assertions
+
+        vm.expectRevert();
+        bitmap.nextBelow(2);
+
+        vm.resumeGasMetering();
+    }
 }

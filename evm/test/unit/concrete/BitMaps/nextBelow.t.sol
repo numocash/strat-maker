@@ -159,5 +159,20 @@ contract NextBelowTest is Test {
     }
 
     /// @notice Test `nextBelow` when there are lower bits that are less significant than the next below on level 0
-    function test_NextBelow_MSBLevel0() external {}
+    function test_NextBelow_MSBLevel0() external {
+        vm.pauseGasMetering();
+
+        bitmap.set(MIN_STRIKE);
+        bitmap.set(2 ** 16 + MIN_STRIKE);
+
+        vm.resumeGasMetering();
+
+        int24 strike = bitmap.nextBelow(2 ** 17 + MIN_STRIKE);
+
+        vm.pauseGasMetering();
+
+        assertEq(strike, 2 ** 16 + MIN_STRIKE);
+
+        vm.resumeGasMetering();
+    }
 }
