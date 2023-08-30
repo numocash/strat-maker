@@ -15,6 +15,7 @@ library BitMaps {
     }
 
     /// @notice Recover the indicies into the data structure from a strike
+    /// @custom:team Could mask level 2 index
     function _indices(int24 strike)
         internal
         pure
@@ -24,7 +25,7 @@ library BitMaps {
             let index := sub(strike, MIN_STRIKE)
             level0Index := shr(16, index)
             level1Index := shr(8, index)
-            level2Index := index // could mask
+            level2Index := index
         }
     }
 
