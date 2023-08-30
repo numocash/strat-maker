@@ -16,7 +16,7 @@ contract RemoveBorrowedLiquidityTest is Test {
     /// @notice Test repaying liquidity for a pair that is not initialized
     function test_RemoveBorrowedLiquidity_NotInitialized() external {
         vm.expectRevert(Pairs.Initialized.selector);
-        pair.removeBorrowedLiquidity(0, 1);
+        pair.removeBorrowedLiquidity(0, 1, false);
     }
 
     /// @notice Test repaying partial liquidity to a spread
@@ -25,11 +25,11 @@ contract RemoveBorrowedLiquidityTest is Test {
 
         pair.initialize(0);
         pair.addSwapLiquidity(2, 1, 1e18);
-        pair.addBorrowedLiquidity(2, 1e18);
+        pair.addBorrowedLiquidity(2, 1e18, false);
 
         vm.resumeGasMetering();
 
-        pair.removeBorrowedLiquidity(2, 0.5e18);
+        pair.removeBorrowedLiquidity(2, 0.5e18, false);
 
         vm.pauseGasMetering();
 
@@ -46,11 +46,11 @@ contract RemoveBorrowedLiquidityTest is Test {
 
         pair.initialize(0);
         pair.addSwapLiquidity(2, 1, 1e18);
-        pair.addBorrowedLiquidity(2, 1e18);
+        pair.addBorrowedLiquidity(2, 1e18, false);
 
         vm.resumeGasMetering();
 
-        pair.removeBorrowedLiquidity(2, 1e18);
+        pair.removeBorrowedLiquidity(2, 1e18, false);
 
         vm.pauseGasMetering();
 
@@ -71,11 +71,11 @@ contract RemoveBorrowedLiquidityTest is Test {
         pair.initialize(0);
         pair.addSwapLiquidity(3, 1, 1e18);
         pair.addSwapLiquidity(3, 2, 1e18);
-        pair.addBorrowedLiquidity(3, 1.5e18);
+        pair.addBorrowedLiquidity(3, 1.5e18, false);
 
         vm.resumeGasMetering();
 
-        pair.removeBorrowedLiquidity(3, 1.5e18);
+        pair.removeBorrowedLiquidity(3, 1.5e18, false);
 
         vm.pauseGasMetering();
 
@@ -122,11 +122,11 @@ contract RemoveBorrowedLiquidityTest is Test {
 
         pair.initialize(0);
         pair.addSwapLiquidity(3, 2, 1e18);
-        pair.addBorrowedLiquidity(3, 0.5e18);
+        pair.addBorrowedLiquidity(3, 0.5e18, false);
 
         vm.resumeGasMetering();
 
-        pair.removeBorrowedLiquidity(3, 0.5e18);
+        pair.removeBorrowedLiquidity(3, 0.5e18, false);
 
         vm.pauseGasMetering();
 
@@ -166,11 +166,11 @@ contract RemoveBorrowedLiquidityTest is Test {
         pair.initialize(0);
         pair.addSwapLiquidity(1, 1, 1e18);
         pair.addSwapLiquidity(1, 2, 1e18);
-        pair.addBorrowedLiquidity(1, 1.5e18);
+        pair.addBorrowedLiquidity(1, 1.5e18, false);
 
         vm.resumeGasMetering();
 
-        pair.removeBorrowedLiquidity(1, 1.5e18);
+        pair.removeBorrowedLiquidity(1, 1.5e18, false);
 
         vm.pauseGasMetering();
 
@@ -215,6 +215,6 @@ contract RemoveBorrowedLiquidityTest is Test {
         vm.resumeGasMetering();
 
         vm.expectRevert(Pairs.OutOfBounds.selector);
-        pair.removeBorrowedLiquidity(1, 1);
+        pair.removeBorrowedLiquidity(1, 1, false);
     }
 }
