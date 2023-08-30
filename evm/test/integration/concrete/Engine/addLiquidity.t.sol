@@ -81,7 +81,7 @@ contract AddLiquidityTest is Test, IExecuteCallback {
             engine.dataOf_cGJnTo(address(this), biDirectionalID(address(mockERC20_0), address(mockERC20_1), 0, 2, 1));
 
         assertEq(position.balance, 1e18);
-        assertEq(position.liquidityBuffer, 0);
+        assertEq(position.buffer, 0);
 
         vm.resumeGasMetering();
     }

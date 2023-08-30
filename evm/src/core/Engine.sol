@@ -172,6 +172,7 @@ contract Engine is Positions {
     /// @param strike The strike to repay liquidity to
     /// @param selectorCollateral What token is used as collateral
     /// @param amountDesired The amount of balance to repay
+    /// @param amountBuffer The amount of buffer to repay
     struct RepayLiquidityParams {
         address token0;
         address token1;
@@ -179,6 +180,7 @@ contract Engine is Positions {
         int24 strike;
         TokenSelector selectorCollateral;
         uint128 amountDesired;
+        uint128 amountBuffer;
     }
 
     /// @notice Data to pass to a remove liquidity action
@@ -339,10 +341,11 @@ contract Engine is Positions {
         // check liquidity positions in
         for (uint256 i = 0; i < numLPs;) {
             uint128 amountBurned = account.lpData[i].amountBurned;
+            uint128 amountBuffer = account.lpData[i].amountBuffer;
             bytes32 id = account.lpData[i].id;
 
             if (id == bytes32(0)) break;
-            _burn(address(this), id, amountBurned, account.lpData[i].orderType);
+            _burn(address(this), id, account.lpData[i].orderType, amountBurned, amountBuffer);
 
             unchecked {
                 i++;
@@ -419,6 +422,7 @@ contract Engine is Positions {
     }
 
     /// @notice Helper borrow liquidity function
+    /// @custom:team Test liquidity accrued being max value
     function _borrowLiquidity(
         address to,
         BorrowLiquidityParams memory params,
@@ -489,9 +493,8 @@ contract Engine is Positions {
 
             uint136 liquidityAccrued = pair.accrue(params.strike);
 
-            uint128 liquidityDebt = debtBalanceToLiquidity(
-                params.amountDesired, pair.strikes[params.strike].liquidityGrowthX128.liquidityGrowthX128
-            );
+            uint256 _liquidityGrowthX128 = pair.strikes[params.strike].liquidityGrowthX128.liquidityGrowthX128;
+            uint128 liquidityDebt = debtBalanceToLiquidity(params.amountDesired, _liquidityGrowthX128);
 
             pair.removeBorrowedLiquidity(params.strike, liquidityAccrued + liquidityDebt);
 
@@ -507,7 +510,8 @@ contract Engine is Positions {
             // account.updateToken(params.token1, toInt256(amount1));
 
             // unlock collateral
-            uint256 liquidityCollateral = params.amountDesired; // + debtBalanceToLiquidity(liquidityBuffer);
+            uint256 liquidityCollateral =
+                params.amountDesired + debtBalanceToLiquidity(params.amountBuffer, _liquidityGrowthX128);
 
             if (params.selectorCollateral == TokenSelector.Token0) {
                 account.updateToken(
@@ -522,8 +526,9 @@ contract Engine is Positions {
             // add burned position to account
             account.updateLP(
                 debtID(params.token0, params.token1, params.scalingFactor, params.strike, params.selectorCollateral),
+                OrderType.Debt,
                 params.amountDesired,
-                OrderType.Debt
+                params.amountBuffer
             );
 
             emit RepayLiquidity(pairID, params.strike, liquidityDebt);
@@ -563,8 +568,9 @@ contract Engine is Positions {
         // update position token
         account.updateLP(
             biDirectionalID(params.token0, params.token1, params.scalingFactor, params.strike, params.spread),
+            OrderType.BiDirectional,
             params.amountDesired,
-            OrderType.BiDirectional
+            0
         );
 
         emit RemoveLiquidity(pairID, params.strike, params.spread, liquidity, _amount0, _amount1);

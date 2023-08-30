@@ -65,11 +65,11 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
     /// @notice The data that a position records
     /// @param balance The balance of the position either in units of share of liquidity provided or non-interested
     /// adjusted liquidity debt
-    /// @param liquidityBuffer The amount of non-fee adjusted liquidity collateral - liquidity debt when order type is
+    /// @param buffer The amount of non-fee adjusted liquidity collateral - liquidity debt when order type is
     /// debt, else 0
     struct ILRTAData {
         uint128 balance;
-        uint128 liquidityBuffer;
+        uint128 buffer;
     }
 
     /// @notice Information needed to describe a transfer
@@ -77,10 +77,12 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
     /// @param orderType Signifies the type of position
     /// @param amount The amount of the position to transfer either in units of share of liquidity provided or
     /// interested adjusted liquidity debt
+    /// @param amountBuffer The amount of buffer to transfer, 0 when `orderType` is BiDirectional
     struct ILRTATransferDetails {
         bytes32 id;
         Engine.OrderType orderType;
         uint128 amount;
+        uint128 amountBuffer;
     }
 
     /// @notice Information needed to describe an approval
@@ -152,7 +154,7 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
 
     /// @notice Returns true if `requestedTransferDetails` is valid given the `signedTransferDetails`
     /// @dev Function selector is keccak256("validateRequest()"")
-    function validateRequest_bzlHQU(
+    function validateRequest_Hkophp(
         ILRTATransferDetails calldata signedTransferDetails,
         ILRTATransferDetails calldata requestedTransferDetails
     )
@@ -162,6 +164,7 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
     {
         return (
             requestedTransferDetails.amount > signedTransferDetails.amount
+                || requestedTransferDetails.amountBuffer > signedTransferDetails.amountBuffer
                 || requestedTransferDetails.id != signedTransferDetails.id
                 || requestedTransferDetails.orderType != signedTransferDetails.orderType
         ) ? false : true;
@@ -169,7 +172,7 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
 
     /// @notice Transfer from `msg.sender` to `to` described by `transferDetails`
     /// @dev Function selector is keccak256("transfer()")
-    function transfer_Jvpprd(address to, ILRTATransferDetails calldata transferDetails) external returns (bool) {
+    function transfer_AjLAUd(address to, ILRTATransferDetails calldata transferDetails) external returns (bool) {
         return _transfer(msg.sender, to, transferDetails);
     }
 
@@ -185,7 +188,7 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
 
     /// @notice Transfer from `from` to `to` described by `transferDetails` if the allowance is adequate, else revert
     /// @dev Function selector is keccak256("transferFrom()")
-    function transferFrom_jDUYFr(
+    function transferFrom_OEpkUx(
         address from,
         address to,
         ILRTATransferDetails calldata transferDetails
@@ -206,23 +209,12 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
 
     /// @notice Helper function for transfers, uses `orderType` and updates a position based on the type
     function _transfer(address from, address to, ILRTATransferDetails memory transferDetails) private returns (bool) {
-        uint128 fromBalance = _dataOf[from][transferDetails.id].balance;
-
-        _dataOf[from][transferDetails.id].balance = fromBalance - transferDetails.amount;
-        unchecked {
-            _dataOf[to][transferDetails.id].balance += transferDetails.amount;
-        }
+        _dataOf[from][transferDetails.id].balance -= transferDetails.amount;
+        _dataOf[to][transferDetails.id].balance += transferDetails.amount;
 
         if (transferDetails.orderType == Engine.OrderType.Debt) {
-            // transfer a proportional amount of the liquidity buffer
-            uint128 liquidityBufferTransfer;
-            uint128 fromLiquidityBuffer = _dataOf[from][transferDetails.id].liquidityBuffer;
-            unchecked {
-                liquidityBufferTransfer =
-                    uint128((uint256(fromLiquidityBuffer) * uint256(transferDetails.amount)) / uint256(fromBalance));
-                _dataOf[from][transferDetails.id].liquidityBuffer = fromLiquidityBuffer - liquidityBufferTransfer;
-            }
-            _dataOf[to][transferDetails.id].liquidityBuffer += liquidityBufferTransfer;
+            _dataOf[from][transferDetails.id].buffer -= transferDetails.amountBuffer;
+            _dataOf[to][transferDetails.id].buffer += transferDetails.amountBuffer;
         }
 
         emit Transfer(from, to, abi.encode(transferDetails));
@@ -242,12 +234,10 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
         internal
     {
         bytes32 id = biDirectionalID(token0, token1, scalingFactor, strike, spread);
-        // change in liquidity cannot exceed the maximum liquidity in a strike
-        unchecked {
-            _dataOf[to][id].balance += amount;
-        }
 
-        emit Transfer(address(0), to, abi.encode(ILRTATransferDetails(id, Engine.OrderType.BiDirectional, amount)));
+        _dataOf[to][id].balance += amount;
+
+        emit Transfer(address(0), to, abi.encode(ILRTATransferDetails(id, Engine.OrderType.BiDirectional, amount, 0)));
     }
 
     /// @notice Mint a debt position
@@ -259,7 +249,7 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
         int24 strike,
         Engine.TokenSelector selector,
         uint128 amount,
-        uint128 liquidityBuffer
+        uint128 buffer
     )
         internal
     {
@@ -268,21 +258,29 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
 
         if (balance == 0) {
             _dataOf[to][id].balance = amount;
-            _dataOf[to][id].liquidityBuffer = liquidityBuffer;
+            _dataOf[to][id].buffer = buffer;
         } else {
-            unchecked {
-                _dataOf[to][id].balance = balance + amount;
-                _dataOf[to][id].liquidityBuffer += liquidityBuffer;
-            }
+            _dataOf[to][id].balance = balance + amount;
+            _dataOf[to][id].buffer += buffer;
         }
 
-        emit Transfer(address(0), to, abi.encode(ILRTATransferDetails(id, Engine.OrderType.Debt, amount)));
+        emit Transfer(address(0), to, abi.encode(ILRTATransferDetails(id, Engine.OrderType.Debt, amount, buffer)));
     }
 
-    /// @custom:team How to handle `liquidityBuffer`
-    function _burn(address from, bytes32 id, uint128 amount, Engine.OrderType orderType) internal {
+    function _burn(
+        address from,
+        bytes32 id,
+        Engine.OrderType orderType,
+        uint128 amount,
+        uint128 amountBuffer
+    )
+        internal
+    {
         _dataOf[from][id].balance -= amount;
+        if (orderType == Engine.OrderType.Debt) {
+            _dataOf[from][id].buffer -= amountBuffer;
+        }
 
-        emit Transfer(from, address(0), abi.encode(ILRTATransferDetails(id, orderType, amount)));
+        emit Transfer(from, address(0), abi.encode(ILRTATransferDetails(id, orderType, amount, amountBuffer)));
     }
 }

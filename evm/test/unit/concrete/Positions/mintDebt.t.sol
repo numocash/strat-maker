@@ -25,7 +25,7 @@ contract MintDebtTest is Test {
             address(this),
             abi.encode(
                 Positions.ILRTATransferDetails(
-                    debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0), Engine.OrderType.Debt, 1e18
+                    debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0), Engine.OrderType.Debt, 1e18, 1e18
                 )
             )
         );
@@ -38,7 +38,7 @@ contract MintDebtTest is Test {
             positions.dataOf_cGJnTo(address(this), debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0));
 
         assertEq(data.balance, 1e18);
-        assertEq(data.liquidityBuffer, 1e18);
+        assertEq(data.buffer, 1e18);
 
         vm.resumeGasMetering();
     }
@@ -54,7 +54,7 @@ contract MintDebtTest is Test {
             address(this),
             abi.encode(
                 Positions.ILRTATransferDetails(
-                    debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0), Engine.OrderType.Debt, 1e18
+                    debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0), Engine.OrderType.Debt, 1e18, 1e18
                 )
             )
         );
@@ -67,7 +67,7 @@ contract MintDebtTest is Test {
             positions.dataOf_cGJnTo(address(this), debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0));
 
         assertEq(data.balance, 2e18);
-        assertEq(data.liquidityBuffer, 2e18);
+        assertEq(data.buffer, 2e18);
 
         vm.resumeGasMetering();
     }

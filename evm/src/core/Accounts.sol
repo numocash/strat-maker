@@ -34,8 +34,9 @@ library Accounts {
     /// @param orderType What type of position does this represent
     struct LPData {
         bytes32 id;
-        uint128 amountBurned;
         Engine.OrderType orderType;
+        uint128 amountBurned;
+        uint128 amountBuffer;
     }
 
     /// @notice Data stored that makes up an account
@@ -84,8 +85,9 @@ library Accounts {
     function updateLP(
         Account memory account,
         bytes32 id,
+        Engine.OrderType orderType,
         uint128 amountBurned,
-        Engine.OrderType orderType
+        uint128 amountBuffer
     )
         internal
         pure
@@ -94,13 +96,14 @@ library Accounts {
 
         for (uint256 i = 0; i < account.lpData.length;) {
             if (account.lpData[i].id == id) {
-                // might not need checked math
                 account.lpData[i].amountBurned += amountBurned;
+                account.lpData[i].amountBuffer += amountBuffer;
                 return;
             } else if (account.lpData[i].id == bytes32(0)) {
                 account.lpData[i].id = id;
-                account.lpData[i].amountBurned = amountBurned;
                 account.lpData[i].orderType = orderType;
+                account.lpData[i].amountBurned = amountBurned;
+                account.lpData[i].amountBuffer = amountBuffer;
                 return;
             }
 

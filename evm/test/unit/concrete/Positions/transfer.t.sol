@@ -23,7 +23,7 @@ contract TransferTest is Test {
     }
 
     function test_Transfer_Selector() external {
-        assertEq(Positions.transfer_Jvpprd.selector, bytes4(keccak256("transfer()")));
+        assertEq(Positions.transfer_AjLAUd.selector, bytes4(keccak256("transfer()")));
     }
 
     /// @notice Transfer more tokens than you have, causing a revert
@@ -34,10 +34,26 @@ contract TransferTest is Test {
 
         vm.expectRevert();
         vm.resumeGasMetering();
-        positions.transfer_Jvpprd(
+        positions.transfer_AjLAUd(
             cuh,
             Positions.ILRTATransferDetails(
-                biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 1e18 + 1
+                biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 1e18 + 1, 0
+            )
+        );
+    }
+
+    function test_Transfer_Overflow() external {
+        vm.pauseGasMetering();
+
+        positions.mintBiDirectional(address(this), address(1), address(2), 0, 0, 1, 1e18);
+        positions.mintBiDirectional(cuh, address(1), address(2), 0, 0, 1, type(uint128).max);
+
+        vm.expectRevert();
+        vm.resumeGasMetering();
+        positions.transfer_AjLAUd(
+            cuh,
+            Positions.ILRTATransferDetails(
+                biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 1e18, 0
             )
         );
     }
@@ -53,16 +69,16 @@ contract TransferTest is Test {
             cuh,
             abi.encode(
                 Positions.ILRTATransferDetails(
-                    biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 1e18
+                    biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 1e18, 0
                 )
             )
         );
 
         vm.resumeGasMetering();
-        positions.transfer_Jvpprd(
+        positions.transfer_AjLAUd(
             cuh,
             Positions.ILRTATransferDetails(
-                biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 1e18
+                biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 1e18, 0
             )
         );
         vm.pauseGasMetering();
@@ -71,12 +87,12 @@ contract TransferTest is Test {
             positions.dataOf_cGJnTo(address(this), biDirectionalID(address(1), address(2), 0, 0, 1));
 
         assertEq(data.balance, 0);
-        assertEq(data.liquidityBuffer, 0);
+        assertEq(data.buffer, 0);
 
         data = positions.dataOf_cGJnTo(cuh, biDirectionalID(address(1), address(2), 0, 0, 1));
 
         assertEq(data.balance, 1e18);
-        assertEq(data.liquidityBuffer, 0);
+        assertEq(data.buffer, 0);
 
         vm.resumeGasMetering();
     }
@@ -92,16 +108,16 @@ contract TransferTest is Test {
             cuh,
             abi.encode(
                 Positions.ILRTATransferDetails(
-                    biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 0.5e18
+                    biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 0.5e18, 0
                 )
             )
         );
 
         vm.resumeGasMetering();
-        positions.transfer_Jvpprd(
+        positions.transfer_AjLAUd(
             cuh,
             Positions.ILRTATransferDetails(
-                biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 0.5e18
+                biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 0.5e18, 0
             )
         );
         vm.pauseGasMetering();
@@ -110,12 +126,12 @@ contract TransferTest is Test {
             positions.dataOf_cGJnTo(address(this), biDirectionalID(address(1), address(2), 0, 0, 1));
 
         assertEq(data.balance, 0.5e18);
-        assertEq(data.liquidityBuffer, 0);
+        assertEq(data.buffer, 0);
 
         data = positions.dataOf_cGJnTo(cuh, biDirectionalID(address(1), address(2), 0, 0, 1));
 
         assertEq(data.balance, 0.5e18);
-        assertEq(data.liquidityBuffer, 0);
+        assertEq(data.buffer, 0);
 
         vm.resumeGasMetering();
     }
@@ -132,16 +148,16 @@ contract TransferTest is Test {
             cuh,
             abi.encode(
                 Positions.ILRTATransferDetails(
-                    biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 0.5e18
+                    biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 0.5e18, 0
                 )
             )
         );
 
         vm.resumeGasMetering();
-        positions.transfer_Jvpprd(
+        positions.transfer_AjLAUd(
             cuh,
             Positions.ILRTATransferDetails(
-                biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 0.5e18
+                biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 0.5e18, 0
             )
         );
         vm.pauseGasMetering();
@@ -150,12 +166,12 @@ contract TransferTest is Test {
             positions.dataOf_cGJnTo(address(this), biDirectionalID(address(1), address(2), 0, 0, 1));
 
         assertEq(data.balance, 0.5e18);
-        assertEq(data.liquidityBuffer, 0);
+        assertEq(data.buffer, 0);
 
         data = positions.dataOf_cGJnTo(cuh, biDirectionalID(address(1), address(2), 0, 0, 1));
 
         assertEq(data.balance, 1.5e18);
-        assertEq(data.liquidityBuffer, 0);
+        assertEq(data.buffer, 0);
 
         vm.resumeGasMetering();
     }
@@ -171,16 +187,16 @@ contract TransferTest is Test {
             cuh,
             abi.encode(
                 Positions.ILRTATransferDetails(
-                    debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0), Engine.OrderType.Debt, 1e18
+                    debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0), Engine.OrderType.Debt, 1e18, 1e18
                 )
             )
         );
 
         vm.resumeGasMetering();
-        positions.transfer_Jvpprd(
+        positions.transfer_AjLAUd(
             cuh,
             Positions.ILRTATransferDetails(
-                debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0), Engine.OrderType.Debt, 1e18
+                debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0), Engine.OrderType.Debt, 1e18, 1e18
             )
         );
         vm.pauseGasMetering();
@@ -189,12 +205,12 @@ contract TransferTest is Test {
             positions.dataOf_cGJnTo(address(this), debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0));
 
         assertEq(data.balance, 0);
-        assertEq(data.liquidityBuffer, 0);
+        assertEq(data.buffer, 0);
 
         data = positions.dataOf_cGJnTo(cuh, debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0));
 
         assertEq(data.balance, 1e18);
-        assertEq(data.liquidityBuffer, 1e18);
+        assertEq(data.buffer, 1e18);
 
         vm.resumeGasMetering();
     }
@@ -210,16 +226,19 @@ contract TransferTest is Test {
             cuh,
             abi.encode(
                 Positions.ILRTATransferDetails(
-                    debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0), Engine.OrderType.Debt, 0.5e18
+                    debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0),
+                    Engine.OrderType.Debt,
+                    0.5e18,
+                    0.5e18
                 )
             )
         );
 
         vm.resumeGasMetering();
-        positions.transfer_Jvpprd(
+        positions.transfer_AjLAUd(
             cuh,
             Positions.ILRTATransferDetails(
-                debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0), Engine.OrderType.Debt, 0.5e18
+                debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0), Engine.OrderType.Debt, 0.5e18, 0.5e18
             )
         );
         vm.pauseGasMetering();
@@ -228,12 +247,12 @@ contract TransferTest is Test {
             positions.dataOf_cGJnTo(address(this), debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0));
 
         assertEq(data.balance, 0.5e18);
-        assertEq(data.liquidityBuffer, 0.5e18);
+        assertEq(data.buffer, 0.5e18);
 
         data = positions.dataOf_cGJnTo(cuh, debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0));
 
         assertEq(data.balance, 0.5e18);
-        assertEq(data.liquidityBuffer, 0.5e18);
+        assertEq(data.buffer, 0.5e18);
 
         vm.resumeGasMetering();
     }
@@ -250,16 +269,19 @@ contract TransferTest is Test {
             cuh,
             abi.encode(
                 Positions.ILRTATransferDetails(
-                    debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0), Engine.OrderType.Debt, 0.5e18
+                    debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0),
+                    Engine.OrderType.Debt,
+                    0.5e18,
+                    0.5e18
                 )
             )
         );
 
         vm.resumeGasMetering();
-        positions.transfer_Jvpprd(
+        positions.transfer_AjLAUd(
             cuh,
             Positions.ILRTATransferDetails(
-                debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0), Engine.OrderType.Debt, 0.5e18
+                debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0), Engine.OrderType.Debt, 0.5e18, 0.5e18
             )
         );
         vm.pauseGasMetering();
@@ -268,12 +290,12 @@ contract TransferTest is Test {
             positions.dataOf_cGJnTo(address(this), debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0));
 
         assertEq(data.balance, 0.5e18);
-        assertEq(data.liquidityBuffer, 0.5e18);
+        assertEq(data.buffer, 0.5e18);
 
         data = positions.dataOf_cGJnTo(cuh, debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0));
 
         assertEq(data.balance, 1.5e18);
-        assertEq(data.liquidityBuffer, 1.5e18);
+        assertEq(data.buffer, 1.5e18);
 
         vm.resumeGasMetering();
     }

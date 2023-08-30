@@ -39,6 +39,7 @@ contract RemoveLiquidityTest is Test, IExecuteCallback {
 
     bytes32 private id;
     uint128 private amountPosition;
+    uint128 private amountBuffer;
 
     function setUp() external {
         engine = new Engine();
@@ -50,8 +51,8 @@ contract RemoveLiquidityTest is Test, IExecuteCallback {
         if (amount0 > 0) mockERC20_0.mint(msg.sender, amount0);
         if (amount1 > 0) mockERC20_1.mint(msg.sender, amount1);
 
-        engine.transfer_Jvpprd(
-            msg.sender, Positions.ILRTATransferDetails(id, Engine.OrderType.BiDirectional, amountPosition)
+        engine.transfer_AjLAUd(
+            msg.sender, Positions.ILRTATransferDetails(id, Engine.OrderType.BiDirectional, amountPosition, amountBuffer)
         );
     }
 
@@ -110,7 +111,7 @@ contract RemoveLiquidityTest is Test, IExecuteCallback {
         Positions.ILRTAData memory position = engine.dataOf_cGJnTo(address(this), id);
 
         assertEq(position.balance, 0);
-        assertEq(position.liquidityBuffer, 0);
+        assertEq(position.buffer, 0);
 
         vm.resumeGasMetering();
     }

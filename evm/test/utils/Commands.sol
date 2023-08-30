@@ -46,7 +46,8 @@ function repayLiquidityCommand(
     uint8 scalingFactor,
     int24 strike,
     Engine.TokenSelector selectorCollateral,
-    uint128 amountDesired
+    uint128 amountDesired,
+    uint128 amountBuffer
 )
     pure
     returns (Engine.CommandInput memory commandInput)
@@ -54,7 +55,9 @@ function repayLiquidityCommand(
     return Engine.CommandInput(
         Engine.Commands.RepayLiquidity,
         abi.encode(
-            Engine.RepayLiquidityParams(token0, token1, scalingFactor, strike, selectorCollateral, amountDesired)
+            Engine.RepayLiquidityParams(
+                token0, token1, scalingFactor, strike, selectorCollateral, amountDesired, amountBuffer
+            )
         )
     );
 }

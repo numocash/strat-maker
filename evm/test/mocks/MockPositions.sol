@@ -27,14 +27,22 @@ contract MockPositions is Positions {
         int24 strike,
         Engine.TokenSelector selector,
         uint128 amount,
-        uint128 liquidityBuffer
+        uint128 buffer
     )
         external
     {
-        _mintDebt(to, token0, token1, scalingFactor, strike, selector, amount, liquidityBuffer);
+        _mintDebt(to, token0, token1, scalingFactor, strike, selector, amount, buffer);
     }
 
-    function burn(address from, bytes32 id, uint128 amount, Engine.OrderType orderType) external {
-        _burn(from, id, amount, orderType);
+    function burn(
+        address from,
+        bytes32 id,
+        Engine.OrderType orderType,
+        uint128 amount,
+        uint128 amountBuffer
+    )
+        external
+    {
+        _burn(from, id, orderType, amount, amountBuffer);
     }
 }
