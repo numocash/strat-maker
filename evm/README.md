@@ -5,15 +5,11 @@
 
 An ERC20 exchange protocol optimized for portfolio replication and margining built for the Ethereum Virtual Machine.
 
-
-
 Features:
 
 - Aggregate of constant-sum liquidity pools with spaced strike prices
 - Reserve the right to swap on liquidity with built in, overcollateralized, liquidation-free lending
 - Custom fee settings within each pair with inherent, optimal, on-chain routing between them
-- Liquidity can be constricted to one trading direction (partial fill limit order)
-- Auto-compounding fees
 - Single contract architecture
 
 ## Benchmarking
