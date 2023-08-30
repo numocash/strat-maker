@@ -76,7 +76,6 @@ library BitMaps {
     }
 
     /// @notice Recover the most significant bit
-    /// @custom:team Can the msb ever be greater than 127?
     function _msb(uint256 x) internal pure returns (uint8 r) {
         unchecked {
             assert(x > 0);
