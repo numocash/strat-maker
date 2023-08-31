@@ -68,7 +68,6 @@ contract Engine is Positions {
 
     error InsufficientInput();
     error InvalidAmountDesired();
-    error InvalidCommand();
     error InvalidTokenOrder();
     error Reentrancy();
 
@@ -265,32 +264,28 @@ contract Engine is Positions {
 
         // find command helper with binary search
         for (uint256 i = 0; i < commandInputs.length;) {
-            if (commandInputs[i].command < Commands.RemoveLiquidity) {
-                if (commandInputs[i].command < Commands.BorrowLiquidity) {
-                    if (commandInputs[i].command == Commands.Swap) {
-                        _swap(abi.decode(commandInputs[i].input, (SwapParams)), account);
-                    } else {
-                        _addLiquidity(to, abi.decode(commandInputs[i].input, (AddLiquidityParams)), account);
-                    }
+            if (commandInputs[i].command < Commands.RepayLiquidity) {
+                if (commandInputs[i].command == Commands.Swap) {
+                    _swap(abi.decode(commandInputs[i].input, (SwapParams)), account);
                 } else {
-                    if (commandInputs[i].command == Commands.BorrowLiquidity) {
-                        _borrowLiquidity(to, abi.decode(commandInputs[i].input, (BorrowLiquidityParams)), account);
+                    if (commandInputs[i].command == Commands.AddLiquidity) {
+                        _addLiquidity(to, abi.decode(commandInputs[i].input, (AddLiquidityParams)), account);
                     } else {
-                        _repayLiquidity(abi.decode(commandInputs[i].input, (RepayLiquidityParams)), account);
+                        _borrowLiquidity(to, abi.decode(commandInputs[i].input, (BorrowLiquidityParams)), account);
                     }
                 }
             } else {
-                if (commandInputs[i].command < Commands.CreatePair) {
-                    if (commandInputs[i].command == Commands.RemoveLiquidity) {
-                        _removeLiquidity(abi.decode(commandInputs[i].input, (RemoveLiquidityParams)), account);
+                if (commandInputs[i].command < Commands.Accrue) {
+                    if (commandInputs[i].command == Commands.RepayLiquidity) {
+                        _repayLiquidity(abi.decode(commandInputs[i].input, (RepayLiquidityParams)), account);
                     } else {
-                        _accrue(abi.decode(commandInputs[i].input, (AccrueParams)));
+                        _removeLiquidity(abi.decode(commandInputs[i].input, (RemoveLiquidityParams)), account);
                     }
                 } else {
-                    if (commandInputs[i].command == Commands.CreatePair) {
-                        _createPair(abi.decode(commandInputs[i].input, (CreatePairParams)));
+                    if (commandInputs[i].command == Commands.Accrue) {
+                        _accrue(abi.decode(commandInputs[i].input, (AccrueParams)));
                     } else {
-                        revert InvalidCommand();
+                        _createPair(abi.decode(commandInputs[i].input, (CreatePairParams)));
                     }
                 }
             }
