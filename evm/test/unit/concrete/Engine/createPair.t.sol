@@ -2,66 +2,72 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
-import {createCommand, createCommandInput, pushCommandInputs} from "../../../utils/Commands.sol";
 
 import {Engine} from "src/core/Engine.sol";
-import {Accounts} from "src/core/Accounts.sol";
-import {NUM_SPREADS} from "src/core/Pairs.sol";
+import {Pairs} from "src/core/Pairs.sol";
+import {MIN_STRIKE, MAX_STRIKE} from "src/core/math/StrikeMath.sol";
 
-contract CreatePairTest is Test {
-    event PairCreated(address indexed token0, address indexed token1, uint8 scalingFactor, int24 strikeInitial);
+contract CreatePairTest is Test, Engine {
+    using Pairs for Pairs.Pair;
+    using Pairs for mapping(bytes32 => Pairs.Pair);
 
-    Engine private engine;
+    function test_CreatePair_ZeroScale() external {
+        _createPair(Engine.CreatePairParams(address(1), address(2), 0, 0));
 
-    function setUp() external {
-        engine = new Engine();
-    }
-
-    function test_CreatePair_SameToken() external {
         vm.pauseGasMetering();
 
-        Engine.CommandInput[] memory commandInputs = createCommandInput();
-        commandInputs = pushCommandInputs(commandInputs, createCommand(address(1), address(1), 0, 0));
+        (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
+
+        assertEq(pair.initialized, true);
 
         vm.resumeGasMetering();
+    }
 
-        vm.expectRevert(Engine.InvalidTokenOrder.selector);
-        engine.execute(address(0), commandInputs, 0, 0, bytes(""));
+    function test_CreatePair_Scale() external {
+        _createPair(Engine.CreatePairParams(address(1), address(2), 8, 0));
+
+        vm.pauseGasMetering();
+
+        (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 8);
+
+        assertEq(pair.initialized, true);
+
+        vm.resumeGasMetering();
+    }
+
+    function test_CreatePair_ZeroInitial() external {
+        _createPair(Engine.CreatePairParams(address(1), address(2), 0, 0));
+
+        vm.pauseGasMetering();
+
+        (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
+
+        assertEq(pair.strikes[0].next0To1, MIN_STRIKE);
+        assertEq(pair.strikes[0].next1To0, MAX_STRIKE);
+
+        vm.resumeGasMetering();
+    }
+
+    function test_CreatePair_Initial() external {
+        _createPair(Engine.CreatePairParams(address(1), address(2), 0, 32));
+
+        vm.pauseGasMetering();
+
+        (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
+
+        assertEq(pair.strikes[32].next0To1, MIN_STRIKE);
+        assertEq(pair.strikes[32].next1To0, MAX_STRIKE);
+
+        vm.resumeGasMetering();
     }
 
     function test_CreatePair_ZeroToken() external {
-        vm.pauseGasMetering();
-
-        Engine.CommandInput[] memory commandInputs = createCommandInput();
-        commandInputs = pushCommandInputs(commandInputs, createCommand(address(0), address(1), 0, 0));
-
-        vm.resumeGasMetering();
-
         vm.expectRevert(Engine.InvalidTokenOrder.selector);
-        engine.execute(address(0), commandInputs, 0, 0, bytes(""));
+        _createPair(Engine.CreatePairParams(address(0), address(1), 0, 0));
     }
 
-    function test_CreatePair() external {
-        vm.pauseGasMetering();
-        Engine.CommandInput[] memory commandInputs = createCommandInput();
-        commandInputs = pushCommandInputs(commandInputs, createCommand(address(1), address(2), 0, 0));
-
-        vm.expectEmit(true, true, false, true);
-        emit PairCreated(address(1), address(2), 0, 0);
-        vm.resumeGasMetering();
-
-        Accounts.Account memory account = engine.execute(address(0), commandInputs, 0, 0, bytes(""));
-
-        vm.pauseGasMetering();
-
-        assertEq(account.erc20Data.length, 0);
-        assertEq(account.lpData.length, 0);
-
-        (, int24[NUM_SPREADS] memory strikeCurrent, bool initialized) = engine.getPair(address(1), address(2), 0);
-
-        assertEq(strikeCurrent[0], 0);
-        assertEq(initialized, true);
-
-        vm.resumeGasMetering();
+    function test_CreatePair_InvalidOrder() external {
+        vm.expectRevert(Engine.InvalidTokenOrder.selector);
+        _createPair(Engine.CreatePairParams(address(2), address(1), 0, 0));
     }
 }
