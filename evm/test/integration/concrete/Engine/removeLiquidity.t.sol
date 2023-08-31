@@ -56,7 +56,7 @@ contract RemoveLiquidityTest is Test, IExecuteCallback {
         );
     }
 
-    function test_RemoveLiquidity() external {
+    function test_RemoveLiquidityFull() external {
         vm.pauseGasMetering();
         Engine.CommandInput[] memory commandInputs = createCommandInput();
         commandInputs =
@@ -109,6 +109,76 @@ contract RemoveLiquidityTest is Test, IExecuteCallback {
         assertEq(mockERC20_0.balanceOf(address(engine)), 1);
 
         Positions.ILRTAData memory position = engine.dataOf_cGJnTo(address(this), id);
+
+        assertEq(position.balance, 0);
+        assertEq(position.buffer, 0);
+
+        position = engine.dataOf_cGJnTo(address(engine), id);
+
+        assertEq(position.balance, 0);
+        assertEq(position.buffer, 0);
+
+        vm.resumeGasMetering();
+    }
+
+    function test_RemoveLiquidityPartial() external {
+        vm.pauseGasMetering();
+        Engine.CommandInput[] memory commandInputs = createCommandInput();
+        commandInputs =
+            pushCommandInputs(commandInputs, createCommand(address(mockERC20_0), address(mockERC20_1), 0, 0));
+
+        engine.execute(address(0), commandInputs, 0, 0, bytes(""));
+
+        delete commandInputs;
+
+        commandInputs = pushCommandInputs(
+            commandInputs, addLiquidityCommand(address(mockERC20_0), address(mockERC20_1), 0, 2, 1, 1e18)
+        );
+
+        amount0 = getAmount0(1e18, getRatioAtStrike(2), 0, true);
+
+        engine.execute(address(this), commandInputs, 1, 0, bytes(""));
+
+        delete commandInputs;
+        delete amount0;
+        delete amount1;
+
+        commandInputs = pushCommandInputs(
+            commandInputs, removeLiquidityCommand(address(mockERC20_0), address(mockERC20_1), 0, 2, 1, 0.5e18)
+        );
+
+        id = biDirectionalID(address(mockERC20_0), address(mockERC20_1), 0, 2, 1);
+
+        amountPosition = 0.5e18;
+
+        // vm.expectEmit(true, true, true, true);
+        // emit RemoveLiquidity(id, 2, 1, 1e18, getAmount0(1e18, getRatioAtStrike(2), 0, false), 0);
+        vm.resumeGasMetering();
+
+        Accounts.Account memory accounts = engine.execute(address(this), commandInputs, 1, 1, bytes(""));
+
+        vm.pauseGasMetering();
+
+        Pairs.Strike memory strike = engine.getStrike(address(mockERC20_0), address(mockERC20_1), 0, 2);
+
+        assertEq(strike.blockLast, 1);
+        assertEq(strike.liquidity[0].swap, 0.5e18);
+
+        assertEq(accounts.erc20Data[0].token, address(mockERC20_0));
+        assertEq(accounts.erc20Data[0].balanceBefore, 0);
+        assertEq(accounts.erc20Data[0].balanceDelta, -int256(getAmount0(0.5e18, getRatioAtStrike(2), 0, false)));
+
+        assertEq(accounts.lpData[0].id, id);
+        assertEq(accounts.lpData[0].amountBurned, 0.5e18);
+
+        assertEq(mockERC20_0.balanceOf(address(engine)), getAmount0(0.5e18, getRatioAtStrike(2), 0, true) + 1);
+
+        Positions.ILRTAData memory position = engine.dataOf_cGJnTo(address(this), id);
+
+        assertEq(position.balance, 0.5e18);
+        assertEq(position.buffer, 0);
+
+        position = engine.dataOf_cGJnTo(address(engine), id);
 
         assertEq(position.balance, 0);
         assertEq(position.buffer, 0);

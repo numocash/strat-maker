@@ -409,12 +409,13 @@ contract Engine is Positions {
             account.updateToken(params.token0, toInt256(_amount0));
             account.updateToken(params.token1, toInt256(_amount1));
 
-            // mint position token
+            // calculate how much to burn
             uint128 balance = liquidityToBalance(
                 params.amountDesired,
                 pair.strikes[params.strike].liquidityGrowthSpreadX128[params.spread - 1].liquidityGrowthX128
             );
 
+            // mint position token
             _mintBiDirectional(
                 to, params.token0, params.token1, params.scalingFactor, params.strike, params.spread, balance
             );
@@ -527,43 +528,46 @@ contract Engine is Positions {
 
     /// @notice Helper remove liquidity function
     function _removeLiquidity(RemoveLiquidityParams memory params, Accounts.Account memory account) internal {
-        (bytes32 pairID, Pairs.Pair storage pair) =
-            pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
-
-        uint136 liquidityAccrued = pair.accrue(params.strike);
-
-        // Calculate how much to remove
-        // Note: subtraction can underflow, will be invalid index error
-        uint128 liquidity;
         unchecked {
-            liquidity = balanceToLiquidity(
+            (bytes32 pairID, Pairs.Pair storage pair) =
+                pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
+
+            {
+                uint136 liquidityAccrued = pair.accrue(params.strike);
+                if (liquidityAccrued > 0) pair.removeBorrowedLiquidity(params.strike, liquidityAccrued);
+            }
+
+            // Calculate how much to remove
+            // Note: subtraction can underflow, will be invalid index error
+            uint128 liquidity = balanceToLiquidity(
                 params.amountDesired,
                 pair.strikes[params.strike].liquidityGrowthSpreadX128[params.spread - 1].liquidityGrowthX128
             );
+
+            if (liquidity == 0) revert InsufficientInput();
+
+            // remove liquidity from pair
             uint136 liquidityDisplaced = pair.removeSwapLiquidity(params.strike, params.spread, liquidity);
-            if (liquidityDisplaced > liquidityAccrued) {
-                pair.addBorrowedLiquidity(params.strike, liquidityDisplaced - liquidityAccrued);
-            } else if (liquidityDisplaced < liquidityAccrued) {
-                pair.removeBorrowedLiquidity(params.strike, liquidityAccrued - liquidityDisplaced);
-            }
+            if (liquidityDisplaced > 0) pair.addBorrowedLiquidity(params.strike, liquidityDisplaced);
+
+            // calculate how much tokens to remove
+            (uint256 _amount0, uint256 _amount1) =
+                getAmounts(pair, scaleLiquidityUp(liquidity, params.scalingFactor), params.strike, params.spread, false);
+
+            // update accounts
+            account.updateToken(params.token0, -toInt256(_amount0));
+            account.updateToken(params.token1, -toInt256(_amount1));
+
+            // update position token
+            account.updateLP(
+                biDirectionalID(params.token0, params.token1, params.scalingFactor, params.strike, params.spread),
+                OrderType.BiDirectional,
+                params.amountDesired,
+                0
+            );
+
+            emit RemoveLiquidity(pairID, params.strike, params.spread, liquidity, _amount0, _amount1);
         }
-
-        (uint256 _amount0, uint256 _amount1) =
-            getAmounts(pair, scaleLiquidityUp(liquidity, params.scalingFactor), params.strike, params.spread, false);
-
-        // update accounts
-        account.updateToken(params.token0, -toInt256(_amount0));
-        account.updateToken(params.token1, -toInt256(_amount1));
-
-        // update position token
-        account.updateLP(
-            biDirectionalID(params.token0, params.token1, params.scalingFactor, params.strike, params.spread),
-            OrderType.BiDirectional,
-            params.amountDesired,
-            0
-        );
-
-        emit RemoveLiquidity(pairID, params.strike, params.spread, liquidity, _amount0, _amount1);
     }
 
     /// @notice Helper accrue function

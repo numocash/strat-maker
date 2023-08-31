@@ -11,7 +11,7 @@ import {Positions, biDirectionalID} from "src/core/Positions.sol";
 import {getAmounts} from "src/core/math/LiquidityMath.sol";
 import {Q128} from "src/core/math/StrikeMath.sol";
 
-contract AddLiquidity is Test, Engine {
+contract AddLiquidityTest is Test, Engine {
     using Accounts for Accounts.Account;
     using Pairs for Pairs.Pair;
     using Pairs for mapping(bytes32 => Pairs.Pair);
@@ -25,7 +25,7 @@ contract AddLiquidity is Test, Engine {
 
         vm.resumeGasMetering();
 
-        vm.expectRevert();
+        vm.expectRevert(Engine.InsufficientInput.selector);
         _addLiquidity(address(this), Engine.AddLiquidityParams(address(1), address(2), 0, 2, 1, 0), account);
     }
 
@@ -155,7 +155,7 @@ contract AddLiquidity is Test, Engine {
         vm.resumeGasMetering();
     }
 
-    function test_AddLiquidity_Mint_LiquidityGrowthZero() external {
+    function test_AddLiquidity_MintLiquidityGrowthZero() external {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
@@ -176,7 +176,7 @@ contract AddLiquidity is Test, Engine {
         vm.resumeGasMetering();
     }
 
-    function test_AddLiquidity_Mint_LiquidityGrowth() external {
+    function test_AddLiquidity_MintLiquidityGrowth() external {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);

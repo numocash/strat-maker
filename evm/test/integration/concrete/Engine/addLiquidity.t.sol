@@ -86,11 +86,49 @@ contract AddLiquidityTest is Test, IExecuteCallback {
         vm.resumeGasMetering();
     }
 
-    function test_AddLiquidity_LiquidityGrowth() external {}
+    function test_AddLiquidity_Hot() external {
+        vm.pauseGasMetering();
+        Engine.CommandInput[] memory commandInputs = createCommandInput();
+        commandInputs =
+            pushCommandInputs(commandInputs, createCommand(address(mockERC20_0), address(mockERC20_1), 0, 0));
 
-    function test_AddLiquidity_LiquidityAccrued() external {}
+        engine.execute(address(0), commandInputs, 0, 0, bytes(""));
 
-    function test_AddLiquidity_LiquidityDisplaced() external {}
+        delete commandInputs;
 
-    function test_AddLiquidity_ScaleLiquidity() external {}
+        commandInputs = pushCommandInputs(
+            commandInputs, addLiquidityCommand(address(mockERC20_0), address(mockERC20_1), 0, 2, 1, 1e18)
+        );
+
+        amount0 = getAmount0(1e18, getRatioAtStrike(2), 0, true);
+
+        engine.execute(address(this), commandInputs, 1, 0, bytes(""));
+
+        vm.expectEmit(true, true, true, true);
+        emit AddLiquidity(Pairs.getPairID(address(mockERC20_0), address(mockERC20_1), 0), 2, 1, 1e18, amount0, 0);
+        vm.resumeGasMetering();
+
+        Accounts.Account memory accounts = engine.execute(address(this), commandInputs, 1, 0, bytes(""));
+
+        vm.pauseGasMetering();
+
+        Pairs.Strike memory strike = engine.getStrike(address(mockERC20_0), address(mockERC20_1), 0, 2);
+
+        assertEq(strike.blockLast, 1);
+        assertEq(strike.liquidity[0].swap, 2e18);
+
+        assertEq(accounts.erc20Data[0].token, address(mockERC20_0));
+        assertEq(accounts.erc20Data[0].balanceBefore, amount0);
+        assertEq(accounts.erc20Data[0].balanceDelta, int256(amount0));
+
+        assertEq(mockERC20_0.balanceOf(address(engine)), 2 * amount0);
+
+        Positions.ILRTAData memory position =
+            engine.dataOf_cGJnTo(address(this), biDirectionalID(address(mockERC20_0), address(mockERC20_1), 0, 2, 1));
+
+        assertEq(position.balance, 2e18);
+        assertEq(position.buffer, 0);
+
+        vm.resumeGasMetering();
+    }
 }
