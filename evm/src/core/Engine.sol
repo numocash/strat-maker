@@ -27,8 +27,6 @@ import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
 
 import {IExecuteCallback} from "./interfaces/IExecuteCallback.sol";
 
-import {console2} from "forge-std/console2.sol";
-
 /// @title Engine
 /// @notice ERC20 exchange
 /// @author Kyle Scott and Robert Leifke
@@ -486,6 +484,53 @@ contract Engine is Positions {
             pair.addBorrowedLiquidity(params.strike, params.amountDesiredDebt);
 
             // calculate how much tokens to remove
+            {
+                uint256 amount0;
+                uint256 amount1;
+
+                uint8 _activeSpread = pair.strikes[params.strike].activeSpread;
+                uint128 liquidity = params.amountDesiredDebt;
+
+                while (true) {
+                    uint128 borrowedLiquidity = pair.strikes[params.strike].liquidity[_activeSpread].borrowed;
+
+                    if (borrowedLiquidity >= liquidity) {
+                        (uint256 _amount0, uint256 _amount1) = getAmounts(
+                            pair,
+                            scaleLiquidityUp(liquidity, params.scalingFactor),
+                            params.strike,
+                            _activeSpread + 1,
+                            false
+                        );
+
+                        amount0 += _amount0;
+                        amount1 += _amount1;
+
+                        break;
+                    }
+
+                    if (borrowedLiquidity > 0) {
+                        (uint256 _amount0, uint256 _amount1) = getAmounts(
+                            pair,
+                            scaleLiquidityUp(borrowedLiquidity, params.scalingFactor),
+                            params.strike,
+                            _activeSpread + 1,
+                            false
+                        );
+
+                        amount0 += _amount0;
+                        amount1 += _amount1;
+
+                        liquidity -= borrowedLiquidity;
+                    }
+
+                    _activeSpread--;
+                }
+
+                // update accounts
+                account.updateToken(params.token0, -toInt256(amount0));
+                account.updateToken(params.token1, -toInt256(amount1));
+            }
 
             // add collateral to account
             uint128 liquidityCollateral;

@@ -19,7 +19,7 @@ contract BorrowLiquidityTest is Test, Engine {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 0);
+        Accounts.Account memory account = Accounts.newAccount(2, 0);
         pair.initialize(0);
 
         pair.addSwapLiquidity(0, 1, 1e18);
@@ -45,7 +45,7 @@ contract BorrowLiquidityTest is Test, Engine {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 0);
+        Accounts.Account memory account = Accounts.newAccount(2, 0);
         pair.initialize(0);
 
         pair.addSwapLiquidity(0, 1, 1e18);
@@ -71,7 +71,7 @@ contract BorrowLiquidityTest is Test, Engine {
     function test_BorrowLiquidity_InvalidAmountDesired() external {
         vm.pauseGasMetering();
 
-        Accounts.Account memory account = Accounts.newAccount(1, 0);
+        Accounts.Account memory account = Accounts.newAccount(2, 0);
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
         pair.initialize(0);
@@ -90,7 +90,7 @@ contract BorrowLiquidityTest is Test, Engine {
     function test_BorrowLiquidity_UpdatePair() external {
         vm.pauseGasMetering();
 
-        Accounts.Account memory account = Accounts.newAccount(1, 0);
+        Accounts.Account memory account = Accounts.newAccount(2, 0);
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
         pair.initialize(0);
@@ -118,7 +118,7 @@ contract BorrowLiquidityTest is Test, Engine {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 0);
+        Accounts.Account memory account = Accounts.newAccount(2, 0);
         pair.initialize(0);
 
         pair.addSwapLiquidity(0, 1, 1e18);
@@ -146,7 +146,7 @@ contract BorrowLiquidityTest is Test, Engine {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 0);
+        Accounts.Account memory account = Accounts.newAccount(2, 0);
         pair.initialize(0);
 
         pair.addSwapLiquidity(0, 1, 1e18);
@@ -175,7 +175,7 @@ contract BorrowLiquidityTest is Test, Engine {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 8);
-        Accounts.Account memory account = Accounts.newAccount(1, 0);
+        Accounts.Account memory account = Accounts.newAccount(2, 0);
         pair.initialize(0);
 
         pair.addSwapLiquidity(0, 1, 1e18);
@@ -202,7 +202,7 @@ contract BorrowLiquidityTest is Test, Engine {
     function test_BorrowLiquidity_Undercollateralized() external {
         vm.pauseGasMetering();
 
-        Accounts.Account memory account = Accounts.newAccount(1, 0);
+        Accounts.Account memory account = Accounts.newAccount(2, 0);
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
         pair.initialize(0);
@@ -217,5 +217,115 @@ contract BorrowLiquidityTest is Test, Engine {
             Engine.BorrowLiquidityParams(address(1), address(2), 0, 0, Engine.TokenSelector.Token1, 0.5e18 - 1, 0.5e18),
             account
         );
+    }
+
+    function test_BorrowLiquidity_Amounts() external {
+        vm.pauseGasMetering();
+
+        (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
+        Accounts.Account memory account = Accounts.newAccount(2, 0);
+        pair.initialize(0);
+
+        pair.addSwapLiquidity(0, 1, 1e18);
+
+        vm.resumeGasMetering();
+
+        _borrowLiquidity(
+            address(this),
+            Engine.BorrowLiquidityParams(address(1), address(2), 0, 0, Engine.TokenSelector.Token1, 1e18, 0.5e18),
+            account
+        );
+
+        vm.pauseGasMetering();
+
+        assertEq(account.erc20Data[0].token, address(1));
+        assertEq(account.erc20Data[1].token, address(2));
+        assertEq(account.erc20Data[0].balanceDelta, 1 - 0.5e18);
+        assertEq(account.erc20Data[1].balanceDelta, 1e18);
+
+        vm.resumeGasMetering();
+    }
+
+    function test_BorrowLiquidity_AmountsScale() external {
+        vm.pauseGasMetering();
+
+        (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 8);
+        Accounts.Account memory account = Accounts.newAccount(2, 0);
+        pair.initialize(0);
+
+        pair.addSwapLiquidity(0, 1, 1e18);
+
+        vm.resumeGasMetering();
+
+        _borrowLiquidity(
+            address(this),
+            Engine.BorrowLiquidityParams(address(1), address(2), 8, 0, Engine.TokenSelector.Token1, 1e18 << 8, 0.5e18),
+            account
+        );
+
+        vm.pauseGasMetering();
+
+        assertEq(account.erc20Data[0].token, address(1));
+        assertEq(account.erc20Data[1].token, address(2));
+        assertEq(account.erc20Data[0].balanceDelta, 1 - (0.5e18 << 8));
+        assertEq(account.erc20Data[1].balanceDelta, 1e18 << 8);
+
+        vm.resumeGasMetering();
+    }
+
+    function test_BorrowLiquidity_AmountsMultiSpread() external {
+        vm.pauseGasMetering();
+
+        (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
+        Accounts.Account memory account = Accounts.newAccount(2, 0);
+        pair.initialize(0);
+
+        pair.addSwapLiquidity(0, 1, 1e18);
+        pair.addSwapLiquidity(0, 2, 1e18);
+
+        vm.resumeGasMetering();
+
+        _borrowLiquidity(
+            address(this),
+            Engine.BorrowLiquidityParams(address(1), address(2), 0, 0, Engine.TokenSelector.Token1, 2e18, 1.5e18),
+            account
+        );
+
+        vm.pauseGasMetering();
+
+        assertEq(account.erc20Data[0].token, address(1));
+        assertEq(account.erc20Data[1].token, address(2));
+        assertEq(account.erc20Data[0].balanceDelta, 2 - 1.5e18);
+        assertEq(account.erc20Data[1].balanceDelta, 2e18);
+
+        vm.resumeGasMetering();
+    }
+
+    function test_BorrowLiquidity_AmountsEmptySpread() external {
+        vm.pauseGasMetering();
+
+        (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
+        Accounts.Account memory account = Accounts.newAccount(2, 0);
+        pair.initialize(0);
+
+        pair.addSwapLiquidity(0, 1, 1e18);
+        pair.addSwapLiquidity(0, 3, 1e18);
+
+        vm.resumeGasMetering();
+
+        _borrowLiquidity(
+            address(this),
+            Engine.BorrowLiquidityParams(address(1), address(2), 0, 0, Engine.TokenSelector.Token1, 2e18, 1.5e18),
+            account
+        );
+
+        vm.pauseGasMetering();
+
+        assertEq(account.erc20Data[0].token, address(1));
+        assertEq(account.erc20Data[1].token, address(2));
+        assertEq(account.erc20Data[0].balanceDelta, 2 - 1.5e18);
+        assertEq(account.erc20Data[1].balanceDelta, 2e18);
+
+        vm.resumeGasMetering();
     }
 }
