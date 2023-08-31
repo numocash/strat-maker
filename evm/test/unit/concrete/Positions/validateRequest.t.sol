@@ -15,9 +15,9 @@ contract ValidateRequestTest is Test {
     }
 
     function test_ValidateRequest_IDMismatch() external {
-        bool ret = positions.validateRequest_bzlHQU(
-            Positions.ILRTATransferDetails(bytes32(0), Engine.OrderType.BiDirectional, 0),
-            Positions.ILRTATransferDetails(bytes32(uint256(1)), Engine.OrderType.BiDirectional, 0)
+        bool ret = positions.validateRequest_Hkophp(
+            Positions.ILRTATransferDetails(bytes32(0), Engine.OrderType.BiDirectional, 0, 0),
+            Positions.ILRTATransferDetails(bytes32(uint256(1)), Engine.OrderType.BiDirectional, 0, 0)
         );
 
         vm.pauseGasMetering();
@@ -28,9 +28,9 @@ contract ValidateRequestTest is Test {
     }
 
     function test_ValidateRequest_OrderTypeMismatch() external {
-        bool ret = positions.validateRequest_bzlHQU(
-            Positions.ILRTATransferDetails(bytes32(0), Engine.OrderType.BiDirectional, 0),
-            Positions.ILRTATransferDetails(bytes32(0), Engine.OrderType.Debt, 0)
+        bool ret = positions.validateRequest_Hkophp(
+            Positions.ILRTATransferDetails(bytes32(0), Engine.OrderType.BiDirectional, 0, 0),
+            Positions.ILRTATransferDetails(bytes32(0), Engine.OrderType.Debt, 0, 0)
         );
 
         vm.pauseGasMetering();
@@ -41,9 +41,22 @@ contract ValidateRequestTest is Test {
     }
 
     function test_ValidateRequest_AmountGT() external {
-        bool ret = positions.validateRequest_bzlHQU(
-            Positions.ILRTATransferDetails(bytes32(0), Engine.OrderType.BiDirectional, 0),
-            Positions.ILRTATransferDetails(bytes32(0), Engine.OrderType.BiDirectional, 1)
+        bool ret = positions.validateRequest_Hkophp(
+            Positions.ILRTATransferDetails(bytes32(0), Engine.OrderType.BiDirectional, 0, 0),
+            Positions.ILRTATransferDetails(bytes32(0), Engine.OrderType.BiDirectional, 1, 0)
+        );
+
+        vm.pauseGasMetering();
+
+        assertFalse(ret);
+
+        vm.resumeGasMetering();
+    }
+
+    function test_ValidateRequest_AmountBufferGT() external {
+        bool ret = positions.validateRequest_Hkophp(
+            Positions.ILRTATransferDetails(bytes32(0), Engine.OrderType.BiDirectional, 0, 0),
+            Positions.ILRTATransferDetails(bytes32(0), Engine.OrderType.BiDirectional, 0, 1)
         );
 
         vm.pauseGasMetering();
@@ -54,9 +67,9 @@ contract ValidateRequestTest is Test {
     }
 
     function test_ValidateRequest_True() external {
-        bool ret = positions.validateRequest_bzlHQU(
-            Positions.ILRTATransferDetails(bytes32(0), Engine.OrderType.BiDirectional, 0),
-            Positions.ILRTATransferDetails(bytes32(0), Engine.OrderType.BiDirectional, 0)
+        bool ret = positions.validateRequest_Hkophp(
+            Positions.ILRTATransferDetails(bytes32(0), Engine.OrderType.BiDirectional, 0, 0),
+            Positions.ILRTATransferDetails(bytes32(0), Engine.OrderType.BiDirectional, 0, 0)
         );
 
         vm.pauseGasMetering();
@@ -67,6 +80,6 @@ contract ValidateRequestTest is Test {
     }
 
     function test_ValidateRequest_Selector() external {
-        assertEq(Positions.validateRequest_bzlHQU.selector, bytes4(keccak256("validateRequest()")));
+        assertEq(Positions.validateRequest_Hkophp.selector, bytes4(keccak256("validateRequest()")));
     }
 }

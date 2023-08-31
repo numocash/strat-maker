@@ -25,7 +25,7 @@ contract MintBiDirectionalTest is Test {
             address(this),
             abi.encode(
                 Positions.ILRTATransferDetails(
-                    biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 1e18
+                    biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 1e18, 0
                 )
             )
         );
@@ -38,7 +38,7 @@ contract MintBiDirectionalTest is Test {
             positions.dataOf_cGJnTo(address(this), biDirectionalID(address(1), address(2), 0, 0, 1));
 
         assertEq(data.balance, 1e18);
-        assertEq(data.liquidityBuffer, 0);
+        assertEq(data.buffer, 0);
 
         vm.resumeGasMetering();
     }
@@ -54,7 +54,7 @@ contract MintBiDirectionalTest is Test {
             address(this),
             abi.encode(
                 Positions.ILRTATransferDetails(
-                    biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 1e18
+                    biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 1e18, 0
                 )
             )
         );
@@ -67,7 +67,7 @@ contract MintBiDirectionalTest is Test {
             positions.dataOf_cGJnTo(address(this), biDirectionalID(address(1), address(2), 0, 0, 1));
 
         assertEq(data.balance, 2e18);
-        assertEq(data.liquidityBuffer, 0);
+        assertEq(data.buffer, 0);
 
         vm.resumeGasMetering();
     }

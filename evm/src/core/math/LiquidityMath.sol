@@ -74,6 +74,7 @@ function getAmount1(uint256 liquidity, uint128 composition, bool roundUp) pure r
 }
 
 /// @notice Calculate the amount of token 0 and token 1 for `liquidity` units of liquidity with `pair`
+/// @param pair Storage pointer to a pair struct, used to conditionally sload composition
 /// @dev Assumes spread is valid
 function getAmounts(
     Pairs.Pair storage pair,
@@ -100,12 +101,6 @@ function getAmounts(
             );
         }
     }
-}
-
-/// @notice cast uint128 to int128, revert on overflow
-function toInt128(uint128 x) pure returns (int128 z) {
-    assert(x <= uint128(type(int128).max));
-    z = int128(x);
 }
 
 /// @notice cast uint256 to int256, revert on overflow

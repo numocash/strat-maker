@@ -45,7 +45,7 @@ library Pairs {
     }
 
     /// @notice Data needed to represent a strike (constant sum automated market market with a fixed price)
-    /// @param liquidityGrowthX128 Liquidity repaid per unit of liquidty
+    /// @param liquidityGrowthExpX128 Exponential multiplier of liquidity debt to balance
     /// @param liquidityGrowthSpreadX128 Liquidity repaid per unit of liquidty per spread
     /// @param liquidity Liquidity available
     /// @param blockLast The block where liquidity was accrued last
@@ -55,7 +55,7 @@ library Pairs {
     /// @param reference1To0 Bitmap of spreads offering 1 to 0 swaps at the price of this strike
     /// @param activeSpread The spread index where liquidity is actively being borrowed from
     struct Strike {
-        LiquidityGrowth liquidityGrowthX128;
+        uint256 liquidityGrowthExpX128;
         LiquidityGrowth[NUM_SPREADS] liquidityGrowthSpreadX128;
         Liquidity[NUM_SPREADS] liquidity;
         uint184 blockLast;
@@ -72,7 +72,6 @@ library Pairs {
     /// @param bitMap1To0 Bit map of strikes supporting 1 to 0 swaps
     /// @param composition Percentage of liquidity held in token 1 per spread
     /// @param strikeCurrent Active strike index per spread
-    /// @param strikeCurrentCached Strike index that was last used for a swap
     /// @param initialized True if the pair has been initialized
     struct Pair {
         mapping(int24 => Strike) strikes;
@@ -80,7 +79,6 @@ library Pairs {
         BitMaps.BitMap bitMap1To0;
         uint128[NUM_SPREADS] composition;
         int24[NUM_SPREADS] strikeCurrent;
-        int24 strikeCurrentCached;
         bool initialized;
     }
 
@@ -118,7 +116,6 @@ library Pairs {
 
         _checkStrike(strikeInitial);
 
-        pair.strikeCurrentCached = strikeInitial;
         pair.initialized = true;
 
         // strike order when swapping 0 -> 1
@@ -135,6 +132,12 @@ library Pairs {
         pair.strikes[MIN_STRIKE].next1To0 = strikeInitial;
         pair.strikes[strikeInitial].next0To1 = MIN_STRIKE;
         pair.strikes[strikeInitial].next1To0 = MAX_STRIKE;
+
+        unchecked {
+            for (uint256 i = 0; i < NUM_SPREADS; i++) {
+                pair.strikeCurrent[i] = strikeInitial;
+            }
+        }
     }
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
@@ -153,7 +156,6 @@ library Pairs {
     /// @param strike Swap is being offered at the price of this strike
     /// @param strikeStart First `strike` a swap was offered at
     /// @param spreadBitMap Bit map with positive representing a spread that is offering a swap at `strike`
-    /// @custom:team copy pair variables to memory
     struct SwapState {
         uint256 liquiditySwap;
         uint256 liquidityTotal;
@@ -173,7 +175,6 @@ library Pairs {
     /// @return amount0 The delta of the balance of token 0 of the pair
     /// @return amount1 The delta of the balance of token 1 of the pair
     /// @custom:team Account for liquidity growth
-    /// @custom:team Does amountDesired need to be more than zero
     function swap(Pair storage pair, bool isToken0, int256 amountDesired) internal returns (int256, int256) {
         if (!pair.initialized) revert Initialized();
 
@@ -181,14 +182,14 @@ library Pairs {
 
         // Find the closest strike offering a swap and set initial swap state
         SwapState memory state;
-        {
-            int24 _strikeCurrentCached = pair.strikeCurrentCached;
+        unchecked {
+            int24 _strikeCurrent = pair.strikeCurrent[0];
             int24 strike = isSwap0To1
-                ? pair.strikes[-pair.bitMap0To1.nextBelow(-_strikeCurrentCached)].next0To1
-                : pair.strikes[pair.bitMap1To0.nextBelow(_strikeCurrentCached)].next1To0;
+                ? pair.strikes[-pair.bitMap0To1.nextBelow(-_strikeCurrent)].next0To1
+                : pair.strikes[pair.bitMap1To0.nextBelow(_strikeCurrent)].next1To0;
 
             state.strike = strike;
-            state.strikeStart = _strikeCurrentCached;
+            state.strikeStart = isSwap0To1 ? _strikeCurrent - 1 : _strikeCurrent + 1;
             state.spreadBitMap = isSwap0To1 ? pair.strikes[strike].reference0To1 : pair.strikes[strike].reference1To0;
         }
 
@@ -294,7 +295,7 @@ library Pairs {
                     for (uint256 i = _lsb(state.spreadBitMap); i <= _msb(state.spreadBitMap); i++) {
                         if ((state.spreadBitMap & (1 << i)) > 0) {
                             int24 spreadStrike = state.strike + int24(uint24(i + 1));
-                            uint24 strikeDelta = uint24(state.strikeStart - state.strike) - 1;
+                            uint24 strikeDelta = uint24(state.strikeStart - state.strike);
 
                             if (i < strikeDelta) {
                                 uint256 liquidity = pair.strikes[spreadStrike].liquidity[i].swap;
@@ -348,7 +349,7 @@ library Pairs {
                     for (uint256 i = _lsb(state.spreadBitMap); i <= _msb(state.spreadBitMap); i++) {
                         if ((state.spreadBitMap & (1 << i)) > 0) {
                             int24 spreadStrike = state.strike - int24(uint24(i + 1));
-                            uint24 strikeDelta = uint24(state.strike - state.strikeStart) - 1;
+                            uint24 strikeDelta = uint24(state.strike - state.strikeStart);
 
                             if (i < strikeDelta) {
                                 uint256 liquidity = pair.strikes[spreadStrike].liquidity[i].swap;
@@ -380,17 +381,21 @@ library Pairs {
         // Save updated pair state to storage
         unchecked {
             if (isSwap0To1) {
-                pair.strikeCurrentCached = state.strike + int24(uint24(_lsb(state.spreadBitMap) + 1));
                 uint128 composition = uint128(mulDiv(state.liquidityRemaining, Q128, state.liquidityTotal));
-                for (uint256 i = 0; i <= _msb(state.spreadBitMap); i++) {
+                uint256 strikeDelta = uint24(state.strikeStart - state.strike);
+                uint256 consecutiveSpreads = strikeDelta > NUM_SPREADS ? NUM_SPREADS : strikeDelta;
+                uint8 msb = _msb(state.spreadBitMap);
+                for (uint256 i = 0; i <= (msb > consecutiveSpreads ? msb : consecutiveSpreads); i++) {
                     pair.strikeCurrent[i] = state.strike + int24(uint24(i + 1));
                     pair.composition[i] = composition;
                 }
             } else {
-                pair.strikeCurrentCached = state.strike - int24(uint24(_lsb(state.spreadBitMap) + 1));
                 uint128 composition =
                     type(uint128).max - uint128(mulDiv(state.liquidityRemaining, Q128, state.liquidityTotal));
-                for (uint256 i = 0; i <= _msb(state.spreadBitMap); i++) {
+                uint24 strikeDelta = uint24(state.strike - state.strikeStart);
+                uint256 consecutiveSpreads = strikeDelta > NUM_SPREADS ? NUM_SPREADS : strikeDelta;
+                uint8 msb = _msb(state.spreadBitMap);
+                for (uint256 i = 0; i <= (msb > consecutiveSpreads ? msb : consecutiveSpreads); i++) {
                     pair.strikeCurrent[i] = state.strike - int24(uint24(i + 1));
                     pair.composition[i] = composition;
                 }
@@ -406,51 +411,92 @@ library Pairs {
 
     /// @notice Add liquidity to a specific strike
     /// @dev liquidity > 0
-    function addSwapLiquidity(Pair storage pair, int24 strike, uint8 spread, uint128 liquidity) internal {
+    function addSwapLiquidity(
+        Pair storage pair,
+        int24 strike,
+        uint8 spread,
+        uint128 liquidity
+    )
+        internal
+        returns (uint128)
+    {
         unchecked {
             if (!pair.initialized) revert Initialized();
             _checkSpread(spread);
 
-            int24 strike0To1 = strike - int8(spread);
-            int24 strike1To0 = strike + int8(spread);
-
-            _checkStrike(strike0To1);
-            _checkStrike(strike1To0);
-
             uint256 existingLiquidity = pair.strikes[strike].liquidity[spread - 1].swap;
             uint256 borrowedLiquidity = pair.strikes[strike].liquidity[spread - 1].borrowed;
-            if (existingLiquidity + borrowedLiquidity + uint256(liquidity) > type(uint128).max) revert Overflow();
-            pair.strikes[strike].liquidity[spread - 1].swap = uint128(existingLiquidity) + liquidity;
 
-            if (existingLiquidity == 0) {
-                int24 _strikeCurrentCached = pair.strikeCurrentCached;
-                _addStrike0To1(pair, strike0To1, spread, _strikeCurrentCached == strike0To1);
-                _addStrike1To0(pair, strike1To0, spread, _strikeCurrentCached == strike1To0);
+            if (existingLiquidity + borrowedLiquidity + uint256(liquidity) > type(uint128).max) revert Overflow();
+
+            if (spread - 1 < pair.strikes[strike].activeSpread) {
+                pair.strikes[strike].liquidity[spread - 1].borrowed = uint128(borrowedLiquidity) + liquidity;
+
+                return liquidity;
+            } else {
+                pair.strikes[strike].liquidity[spread - 1].swap = uint128(existingLiquidity) + liquidity;
+
+                int24 strike0To1 = strike - int8(spread);
+                int24 strike1To0 = strike + int8(spread);
+
+                _checkStrike(strike0To1);
+                _checkStrike(strike1To0);
+
+                if (existingLiquidity == 0) {
+                    int24 _strikeCurrent = pair.strikeCurrent[0];
+                    _addStrike0To1(pair, strike0To1, spread, _strikeCurrent == strike0To1);
+                    _addStrike1To0(pair, strike1To0, spread, _strikeCurrent == strike1To0);
+                }
+
+                return 0;
             }
         }
     }
 
     /// @notice Remove liquidity from a specific strike
     /// @dev liquidity > 0
-    function removeSwapLiquidity(Pair storage pair, int24 strike, uint8 spread, uint128 liquidity) internal {
+    function removeSwapLiquidity(
+        Pair storage pair,
+        int24 strike,
+        uint8 spread,
+        uint128 liquidity
+    )
+        internal
+        returns (uint128)
+    {
         unchecked {
             if (!pair.initialized) revert Initialized();
             _checkSpread(spread);
 
-            int24 strike0To1 = strike - int8(spread);
-            int24 strike1To0 = strike + int8(spread);
+            uint256 _activeSpread = pair.strikes[strike].activeSpread;
 
-            _checkStrike(strike0To1);
-            _checkStrike(strike1To0);
+            if (spread - 1 < _activeSpread) {
+                pair.strikes[strike].liquidity[spread - 1].borrowed -= liquidity;
 
-            uint128 existingLiquidity = pair.strikes[strike].liquidity[spread - 1].swap;
-            if (liquidity > existingLiquidity) revert Overflow();
-            pair.strikes[strike].liquidity[spread - 1].swap = existingLiquidity - liquidity;
+                return liquidity;
+            } else {
+                uint128 existingLiquidity = pair.strikes[strike].liquidity[spread - 1].swap;
 
-            if (existingLiquidity == liquidity) {
-                int24 _strikeCurrentCached = pair.strikeCurrentCached;
-                _removeStrike0To1(pair, strike0To1, spread, _strikeCurrentCached == strike0To1);
-                _removeStrike1To0(pair, strike1To0, spread, _strikeCurrentCached == strike1To0);
+                if (liquidity < existingLiquidity) {
+                    pair.strikes[strike].liquidity[spread - 1].swap = existingLiquidity - liquidity;
+                    return 0;
+                } else {
+                    if (liquidity >= existingLiquidity) {
+                        int24 strike0To1 = strike - int8(spread);
+                        int24 strike1To0 = strike + int8(spread);
+
+                        int24 _strikeCurrent = pair.strikeCurrent[0];
+                        _removeStrike0To1(pair, strike0To1, spread, _strikeCurrent == strike0To1);
+                        _removeStrike1To0(pair, strike1To0, spread, _strikeCurrent == strike1To0);
+                    }
+
+                    uint128 remainingLiquidity = liquidity - existingLiquidity;
+
+                    if (spread - 1 == _activeSpread) pair.strikes[strike].liquidity[spread - 1].swap = 0;
+                    pair.strikes[strike].liquidity[spread - 1].borrowed -= remainingLiquidity;
+
+                    return remainingLiquidity;
+                }
             }
         }
     }
@@ -485,9 +531,9 @@ library Pairs {
                     int24 strike0To1 = strike - int8(_activeSpread + 1);
                     int24 strike1To0 = strike + int8(_activeSpread + 1);
 
-                    int24 _strikeCurrentCached = pair.strikeCurrentCached;
-                    _removeStrike0To1(pair, strike0To1, _activeSpread + 1, _strikeCurrentCached == strike0To1);
-                    _removeStrike1To0(pair, strike1To0, _activeSpread + 1, _strikeCurrentCached == strike1To0);
+                    int24 _strikeCurrent = pair.strikeCurrent[0];
+                    _removeStrike0To1(pair, strike0To1, _activeSpread + 1, _strikeCurrent == strike0To1);
+                    _removeStrike1To0(pair, strike1To0, _activeSpread + 1, _strikeCurrent == strike1To0);
                 }
 
                 // move to next spread
@@ -528,9 +574,9 @@ library Pairs {
                     int24 strike0To1 = strike - int8(_activeSpread);
                     int24 strike1To0 = strike + int8(_activeSpread);
 
-                    int24 _strikeCurrentCached = pair.strikeCurrentCached;
-                    _addStrike0To1(pair, strike0To1, _activeSpread, _strikeCurrentCached == strike0To1);
-                    _addStrike1To0(pair, strike1To0, _activeSpread, _strikeCurrentCached == strike1To0);
+                    int24 _strikeCurrent = pair.strikeCurrent[0];
+                    _addStrike0To1(pair, strike0To1, _activeSpread, _strikeCurrent == strike0To1);
+                    _addStrike1To0(pair, strike1To0, _activeSpread, _strikeCurrent == strike1To0);
                 }
 
                 // move to next spread
@@ -543,7 +589,7 @@ library Pairs {
     }
 
     /// @notice Accrue liquidity for a strike and return the amount of liquidity that must be repaid
-    /// @custom:team How to handle initial block last value
+    /// @custom:team How to handle overflow
     function accrue(Pair storage pair, int24 strike) internal returns (uint136) {
         unchecked {
             if (!pair.initialized) revert Initialized();
@@ -553,32 +599,46 @@ library Pairs {
             if (blocks == 0) return 0;
             pair.strikes[strike].blockLast = uint184(block.number);
 
-            uint256 liquidityRepaid;
+            uint256 liquidityAccrued;
             uint256 liquidityBorrowedTotal;
             for (uint256 i = 0; i <= pair.strikes[strike].activeSpread; i++) {
                 uint128 liquidityBorrowed = pair.strikes[strike].liquidity[i].borrowed;
+                uint128 liquiditySwap = pair.strikes[strike].liquidity[i].swap;
 
                 if (liquidityBorrowed > 0) {
                     // can only overflow when (i + 1) * blocks > type(uint128).max
                     uint256 fee = (i + 1) * blocks;
-                    uint256 liquidityRepaidSpread =
+                    uint256 liquidityAccruedSpread =
                         fee >= 10_000 ? liquidityBorrowed : (fee * uint256(liquidityBorrowed)) / 10_000;
 
-                    liquidityRepaid += liquidityRepaidSpread;
+                    liquidityAccrued += liquidityAccruedSpread;
                     liquidityBorrowedTotal += liquidityBorrowed;
 
                     _updateLiqudityGrowth(
-                        pair.strikes[strike].liquidityGrowthSpreadX128[i], liquidityRepaidSpread, liquidityBorrowed
+                        pair.strikes[strike].liquidityGrowthSpreadX128[i],
+                        liquidityAccruedSpread,
+                        liquidityBorrowed + liquiditySwap
                     );
                 }
             }
 
-            if (liquidityRepaid == 0) return 0;
+            if (liquidityAccrued == 0) return 0;
 
-            _updateLiqudityGrowth(pair.strikes[strike].liquidityGrowthX128, liquidityRepaid, liquidityBorrowedTotal);
+            // update liqudity growth exp
+            uint256 _liquidityGrowthExp = pair.strikes[strike].liquidityGrowthExpX128;
+            uint256 denominator = liquidityBorrowedTotal - liquidityAccrued;
+            if (denominator == 0) {
+                pair.strikes[strike].liquidityGrowthExpX128 = type(uint256).max;
+            } else {
+                pair.strikes[strike].liquidityGrowthExpX128 = mulDiv(
+                    liquidityBorrowedTotal,
+                    _liquidityGrowthExp == 0 ? Q128 : _liquidityGrowthExp,
+                    liquidityBorrowedTotal - liquidityAccrued
+                );
+            }
 
-            // liquidityRepaid max value is NUM_SPREADS * type(uint128).max
-            return uint136(liquidityRepaid);
+            // liquidityAccrued max value is NUM_SPREADS * type(uint128).max
+            return uint136(liquidityAccrued);
         }
     }
 

@@ -2,10 +2,9 @@
 pragma solidity ^0.8.19;
 
 import {Accounts} from "./Accounts.sol";
-import {toInt128, toInt256} from "./math/LiquidityMath.sol";
+import {toInt256} from "./math/LiquidityMath.sol";
 import {Pairs, NUM_SPREADS} from "./Pairs.sol";
-import {Positions} from "./Positions.sol";
-import {mulDiv} from "./math/FullMath.sol";
+import {Positions, biDirectionalID, debtID} from "./Positions.sol";
 import {
     getAmounts,
     getAmount0,
@@ -21,7 +20,7 @@ import {
     debtBalanceToLiquidity,
     debtLiquidityToBalance
 } from "./math/PositionMath.sol";
-import {getRatioAtStrike, Q128} from "./math/StrikeMath.sol";
+import {getRatioAtStrike} from "./math/StrikeMath.sol";
 
 import {BalanceLib} from "src/libraries/BalanceLib.sol";
 import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
@@ -29,71 +28,99 @@ import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
 import {IExecuteCallback} from "./interfaces/IExecuteCallback.sol";
 
 /// @title Engine
-/// @notice
+/// @notice ERC20 exchange
 /// @author Kyle Scott and Robert Leifke
-/// @custom:team return data and events
-/// @custom:team pass minted position information back to callback
+/// @custom:team Add minted position info to account
 contract Engine is Positions {
-    using Pairs for Pairs.Pair;
     using Accounts for Accounts.Account;
+    using Pairs for Pairs.Pair;
     using Pairs for mapping(bytes32 => Pairs.Pair);
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                  EVENTS
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    event Swap(bytes32 indexed pairID);
-    event AddLiquidity(bytes32 indexed pairID, int24 indexed strike, uint8 indexed spread, uint128 liquidity);
-    event BorrowLiquidity(bytes32 indexed pairID);
-    event RepayLiquidity(bytes32 indexed pairID);
-    event AccruePosition(bytes32 indexed pairID);
-    event Accrue(bytes32 indexed pairID);
-    event RemoveLiquidity(bytes32 indexed pairID, int24 indexed strike, uint8 indexed spread, uint128 liquidity);
-    event PairCreated(address indexed token0, address indexed token1, int24 strikeInitial);
+    event Swap(bytes32 indexed pairID, int256 amount0, int256 amount1);
+    event AddLiquidity(
+        bytes32 indexed pairID,
+        int24 indexed strike,
+        uint8 indexed spread,
+        uint128 liquidity,
+        uint256 amount0,
+        uint256 amount1
+    );
+    event BorrowLiquidity(bytes32 indexed pairID, int24 indexed strike, uint128 liquidity);
+    event RepayLiquidity(bytes32 indexed pairID, int24 indexed strike, uint128 liquidity);
+    event RemoveLiquidity(
+        bytes32 indexed pairID,
+        int24 indexed strike,
+        uint8 indexed spread,
+        uint128 liquidity,
+        uint256 amount0,
+        uint256 amount1
+    );
+    event Accrue(bytes32 indexed pairID, int24 indexed strike, uint136 liquidityAccrued);
+    event PairCreated(address indexed token0, address indexed token1, uint8 scalingFactor, int24 strikeInitial);
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                  ERRORS
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    error Reentrancy();
-    error InvalidTokenOrder();
     error InsufficientInput();
-    error CommandLengthMismatch();
-    error InvalidCommand();
-    error InvalidSelector();
     error InvalidAmountDesired();
+    error InvalidTokenOrder();
+    error Reentrancy();
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                DATA TYPES
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
+    /// @notice Types of commands to execute
     enum Commands {
         Swap,
         AddLiquidity,
+        RemoveLiquidity,
         BorrowLiquidity,
         RepayLiquidity,
-        RemoveLiquidity,
         Accrue,
         CreatePair
     }
 
+    /// @notice Type of command with input to that command
+    struct CommandInput {
+        Commands command;
+        bytes input;
+    }
+
+    /// @notice Type to describe which token in the pair is being referred to
     enum TokenSelector {
         Token0,
         Token1
     }
 
+    /// @notice Type to describe what is being exchanged in a swap
+    /// @param Token0 The swap is token 0
+    /// @param Token1 The swap is token 1
+    /// @param Account The swap indexes into the account data
     enum SwapTokenSelector {
         Token0,
         Token1,
-        Token0Account,
-        Token1Account
+        Account
     }
 
+    /// @notice Type to describe a liquidity position
     enum OrderType {
         BiDirectional,
         Debt
     }
 
+    /// @notice Data to pass to a swap action
+    /// @param token0 Token in the 0 position of the pair
+    /// @param token1 Token in the 1 position of the pair
+    /// @param scalingFactor Amount to divide liquidity by to make it fit in a uint128
+    /// @param selector What to swap
+    /// @param amountDesired Amount of the token that `selector` refers to, when `selector` == Account, this indexes
+    /// into the `Accounts` data
     struct SwapParams {
         address token0;
         address token1;
@@ -102,6 +129,13 @@ contract Engine is Positions {
         int256 amountDesired;
     }
 
+    /// @notice Data to pass to an add liquidity action
+    /// @param token0 Token in the 0 position of the pair
+    /// @param token1 Token in the 1 position of the pair
+    /// @param scalingFactor Amount to divide liquidity by to make it fit in a uint128
+    /// @param strike The strike to provide liquidity to
+    /// @param spread The spread to impose on the liquidity
+    /// @param amountDesired The amount of liquidity to add
     struct AddLiquidityParams {
         address token0;
         address token1;
@@ -111,6 +145,14 @@ contract Engine is Positions {
         uint128 amountDesired;
     }
 
+    /// @notice Data to pass to a borrow liquidity action
+    /// @param token0 Token in the 0 position of the pair
+    /// @param token1 Token in the 1 position of the pair
+    /// @param scalingFactor Amount to divide liquidity by to make it fit in a uint128
+    /// @param strike The strike to borrow liquidity from
+    /// @param selectorCollateral What token is used as collateral
+    /// @param amountDesiredCollateral The amount of token that `selectorCollateral` refers to to use as collateral
+    /// @param amountDesiredDebt The amount of liquidity to use as debt
     struct BorrowLiquidityParams {
         address token0;
         address token1;
@@ -121,16 +163,31 @@ contract Engine is Positions {
         uint128 amountDesiredDebt;
     }
 
+    /// @notice Data to pass to a repay liquidity action
+    /// @param token0 Token in the 0 position of the pair
+    /// @param token1 Token in the 1 position of the pair
+    /// @param scalingFactor Amount to divide liquidity by to make it fit in a uint128
+    /// @param strike The strike to repay liquidity to
+    /// @param selectorCollateral What token is used as collateral
+    /// @param amountDesired The amount of balance to repay
+    /// @param amountBuffer The amount of buffer to repay
     struct RepayLiquidityParams {
         address token0;
         address token1;
         uint8 scalingFactor;
         int24 strike;
         TokenSelector selectorCollateral;
-        uint256 leverageRatioX128;
-        uint128 amountDesiredDebt;
+        uint128 amountDesired;
+        uint128 amountBuffer;
     }
 
+    /// @notice Data to pass to a remove liquidity action
+    /// @param token0 Token in the 0 position of the pair
+    /// @param token1 Token in the 1 position of the pair
+    /// @param scalingFactor Amount to divide liquidity by to make it fit in a uint128
+    /// @param strike The strike to remove liquidity from
+    /// @param spread The spread on the liquidity
+    /// @param amountDesired The amount of balance to remove
     struct RemoveLiquidityParams {
         address token0;
         address token1;
@@ -140,13 +197,19 @@ contract Engine is Positions {
         uint128 amountDesired;
     }
 
+    /// @notice Data to pass to an accrue action
+    /// @param pairID ID of the pair
+    /// @param strike The strike to accrue interest to
     struct AccrueParams {
-        address token0;
-        address token1;
-        uint8 scalingFactor;
+        bytes32 pairID;
         int24 strike;
     }
 
+    /// @notice Data to pass to a create pair action
+    /// @param token0 Token in the 0 position of the pair
+    /// @param token1 Token in the 1 position of the pair
+    /// @param scalingFactor Amount to divide liquidity by to make it fit in a uint128
+    /// @param strikeInitial The strike to start the pair at
     struct CreatePairParams {
         address token0;
         address token1;
@@ -158,16 +221,15 @@ contract Engine is Positions {
                                 STORAGE
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    mapping(bytes32 => Pairs.Pair) private pairs;
+    mapping(bytes32 => Pairs.Pair) internal pairs;
 
-    /// @dev this should be checked when reading any `get` function from another contract to prevent read-only
-    /// reentrancy
     uint256 public locked = 1;
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                 MODIFIER
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
+    /// @notice Reentrancy lock
     modifier nonReentrant() {
         if (locked != 1) revert Reentrancy();
 
@@ -182,51 +244,48 @@ contract Engine is Positions {
                                  LOGIC
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
+    /// @notice Execute an action on the exchange
+    /// @param to Address to send the output to
+    /// @param commandInputs List of command inputs
+    /// @param data Untouched data passed back to the callback
+    /// @custom:team Try changing commandInputs to memory
     function execute(
         address to,
-        Commands[] calldata commands,
-        bytes[] calldata inputs,
+        CommandInput[] calldata commandInputs,
         uint256 numTokens,
         uint256 numLPs,
         bytes calldata data
     )
         external
         nonReentrant
+        returns (Accounts.Account memory)
     {
-        if (commands.length != inputs.length) {
-            revert CommandLengthMismatch();
-        }
-
         Accounts.Account memory account = Accounts.newAccount(numTokens, numLPs);
 
         // find command helper with binary search
-        for (uint256 i = 0; i < commands.length;) {
-            if (commands[i] < Commands.RemoveLiquidity) {
-                if (commands[i] < Commands.BorrowLiquidity) {
-                    if (commands[i] == Commands.Swap) {
-                        _swap(abi.decode(inputs[i], (SwapParams)), account);
-                    } else {
-                        // _addLiquidity(to, abi.decode(inputs[i], (AddLiquidityParams)), account);
-                    }
+        for (uint256 i = 0; i < commandInputs.length;) {
+            if (commandInputs[i].command < Commands.BorrowLiquidity) {
+                if (commandInputs[i].command == Commands.Swap) {
+                    _swap(abi.decode(commandInputs[i].input, (SwapParams)), account);
                 } else {
-                    if (commands[i] == Commands.BorrowLiquidity) {
-                        // _borrowLiquidity(to, abi.decode(inputs[i], (BorrowLiquidityParams)), account);
+                    if (commandInputs[i].command == Commands.AddLiquidity) {
+                        _addLiquidity(to, abi.decode(commandInputs[i].input, (AddLiquidityParams)), account);
                     } else {
-                        // _repayLiquidity(abi.decode(inputs[i], (RepayLiquidityParams)), account);
+                        _removeLiquidity(abi.decode(commandInputs[i].input, (RemoveLiquidityParams)), account);
                     }
                 }
             } else {
-                if (commands[i] < Commands.CreatePair) {
-                    if (commands[i] == Commands.RemoveLiquidity) {
-                        // _removeLiquidity(abi.decode(inputs[i], (RemoveLiquidityParams)), account);
+                if (commandInputs[i].command < Commands.Accrue) {
+                    if (commandInputs[i].command == Commands.BorrowLiquidity) {
+                        _borrowLiquidity(to, abi.decode(commandInputs[i].input, (BorrowLiquidityParams)), account);
                     } else {
-                        _accrue(abi.decode(inputs[i], (AccrueParams)));
+                        _repayLiquidity(abi.decode(commandInputs[i].input, (RepayLiquidityParams)), account);
                     }
                 } else {
-                    if (commands[i] == Commands.CreatePair) {
-                        _createPair(abi.decode(inputs[i], (CreatePairParams)));
+                    if (commandInputs[i].command == Commands.Accrue) {
+                        _accrue(abi.decode(commandInputs[i].input, (AccrueParams)));
                     } else {
-                        revert InvalidCommand();
+                        _createPair(abi.decode(commandInputs[i].input, (CreatePairParams)));
                     }
                 }
             }
@@ -276,232 +335,365 @@ contract Engine is Positions {
         // check liquidity positions in
         for (uint256 i = 0; i < numLPs;) {
             uint128 amountBurned = account.lpData[i].amountBurned;
+            uint128 amountBuffer = account.lpData[i].amountBuffer;
             bytes32 id = account.lpData[i].id;
 
             if (id == bytes32(0)) break;
-            _burn(address(this), id, amountBurned, account.lpData[i].orderType);
+            _burn(address(this), id, account.lpData[i].orderType, amountBurned, amountBuffer);
 
             unchecked {
                 i++;
             }
         }
+
+        return account;
     }
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                INTERNAL LOGIC
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    function _swap(SwapParams memory params, Accounts.Account memory account) private {
+    /// @notice Helper swap function
+    /// @custom:team Should we emit the `to` address
+    function _swap(SwapParams memory params, Accounts.Account memory account) internal {
         (bytes32 pairID, Pairs.Pair storage pair) =
             pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
 
         int256 amount0;
         int256 amount1;
-        if (params.selector < SwapTokenSelector.Token0Account) {
+        if (params.selector < SwapTokenSelector.Account) {
+            if (params.amountDesired == 0) revert InvalidAmountDesired();
             (amount0, amount1) = pair.swap(params.selector == SwapTokenSelector.Token0, params.amountDesired);
-        } else if (params.selector == SwapTokenSelector.Token0Account) {
-            assert(account.erc20Data[uint256(params.amountDesired)].token == params.token0);
-            (amount0, amount1) = pair.swap(true, -account.erc20Data[uint256(params.amountDesired)].balanceDelta);
-        } else if (params.selector == SwapTokenSelector.Token1Account) {
-            assert(account.erc20Data[uint256(params.amountDesired)].token == params.token1);
-            (amount0, amount1) = pair.swap(false, -account.erc20Data[uint256(params.amountDesired)].balanceDelta);
         } else {
-            revert InvalidSelector();
+            address token = account.erc20Data[uint256(params.amountDesired)].token;
+            int256 swapAmount = -account.erc20Data[uint256(params.amountDesired)].balanceDelta;
+            if (swapAmount == 0) revert InvalidAmountDesired();
+            (amount0, amount1) = pair.swap(params.token0 == token, swapAmount);
         }
+
         account.updateToken(params.token0, amount0);
         account.updateToken(params.token1, amount1);
 
-        emit Swap(pairID);
+        emit Swap(pairID, amount0, amount1);
     }
 
-    // function _addLiquidity(address to, AddLiquidityParams memory params, Accounts.Account memory account) private {
-    //     (bytes32 pairID, Pairs.Pair storage pair) =
-    //         pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
-    //     pair.accrue(params.strike);
+    /// @notice Helper add liquidity function
+    function _addLiquidity(address to, AddLiquidityParams memory params, Accounts.Account memory account) internal {
+        unchecked {
+            if (params.amountDesired == 0) revert InvalidAmountDesired();
 
-    //     // calculate how much to add
-    //     int128 liquidity = toInt128(params.amountDesired);
-    //     int128 balance = toInt128(liquidityToBalance(pair, params.strike, params.spread, params.amountDesired));
-    //     (uint256 _amount0, uint256 _amount1) = getAmounts(
-    //         pair, scaleLiquidityUp(params.amountDesired, params.scalingFactor), params.strike, params.spread, true
-    //     );
-    //     int256 amount0 = int256(_amount0);
-    //     int256 amount1 = int256(_amount1);
+            (bytes32 pairID, Pairs.Pair storage pair) =
+                pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
 
-    //     // add to pair
-    //     pair.updateStrike(params.strike, params.spread, balance, liquidity);
+            {
+                uint136 liquidityAccrued = pair.accrue(params.strike);
+                if (liquidityAccrued > 0) pair.removeBorrowedLiquidity(params.strike, liquidityAccrued);
+            }
 
-    //     // update accounts
-    //     account.updateToken(params.token0, amount0);
-    //     account.updateToken(params.token1, amount1);
+            // add liquidity to pair
+            uint136 liquidityDisplaced = pair.addSwapLiquidity(params.strike, params.spread, params.amountDesired);
+            if (liquidityDisplaced > 0) pair.removeBorrowedLiquidity(params.strike, liquidityDisplaced);
 
-    //     // mint position token
-    //     _mintBiDirectional(
-    //         to, params.token0, params.token1, params.scalingFactor, params.strike, params.spread, uint128(balance)
-    //     );
+            // Calculate how much tokens to add
+            (uint256 _amount0, uint256 _amount1) = getAmounts(
+                pair, scaleLiquidityUp(params.amountDesired, params.scalingFactor), params.strike, params.spread, true
+            );
 
-    //     emit AddLiquidity(pairID, params.strike, params.spread, uint128(balance));
-    // }
+            // update accounts
+            account.updateToken(params.token0, toInt256(_amount0));
+            account.updateToken(params.token1, toInt256(_amount1));
 
-    // function _borrowLiquidity(
-    //     address to,
-    //     BorrowLiquidityParams memory params,
-    //     Accounts.Account memory account
-    // )
-    //     private
-    // {
-    //     (bytes32 pairID, Pairs.Pair storage pair) =
-    //         pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
-    //     pair.accrue(params.strike);
+            // calculate how much to mint
+            uint128 balance = liquidityToBalance(
+                params.amountDesired,
+                pair.strikes[params.strike].liquidityGrowthSpreadX128[params.spread - 1].liquidityGrowthX128
+            );
 
-    //     uint128 liquidityToken1 = pair.borrowLiquidity(params.strike, params.amountDesiredDebt);
+            // mint position token
+            _mintBiDirectional(
+                to, params.token0, params.token1, params.scalingFactor, params.strike, params.spread, balance
+            );
 
-    //     // calculate the the tokens that are borrowed
-    //     account.updateToken(
-    //         params.token0,
-    //         -toInt256(
-    //             getAmount0(
-    //                 scaleLiquidityUp(params.amountDesiredDebt - liquidityToken1, params.scalingFactor),
-    //                 getRatioAtStrike(params.strike),
-    //                 false
-    //             )
-    //         )
-    //     );
-    //     account.updateToken(
-    //         params.token1, -toInt256(getAmount1(scaleLiquidityUp(liquidityToken1, params.scalingFactor)))
-    //     );
-
-    //     // add collateral to account
-    //     uint128 liquidityCollateral;
-    //     if (params.selectorCollateral == TokenSelector.Token0) {
-    //         account.updateToken(params.token0, toInt256(params.amountDesiredCollateral));
-    //         liquidityCollateral = scaleLiquidityDown(
-    //             getLiquidityForAmount0(params.amountDesiredCollateral, getRatioAtStrike(params.strike)),
-    //             params.scalingFactor
-    //         );
-    //     } else if (params.selectorCollateral == TokenSelector.Token1) {
-    //         account.updateToken(params.token1, toInt256(params.amountDesiredCollateral));
-    //         liquidityCollateral =
-    //             scaleLiquidityDown(getLiquidityForAmount1(params.amountDesiredCollateral), params.scalingFactor);
-    //     } else {
-    //         revert InvalidSelector();
-    //     }
-
-    //     if (params.amountDesiredDebt > liquidityCollateral) revert InsufficientInput();
-
-    //     uint128 balance =
-    //         debtLiquidityToBalance(params.amountDesiredDebt, pair.strikes[params.strike].liquidityGrowthExpX128);
-
-    //     // mint position to user
-    //     _mintDebt(
-    //         to,
-    //         params.token0,
-    //         params.token1,
-    //         params.scalingFactor,
-    //         params.strike,
-    //         params.selectorCollateral,
-    //         balance,
-    //         uint120(liquidityCollateral - params.amountDesiredDebt) // can be unchecked
-    //     );
-
-    //     emit BorrowLiquidity(pairID);
-    // }
-
-    // function _repayLiquidity(RepayLiquidityParams memory params, Accounts.Account memory account) private {
-    //     (bytes32 pairID, Pairs.Pair storage pair) =
-    //         pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
-    //     pair.accrue(params.strike);
-
-    //     uint128 liquidityDebt =
-    //         debtBalanceToLiquidity(params.amountDesiredDebt, pair.strikes[params.strike].liquidityGrowthExpX128);
-
-    //     pair.repayLiquidity(params.strike, liquidityDebt);
-
-    //     // calculate tokens owed and add to account
-    //     (uint256 amount0, uint256 amount1) = getAmounts(
-    //         pair,
-    //         scaleLiquidityUp(params.amountDesiredDebt, params.scalingFactor),
-    //         params.strike,
-    //         pair.strikes[params.strike].activeSpread + 1,
-    //         true
-    //     );
-    //     account.updateToken(params.token0, toInt256(amount0));
-    //     account.updateToken(params.token1, toInt256(amount1));
-
-    //     // add unlocked collateral to account
-    //     uint256 liquidityCollateral = mulDiv(params.amountDesiredDebt, params.leverageRatioX128, Q128)
-    //         - 2 * (params.amountDesiredDebt - liquidityDebt);
-    //     if (params.selectorCollateral == TokenSelector.Token0) {
-    //         account.updateToken(
-    //             params.token0, -toInt256(getAmount0(liquidityCollateral, getRatioAtStrike(params.strike), false))
-    //         );
-    //     } else if (params.selectorCollateral == TokenSelector.Token1) {
-    //         account.updateToken(params.token0, -toInt256(getAmount1(liquidityCollateral)));
-    //     } else {
-    //         revert InvalidSelector();
-    //     }
-
-    //     // add burned position to account
-
-    //     bytes32 id =
-    //         _debtID(params.token0, params.token1, params.scalingFactor, params.strike, params.selectorCollateral);
-    //     account.updateLP(id, params.amountDesiredDebt, OrderType.Debt);
-
-    //     emit RepayLiquidity(pairID);
-    // }
-
-    // function _removeLiquidity(RemoveLiquidityParams memory params, Accounts.Account memory account) private {
-    //     (bytes32 pairID, Pairs.Pair storage pair) =
-    //         pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
-    //     pair.accrue(params.strike);
-
-    //     // calculate how much to remove
-    //     int128 balance = -toInt128(params.amountDesired);
-    //     int128 liquidity =
-    //         -toInt128(balanceToLiquidity(pair, params.strike, params.spread, uint128(params.amountDesired)));
-    //     (uint256 _amount0, uint256 _amount1) = getAmounts(
-    //         pair, scaleLiquidityUp(uint128(-liquidity), params.scalingFactor), params.strike, params.spread, false
-    //     );
-    //     int256 amount0 = -int256(_amount0);
-    //     int256 amount1 = -int256(_amount1);
-
-    //     // remove from pair
-    //     pair.updateStrike(params.strike, params.spread, liquidity);
-
-    //     // update accounts
-    //     account.updateToken(params.token0, amount0);
-    //     account.updateToken(params.token1, amount1);
-    //     account.updateLP(
-    //         _biDirectionalID(params.token0, params.token1, params.scalingFactor, params.strike, params.spread),
-    //         uint128(-balance),
-    //         OrderType.BiDirectional
-    //     );
-
-    //     emit RemoveLiquidity(pairID, params.strike, params.spread, uint128(-balance));
-    // }
-
-    function _accrue(AccrueParams memory params) private {
-        (bytes32 pairID, Pairs.Pair storage pair) =
-            pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
-
-        pair.accrue(params.strike);
-
-        emit Accrue(pairID);
+            emit AddLiquidity(pairID, params.strike, params.spread, params.amountDesired, _amount0, _amount1);
+        }
     }
 
-    function _createPair(CreatePairParams memory params) private {
+    /// @notice Helper remove liquidity function
+    function _removeLiquidity(RemoveLiquidityParams memory params, Accounts.Account memory account) internal {
+        unchecked {
+            (bytes32 pairID, Pairs.Pair storage pair) =
+                pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
+
+            {
+                uint136 liquidityAccrued = pair.accrue(params.strike);
+                if (liquidityAccrued > 0) pair.removeBorrowedLiquidity(params.strike, liquidityAccrued);
+            }
+
+            // Calculate how much to remove
+            // Note: subtraction can underflow, will be invalid index error
+            uint128 liquidity = balanceToLiquidity(
+                params.amountDesired,
+                pair.strikes[params.strike].liquidityGrowthSpreadX128[params.spread - 1].liquidityGrowthX128
+            );
+
+            if (liquidity == 0) revert InvalidAmountDesired();
+
+            // remove liquidity from pair
+            uint136 liquidityDisplaced = pair.removeSwapLiquidity(params.strike, params.spread, liquidity);
+            if (liquidityDisplaced > 0) pair.addBorrowedLiquidity(params.strike, liquidityDisplaced);
+
+            // calculate how much tokens to remove
+            (uint256 _amount0, uint256 _amount1) =
+                getAmounts(pair, scaleLiquidityUp(liquidity, params.scalingFactor), params.strike, params.spread, false);
+
+            // update accounts
+            account.updateToken(params.token0, -toInt256(_amount0));
+            account.updateToken(params.token1, -toInt256(_amount1));
+
+            // update position token
+            account.updateLP(
+                biDirectionalID(params.token0, params.token1, params.scalingFactor, params.strike, params.spread),
+                OrderType.BiDirectional,
+                params.amountDesired,
+                0
+            );
+
+            emit RemoveLiquidity(pairID, params.strike, params.spread, liquidity, _amount0, _amount1);
+        }
+    }
+
+    /// @notice Helper borrow liquidity function
+    function _borrowLiquidity(
+        address to,
+        BorrowLiquidityParams memory params,
+        Accounts.Account memory account
+    )
+        internal
+    {
+        unchecked {
+            (bytes32 pairID, Pairs.Pair storage pair) =
+                pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
+
+            {
+                uint136 liquidityAccrued = pair.accrue(params.strike);
+                if (liquidityAccrued > 0) pair.removeBorrowedLiquidity(params.strike, liquidityAccrued);
+            }
+
+            // borrow liquidity from pair
+            if (params.amountDesiredDebt == 0) revert InvalidAmountDesired();
+            pair.addBorrowedLiquidity(params.strike, params.amountDesiredDebt);
+
+            // calculate how much tokens to remove
+            {
+                uint256 amount0;
+                uint256 amount1;
+
+                uint8 _activeSpread = pair.strikes[params.strike].activeSpread;
+                uint128 liquidity = params.amountDesiredDebt;
+
+                while (true) {
+                    uint128 borrowedLiquidity = pair.strikes[params.strike].liquidity[_activeSpread].borrowed;
+
+                    if (borrowedLiquidity >= liquidity) {
+                        (uint256 _amount0, uint256 _amount1) = getAmounts(
+                            pair,
+                            scaleLiquidityUp(liquidity, params.scalingFactor),
+                            params.strike,
+                            _activeSpread + 1,
+                            false
+                        );
+
+                        amount0 += _amount0;
+                        amount1 += _amount1;
+
+                        break;
+                    }
+
+                    if (borrowedLiquidity > 0) {
+                        (uint256 _amount0, uint256 _amount1) = getAmounts(
+                            pair,
+                            scaleLiquidityUp(borrowedLiquidity, params.scalingFactor),
+                            params.strike,
+                            _activeSpread + 1,
+                            false
+                        );
+
+                        amount0 += _amount0;
+                        amount1 += _amount1;
+
+                        liquidity -= borrowedLiquidity;
+                    }
+
+                    _activeSpread--;
+                }
+
+                // update accounts
+                account.updateToken(params.token0, -toInt256(amount0));
+                account.updateToken(params.token1, -toInt256(amount1));
+            }
+
+            // add collateral to account
+            uint128 liquidityCollateral;
+            if (params.selectorCollateral == TokenSelector.Token0) {
+                account.updateToken(params.token0, toInt256(params.amountDesiredCollateral));
+                liquidityCollateral = scaleLiquidityDown(
+                    getLiquidityForAmount0(params.amountDesiredCollateral, getRatioAtStrike(params.strike)),
+                    params.scalingFactor
+                );
+            } else {
+                account.updateToken(params.token1, toInt256(params.amountDesiredCollateral));
+                liquidityCollateral =
+                    scaleLiquidityDown(getLiquidityForAmount1(params.amountDesiredCollateral), params.scalingFactor);
+            }
+
+            // calculate how much to mint
+            uint256 _liquidityGrowthExpX128 = pair.strikes[params.strike].liquidityGrowthExpX128;
+            uint128 balance = debtLiquidityToBalance(params.amountDesiredDebt, _liquidityGrowthExpX128);
+            uint128 collateralBalance = debtLiquidityToBalance(liquidityCollateral, _liquidityGrowthExpX128);
+
+            // check for overcollateralization
+            if (balance > collateralBalance) revert InvalidAmountDesired();
+
+            // mint position token
+            _mintDebt(
+                to,
+                params.token0,
+                params.token1,
+                params.scalingFactor,
+                params.strike,
+                params.selectorCollateral,
+                balance,
+                collateralBalance - balance
+            );
+
+            emit BorrowLiquidity(pairID, params.strike, params.amountDesiredDebt);
+        }
+    }
+
+    /// @notice Helper repay liquidity function
+    function _repayLiquidity(RepayLiquidityParams memory params, Accounts.Account memory account) internal {
+        unchecked {
+            (bytes32 pairID, Pairs.Pair storage pair) =
+                pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
+
+            {
+                uint136 liquidityAccrued = pair.accrue(params.strike);
+                if (liquidityAccrued > 0) pair.removeBorrowedLiquidity(params.strike, liquidityAccrued);
+            }
+
+            // calculate how much to repay
+            uint128 liquidityDebt =
+                debtBalanceToLiquidity(params.amountDesired, pair.strikes[params.strike].liquidityGrowthExpX128);
+
+            // repay liqudity to pair
+            if (liquidityDebt == 0) revert InvalidAmountDesired();
+            pair.removeBorrowedLiquidity(params.strike, liquidityDebt);
+
+            // calculate how much tokens to repay
+            {
+                uint256 amount0;
+                uint256 amount1;
+
+                uint8 _activeSpread = pair.strikes[params.strike].activeSpread;
+                uint128 liquidity = liquidityDebt;
+
+                while (true) {
+                    uint128 swapLiquidity = pair.strikes[params.strike].liquidity[_activeSpread].swap;
+
+                    if (swapLiquidity >= liquidity) {
+                        (uint256 _amount0, uint256 _amount1) = getAmounts(
+                            pair,
+                            scaleLiquidityUp(liquidity, params.scalingFactor),
+                            params.strike,
+                            _activeSpread + 1,
+                            true
+                        );
+
+                        amount0 += _amount0;
+                        amount1 += _amount1;
+
+                        break;
+                    }
+
+                    if (swapLiquidity > 0) {
+                        (uint256 _amount0, uint256 _amount1) = getAmounts(
+                            pair,
+                            scaleLiquidityUp(swapLiquidity, params.scalingFactor),
+                            params.strike,
+                            _activeSpread + 1,
+                            true
+                        );
+
+                        amount0 += _amount0;
+                        amount1 += _amount1;
+
+                        liquidity -= swapLiquidity;
+                    }
+
+                    _activeSpread++;
+                }
+
+                // update accounts
+                account.updateToken(params.token0, toInt256(amount0));
+                account.updateToken(params.token1, toInt256(amount1));
+            }
+            // calculate unlocked collateral and update account
+            uint128 liquidityCollateral = params.amountDesired
+                + debtBalanceToLiquidity(params.amountBuffer, pair.strikes[params.strike].liquidityGrowthExpX128);
+            if (params.selectorCollateral == TokenSelector.Token0) {
+                account.updateToken(
+                    params.token0,
+                    -toInt256(
+                        getAmount0(
+                            scaleLiquidityUp(liquidityCollateral, params.scalingFactor),
+                            getRatioAtStrike(params.strike),
+                            false
+                        )
+                    )
+                );
+            } else {
+                account.updateToken(
+                    params.token1, -toInt256(getAmount1(scaleLiquidityUp(liquidityCollateral, params.scalingFactor)))
+                );
+            }
+
+            // update position token
+            account.updateLP(
+                debtID(params.token0, params.token1, params.scalingFactor, params.strike, params.selectorCollateral),
+                OrderType.Debt,
+                params.amountDesired,
+                params.amountBuffer
+            );
+
+            emit RepayLiquidity(pairID, params.strike, liquidityDebt);
+        }
+    }
+
+    /// @notice Helper accrue function
+    function _accrue(AccrueParams memory params) internal {
+        Pairs.Pair storage pair = pairs[params.pairID];
+
+        uint136 liquidityAccrued = pair.accrue(params.strike);
+        if (liquidityAccrued > 0) pair.removeBorrowedLiquidity(params.strike, liquidityAccrued);
+
+        emit Accrue(params.pairID, params.strike, liquidityAccrued);
+    }
+
+    /// @notice Helper create pair function
+    function _createPair(CreatePairParams memory params) internal {
         if (params.token0 >= params.token1 || params.token0 == address(0)) revert InvalidTokenOrder();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
         pair.initialize(params.strikeInitial);
 
-        emit PairCreated(params.token0, params.token1, params.strikeInitial);
+        emit PairCreated(params.token0, params.token1, params.scalingFactor, params.strikeInitial);
     }
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                VIEW LOGIC
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
+    /// @notice Return the state of the pair
     function getPair(
         address token0,
         address token1,
@@ -509,18 +701,14 @@ contract Engine is Positions {
     )
         external
         view
-        returns (
-            uint128[NUM_SPREADS] memory composition,
-            int24[NUM_SPREADS] memory strikeCurrentCached,
-            int24 cachedStrikeCurrent,
-            bool initialized
-        )
+        returns (uint128[NUM_SPREADS] memory composition, int24[NUM_SPREADS] memory strikeCurrent, bool initialized)
     {
         (, Pairs.Pair storage pair) = pairs.getPairAndID(token0, token1, scalingFactor);
-        (composition, strikeCurrentCached, cachedStrikeCurrent, initialized) =
-            (pair.composition, pair.strikeCurrent, pair.strikeCurrentCached, pair.initialized);
+
+        (composition, strikeCurrent, initialized) = (pair.composition, pair.strikeCurrent, pair.initialized);
     }
 
+    /// @notice Return the state of the strike
     function getStrike(
         address token0,
         address token1,
