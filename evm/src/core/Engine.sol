@@ -69,7 +69,6 @@ contract Engine is Positions {
     error InsufficientInput();
     error InvalidAmountDesired();
     error InvalidCommand();
-    error InvalidSelector();
     error InvalidTokenOrder();
     error Reentrancy();
 
@@ -369,12 +368,10 @@ contract Engine is Positions {
         int256 amount1;
         if (params.selector < SwapTokenSelector.Account) {
             (amount0, amount1) = pair.swap(params.selector == SwapTokenSelector.Token0, params.amountDesired);
-        } else if (params.selector == SwapTokenSelector.Account) {
+        } else {
             address token = account.erc20Data[uint256(params.amountDesired)].token;
             int256 swapAmount = -account.erc20Data[uint256(params.amountDesired)].balanceDelta;
             (amount0, amount1) = pair.swap(params.token0 == token, swapAmount);
-        } else {
-            revert InvalidSelector();
         }
 
         account.updateToken(params.token0, amount0);
@@ -452,14 +449,11 @@ contract Engine is Positions {
                     getLiquidityForAmount0(params.amountDesiredCollateral, getRatioAtStrike(params.strike)),
                     params.scalingFactor
                 );
-            } else if (params.selectorCollateral == TokenSelector.Token1) {
+            } else {
                 account.updateToken(params.token1, toInt256(params.amountDesiredCollateral));
                 liquidityCollateral =
                     scaleLiquidityDown(getLiquidityForAmount1(params.amountDesiredCollateral), params.scalingFactor);
-            } else {
-                revert InvalidSelector();
             }
-
             uint256 _liquidityGrowthX128 = pair.strikes[params.strike].liquidityGrowthX128.liquidityGrowthX128;
             uint128 balance = debtLiquidityToBalance(params.amountDesiredDebt, _liquidityGrowthX128);
             uint128 collateralBalance = debtLiquidityToBalance(liquidityCollateral, _liquidityGrowthX128);
@@ -508,10 +502,8 @@ contract Engine is Positions {
                 account.updateToken(
                     params.token0, -toInt256(getAmount0(liquidityCollateral, getRatioAtStrike(params.strike), false))
                 );
-            } else if (params.selectorCollateral == TokenSelector.Token1) {
-                account.updateToken(params.token0, -toInt256(getAmount1(liquidityCollateral)));
             } else {
-                revert InvalidSelector();
+                account.updateToken(params.token0, -toInt256(getAmount1(liquidityCollateral)));
             }
 
             // add burned position to account
