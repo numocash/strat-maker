@@ -633,7 +633,7 @@ library Pairs {
                 pair.strikes[strike].liquidityGrowthExpX128 = mulDiv(
                     liquidityBorrowedTotal,
                     _liquidityGrowthExp == 0 ? Q128 : _liquidityGrowthExp,
-                    liquidityBorrowedTotal - liquidityAccrued // TODO: make sure not zero
+                    liquidityBorrowedTotal - liquidityAccrued
                 );
             }
 
