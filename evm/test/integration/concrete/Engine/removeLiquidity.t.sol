@@ -67,10 +67,10 @@ contract RemoveLiquidityTest is Test, IExecuteCallback {
         delete commandInputs;
 
         commandInputs = pushCommandInputs(
-            commandInputs, addLiquidityCommand(address(mockERC20_0), address(mockERC20_1), 0, 2, 1, 1e18)
+            commandInputs, addLiquidityCommand(address(mockERC20_0), address(mockERC20_1), 0, 0, 1, 1e18)
         );
 
-        amount0 = getAmount0(1e18, getRatioAtStrike(2), 0, true);
+        amount0 = getAmount0(1e18, getRatioAtStrike(0), 0, true);
 
         engine.execute(address(this), commandInputs, 1, 0, bytes(""));
 
@@ -79,10 +79,10 @@ contract RemoveLiquidityTest is Test, IExecuteCallback {
         delete amount1;
 
         commandInputs = pushCommandInputs(
-            commandInputs, removeLiquidityCommand(address(mockERC20_0), address(mockERC20_1), 0, 2, 1, 1e18)
+            commandInputs, removeLiquidityCommand(address(mockERC20_0), address(mockERC20_1), 0, 0, 1, 1e18)
         );
 
-        id = biDirectionalID(address(mockERC20_0), address(mockERC20_1), 0, 2, 1);
+        id = biDirectionalID(address(mockERC20_0), address(mockERC20_1), 0, 0, 1);
 
         amountPosition = 1e18;
 
@@ -94,14 +94,14 @@ contract RemoveLiquidityTest is Test, IExecuteCallback {
 
         vm.pauseGasMetering();
 
-        Pairs.Strike memory strike = engine.getStrike(address(mockERC20_0), address(mockERC20_1), 0, 2);
+        Pairs.Strike memory strike = engine.getStrike(address(mockERC20_0), address(mockERC20_1), 0, 0);
 
         assertEq(strike.blockLast, 1);
         assertEq(strike.liquidity[0].swap, 0);
 
         assertEq(accounts.erc20Data[0].token, address(mockERC20_0));
         assertEq(accounts.erc20Data[0].balanceBefore, 0);
-        assertEq(accounts.erc20Data[0].balanceDelta, -int256(getAmount0(1e18, getRatioAtStrike(2), 0, false)));
+        assertEq(accounts.erc20Data[0].balanceDelta, -int256(getAmount0(1e18, getRatioAtStrike(0), 0, false)));
 
         assertEq(accounts.lpData[0].id, id);
         assertEq(accounts.lpData[0].amountBurned, 1e18);
@@ -132,10 +132,10 @@ contract RemoveLiquidityTest is Test, IExecuteCallback {
         delete commandInputs;
 
         commandInputs = pushCommandInputs(
-            commandInputs, addLiquidityCommand(address(mockERC20_0), address(mockERC20_1), 0, 2, 1, 1e18)
+            commandInputs, addLiquidityCommand(address(mockERC20_0), address(mockERC20_1), 0, 0, 1, 1e18)
         );
 
-        amount0 = getAmount0(1e18, getRatioAtStrike(2), 0, true);
+        amount0 = getAmount0(1e18, getRatioAtStrike(0), 0, true);
 
         engine.execute(address(this), commandInputs, 1, 0, bytes(""));
 
@@ -144,10 +144,10 @@ contract RemoveLiquidityTest is Test, IExecuteCallback {
         delete amount1;
 
         commandInputs = pushCommandInputs(
-            commandInputs, removeLiquidityCommand(address(mockERC20_0), address(mockERC20_1), 0, 2, 1, 0.5e18)
+            commandInputs, removeLiquidityCommand(address(mockERC20_0), address(mockERC20_1), 0, 0, 1, 0.5e18)
         );
 
-        id = biDirectionalID(address(mockERC20_0), address(mockERC20_1), 0, 2, 1);
+        id = biDirectionalID(address(mockERC20_0), address(mockERC20_1), 0, 0, 1);
 
         amountPosition = 0.5e18;
 
@@ -159,19 +159,19 @@ contract RemoveLiquidityTest is Test, IExecuteCallback {
 
         vm.pauseGasMetering();
 
-        Pairs.Strike memory strike = engine.getStrike(address(mockERC20_0), address(mockERC20_1), 0, 2);
+        Pairs.Strike memory strike = engine.getStrike(address(mockERC20_0), address(mockERC20_1), 0, 0);
 
         assertEq(strike.blockLast, 1);
         assertEq(strike.liquidity[0].swap, 0.5e18);
 
         assertEq(accounts.erc20Data[0].token, address(mockERC20_0));
         assertEq(accounts.erc20Data[0].balanceBefore, 0);
-        assertEq(accounts.erc20Data[0].balanceDelta, -int256(getAmount0(0.5e18, getRatioAtStrike(2), 0, false)));
+        assertEq(accounts.erc20Data[0].balanceDelta, -int256(getAmount0(0.5e18, getRatioAtStrike(0), 0, false)));
 
         assertEq(accounts.lpData[0].id, id);
         assertEq(accounts.lpData[0].amountBurned, 0.5e18);
 
-        assertEq(mockERC20_0.balanceOf(address(engine)), getAmount0(0.5e18, getRatioAtStrike(2), 0, true) + 1);
+        assertEq(mockERC20_0.balanceOf(address(engine)), getAmount0(0.5e18, getRatioAtStrike(0), 0, true) + 1);
 
         Positions.ILRTAData memory position = engine.dataOf_cGJnTo(address(this), id);
 

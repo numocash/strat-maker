@@ -53,20 +53,20 @@ contract AddLiquidityTest is Test, IExecuteCallback {
         delete commandInputs;
 
         commandInputs = pushCommandInputs(
-            commandInputs, addLiquidityCommand(address(mockERC20_0), address(mockERC20_1), 0, 2, 1, 1e18)
+            commandInputs, addLiquidityCommand(address(mockERC20_0), address(mockERC20_1), 0, 0, 1, 1e18)
         );
 
-        amount0 = getAmount0(1e18, getRatioAtStrike(2), 0, true);
+        amount0 = getAmount0(1e18, getRatioAtStrike(0), 0, true);
 
         vm.expectEmit(true, true, true, true);
-        emit AddLiquidity(Pairs.getPairID(address(mockERC20_0), address(mockERC20_1), 0), 2, 1, 1e18, amount0, 0);
+        emit AddLiquidity(Pairs.getPairID(address(mockERC20_0), address(mockERC20_1), 0), 0, 1, 1e18, amount0, 0);
         vm.resumeGasMetering();
 
         Accounts.Account memory accounts = engine.execute(address(this), commandInputs, 1, 0, bytes(""));
 
         vm.pauseGasMetering();
 
-        Pairs.Strike memory strike = engine.getStrike(address(mockERC20_0), address(mockERC20_1), 0, 2);
+        Pairs.Strike memory strike = engine.getStrike(address(mockERC20_0), address(mockERC20_1), 0, 0);
 
         assertEq(strike.blockLast, 1);
         assertEq(strike.liquidity[0].swap, 1e18);
@@ -78,7 +78,7 @@ contract AddLiquidityTest is Test, IExecuteCallback {
         assertEq(mockERC20_0.balanceOf(address(engine)), amount0);
 
         Positions.ILRTAData memory position =
-            engine.dataOf_cGJnTo(address(this), biDirectionalID(address(mockERC20_0), address(mockERC20_1), 0, 2, 1));
+            engine.dataOf_cGJnTo(address(this), biDirectionalID(address(mockERC20_0), address(mockERC20_1), 0, 0, 1));
 
         assertEq(position.balance, 1e18);
         assertEq(position.buffer, 0);
@@ -97,22 +97,22 @@ contract AddLiquidityTest is Test, IExecuteCallback {
         delete commandInputs;
 
         commandInputs = pushCommandInputs(
-            commandInputs, addLiquidityCommand(address(mockERC20_0), address(mockERC20_1), 0, 2, 1, 1e18)
+            commandInputs, addLiquidityCommand(address(mockERC20_0), address(mockERC20_1), 0, 0, 1, 1e18)
         );
 
-        amount0 = getAmount0(1e18, getRatioAtStrike(2), 0, true);
+        amount0 = getAmount0(1e18, getRatioAtStrike(0), 0, true);
 
         engine.execute(address(this), commandInputs, 1, 0, bytes(""));
 
         vm.expectEmit(true, true, true, true);
-        emit AddLiquidity(Pairs.getPairID(address(mockERC20_0), address(mockERC20_1), 0), 2, 1, 1e18, amount0, 0);
+        emit AddLiquidity(Pairs.getPairID(address(mockERC20_0), address(mockERC20_1), 0), 0, 1, 1e18, amount0, 0);
         vm.resumeGasMetering();
 
         Accounts.Account memory accounts = engine.execute(address(this), commandInputs, 1, 0, bytes(""));
 
         vm.pauseGasMetering();
 
-        Pairs.Strike memory strike = engine.getStrike(address(mockERC20_0), address(mockERC20_1), 0, 2);
+        Pairs.Strike memory strike = engine.getStrike(address(mockERC20_0), address(mockERC20_1), 0, 0);
 
         assertEq(strike.blockLast, 1);
         assertEq(strike.liquidity[0].swap, 2e18);
@@ -124,7 +124,7 @@ contract AddLiquidityTest is Test, IExecuteCallback {
         assertEq(mockERC20_0.balanceOf(address(engine)), 2 * amount0);
 
         Positions.ILRTAData memory position =
-            engine.dataOf_cGJnTo(address(this), biDirectionalID(address(mockERC20_0), address(mockERC20_1), 0, 2, 1));
+            engine.dataOf_cGJnTo(address(this), biDirectionalID(address(mockERC20_0), address(mockERC20_1), 0, 0, 1));
 
         assertEq(position.balance, 2e18);
         assertEq(position.buffer, 0);
