@@ -27,7 +27,9 @@ contract GetPairTest is Test, Engine {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(0), address(0), 0);
-        pair.initialize(0);
+        pair.initialized = true;
+
+        pair.strikeCurrent[0] = 1;
 
         pair.composition[0] = type(uint128).max;
         pair.composition[2] = type(uint128).max;
@@ -43,7 +45,7 @@ contract GetPairTest is Test, Engine {
         assertEq(composition[2], type(uint128).max);
         assertEq(composition[3], 0);
         assertEq(composition[4], type(uint128).max);
-        assertEq(strikeCurrent[0], 0);
+        assertEq(strikeCurrent[0], 1);
         assertEq(initialized, true);
     }
 }
