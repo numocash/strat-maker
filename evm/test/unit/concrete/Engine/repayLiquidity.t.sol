@@ -19,7 +19,7 @@ contract RepayLiquidityTest is Test, Engine {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 1);
+        Accounts.Account memory account = Accounts.newAccount(2, 1);
         pair.initialize(0);
 
         pair.accrue(0);
@@ -46,7 +46,7 @@ contract RepayLiquidityTest is Test, Engine {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 1);
+        Accounts.Account memory account = Accounts.newAccount(2, 1);
         pair.initialize(0);
 
         pair.addSwapLiquidity(0, 1, 1e18);
@@ -72,7 +72,7 @@ contract RepayLiquidityTest is Test, Engine {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 1);
+        Accounts.Account memory account = Accounts.newAccount(2, 1);
         pair.initialize(0);
 
         pair.accrue(0);
@@ -103,7 +103,7 @@ contract RepayLiquidityTest is Test, Engine {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 1);
+        Accounts.Account memory account = Accounts.newAccount(2, 1);
         pair.initialize(0);
 
         pair.accrue(0);
@@ -135,7 +135,7 @@ contract RepayLiquidityTest is Test, Engine {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 1);
+        Accounts.Account memory account = Accounts.newAccount(2, 1);
         pair.initialize(0);
 
         pair.accrue(0);
@@ -155,7 +155,7 @@ contract RepayLiquidityTest is Test, Engine {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 1);
+        Accounts.Account memory account = Accounts.newAccount(2, 1);
         pair.initialize(0);
 
         pair.accrue(0);
@@ -172,8 +172,8 @@ contract RepayLiquidityTest is Test, Engine {
 
         vm.pauseGasMetering();
 
-        assertEq(account.erc20Data[0].token, address(2));
-        assertEq(account.erc20Data[0].balanceDelta, -1.5e18);
+        assertEq(account.erc20Data[1].token, address(2));
+        assertEq(account.erc20Data[1].balanceDelta, -1.5e18);
 
         vm.resumeGasMetering();
     }
@@ -182,7 +182,7 @@ contract RepayLiquidityTest is Test, Engine {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 8);
-        Accounts.Account memory account = Accounts.newAccount(1, 1);
+        Accounts.Account memory account = Accounts.newAccount(2, 1);
         pair.initialize(0);
 
         pair.accrue(0);
@@ -199,8 +199,8 @@ contract RepayLiquidityTest is Test, Engine {
 
         vm.pauseGasMetering();
 
-        assertEq(account.erc20Data[0].token, address(2));
-        assertEq(account.erc20Data[0].balanceDelta, -1.5e18 << 8);
+        assertEq(account.erc20Data[1].token, address(2));
+        assertEq(account.erc20Data[1].balanceDelta, -1.5e18 << 8);
 
         vm.resumeGasMetering();
     }
@@ -209,7 +209,7 @@ contract RepayLiquidityTest is Test, Engine {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 1);
+        Accounts.Account memory account = Accounts.newAccount(2, 1);
         pair.initialize(0);
 
         pair.accrue(0);
@@ -227,8 +227,93 @@ contract RepayLiquidityTest is Test, Engine {
 
         vm.pauseGasMetering();
 
-        assertEq(account.erc20Data[0].token, address(2));
-        assertEq(account.erc20Data[0].balanceDelta, -1e18);
+        assertEq(account.erc20Data[1].token, address(2));
+        assertEq(account.erc20Data[1].balanceDelta, -1e18);
+
+        vm.resumeGasMetering();
+    }
+
+    function test_RepayLiquidity_RepayAmount() external {
+        vm.pauseGasMetering();
+
+        (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
+        Accounts.Account memory account = Accounts.newAccount(2, 1);
+        pair.initialize(0);
+
+        pair.accrue(0);
+
+        pair.addSwapLiquidity(0, 1, 1e18);
+        pair.addBorrowedLiquidity(0, 0.5e18);
+
+        vm.resumeGasMetering();
+
+        _repayLiquidity(
+            Engine.RepayLiquidityParams(address(1), address(2), 0, 0, Engine.TokenSelector.Token1, 0.5e18, 1e18),
+            account
+        );
+
+        vm.pauseGasMetering();
+
+        assertEq(account.erc20Data[0].token, address(1));
+        assertEq(account.erc20Data[0].balanceDelta, -0.5e18);
+
+        vm.resumeGasMetering();
+    }
+
+    function test_RepayLiquidity_RepayAmountMultiSpread() external {
+        vm.pauseGasMetering();
+
+        (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
+        Accounts.Account memory account = Accounts.newAccount(2, 1);
+        pair.initialize(0);
+
+        pair.accrue(0);
+
+        pair.addSwapLiquidity(0, 1, 1e18);
+        pair.addSwapLiquidity(0, 2, 1e18);
+
+        pair.addBorrowedLiquidity(0, 1.5e18);
+
+        vm.resumeGasMetering();
+
+        _repayLiquidity(
+            Engine.RepayLiquidityParams(address(1), address(2), 0, 0, Engine.TokenSelector.Token1, 1.5e18, 1e18),
+            account
+        );
+
+        vm.pauseGasMetering();
+
+        assertEq(account.erc20Data[0].token, address(1));
+        assertEq(account.erc20Data[0].balanceDelta, -1.5e18);
+
+        vm.resumeGasMetering();
+    }
+
+    function test_RepayLiquidity_RepayAmountEmptySpread() external {
+        vm.pauseGasMetering();
+
+        (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
+        Accounts.Account memory account = Accounts.newAccount(2, 1);
+        pair.initialize(0);
+
+        pair.accrue(0);
+
+        pair.addSwapLiquidity(0, 1, 1e18);
+        pair.addSwapLiquidity(0, 3, 1e18);
+
+        pair.addBorrowedLiquidity(0, 1.5e18);
+
+        vm.resumeGasMetering();
+
+        _repayLiquidity(
+            Engine.RepayLiquidityParams(address(1), address(2), 0, 0, Engine.TokenSelector.Token1, 1.5e18, 1e18),
+            account
+        );
+
+        vm.pauseGasMetering();
+
+        assertEq(account.erc20Data[0].token, address(1));
+        assertEq(account.erc20Data[0].balanceDelta, -1.5e18);
 
         vm.resumeGasMetering();
     }

@@ -582,18 +582,64 @@ contract Engine is Positions {
             }
 
             // calculate how much to repay
-            uint256 _liquidityGrowthExpX128 = pair.strikes[params.strike].liquidityGrowthExpX128;
-            uint128 liquidityDebt = debtBalanceToLiquidity(params.amountDesired, _liquidityGrowthExpX128);
+            uint128 liquidityDebt =
+                debtBalanceToLiquidity(params.amountDesired, pair.strikes[params.strike].liquidityGrowthExpX128);
 
             // repay liqudity to pair
             if (liquidityDebt == 0) revert InvalidAmountDesired();
             pair.removeBorrowedLiquidity(params.strike, liquidityDebt);
 
             // calculate how much tokens to repay
+            {
+                uint256 amount0;
+                uint256 amount1;
 
+                uint8 _activeSpread = pair.strikes[params.strike].activeSpread;
+                uint128 liquidity = liquidityDebt;
+
+                while (true) {
+                    uint128 swapLiquidity = pair.strikes[params.strike].liquidity[_activeSpread].swap;
+
+                    if (swapLiquidity >= liquidity) {
+                        (uint256 _amount0, uint256 _amount1) = getAmounts(
+                            pair,
+                            scaleLiquidityUp(liquidity, params.scalingFactor),
+                            params.strike,
+                            _activeSpread + 1,
+                            true
+                        );
+
+                        amount0 += _amount0;
+                        amount1 += _amount1;
+
+                        break;
+                    }
+
+                    if (swapLiquidity > 0) {
+                        (uint256 _amount0, uint256 _amount1) = getAmounts(
+                            pair,
+                            scaleLiquidityUp(swapLiquidity, params.scalingFactor),
+                            params.strike,
+                            _activeSpread + 1,
+                            true
+                        );
+
+                        amount0 += _amount0;
+                        amount1 += _amount1;
+
+                        liquidity -= swapLiquidity;
+                    }
+
+                    _activeSpread++;
+                }
+
+                // update accounts
+                account.updateToken(params.token0, -toInt256(amount0));
+                account.updateToken(params.token1, -toInt256(amount1));
+            }
             // calculate unlocked collateral and update account
-            uint128 liquidityCollateral =
-                params.amountDesired + debtBalanceToLiquidity(params.amountBuffer, _liquidityGrowthExpX128);
+            uint128 liquidityCollateral = params.amountDesired
+                + debtBalanceToLiquidity(params.amountBuffer, pair.strikes[params.strike].liquidityGrowthExpX128);
             if (params.selectorCollateral == TokenSelector.Token0) {
                 account.updateToken(
                     params.token0,
