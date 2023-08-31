@@ -367,10 +367,12 @@ contract Engine is Positions {
         int256 amount0;
         int256 amount1;
         if (params.selector < SwapTokenSelector.Account) {
+            if (params.amountDesired == 0) revert InvalidAmountDesired();
             (amount0, amount1) = pair.swap(params.selector == SwapTokenSelector.Token0, params.amountDesired);
         } else {
             address token = account.erc20Data[uint256(params.amountDesired)].token;
             int256 swapAmount = -account.erc20Data[uint256(params.amountDesired)].balanceDelta;
+            if (swapAmount == 0) revert InvalidAmountDesired();
             (amount0, amount1) = pair.swap(params.token0 == token, swapAmount);
         }
 
@@ -383,7 +385,7 @@ contract Engine is Positions {
     /// @notice Helper add liquidity function
     function _addLiquidity(address to, AddLiquidityParams memory params, Accounts.Account memory account) internal {
         unchecked {
-            if (params.amountDesired == 0) revert InsufficientInput();
+            if (params.amountDesired == 0) revert InvalidAmountDesired();
 
             (bytes32 pairID, Pairs.Pair storage pair) =
                 pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
@@ -458,7 +460,7 @@ contract Engine is Positions {
             uint128 balance = debtLiquidityToBalance(params.amountDesiredDebt, _liquidityGrowthX128);
             uint128 collateralBalance = debtLiquidityToBalance(liquidityCollateral, _liquidityGrowthX128);
 
-            if (collateralBalance >= balance) revert InsufficientInput();
+            if (collateralBalance >= balance) revert InvalidAmountDesired();
 
             // mint position to user
             _mintDebt(
@@ -536,7 +538,7 @@ contract Engine is Positions {
                 pair.strikes[params.strike].liquidityGrowthSpreadX128[params.spread - 1].liquidityGrowthX128
             );
 
-            if (liquidity == 0) revert InsufficientInput();
+            if (liquidity == 0) revert InvalidAmountDesired();
 
             // remove liquidity from pair
             uint136 liquidityDisplaced = pair.removeSwapLiquidity(params.strike, params.spread, liquidity);

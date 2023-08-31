@@ -175,7 +175,6 @@ library Pairs {
     /// @return amount0 The delta of the balance of token 0 of the pair
     /// @return amount1 The delta of the balance of token 1 of the pair
     /// @custom:team Account for liquidity growth
-    /// @custom:team Does amountDesired need to be more than zero
     function swap(Pair storage pair, bool isToken0, int256 amountDesired) internal returns (int256, int256) {
         if (!pair.initialized) revert Initialized();
 

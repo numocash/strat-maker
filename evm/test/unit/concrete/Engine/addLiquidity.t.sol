@@ -16,7 +16,7 @@ contract AddLiquidityTest is Test, Engine {
     using Pairs for Pairs.Pair;
     using Pairs for mapping(bytes32 => Pairs.Pair);
 
-    function test_AddLiquidity_InsufficientInput() external {
+    function test_AddLiquidity_InvalidAmountDesired() external {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
@@ -25,7 +25,7 @@ contract AddLiquidityTest is Test, Engine {
 
         vm.resumeGasMetering();
 
-        vm.expectRevert(Engine.InsufficientInput.selector);
+        vm.expectRevert(Engine.InvalidAmountDesired.selector);
         _addLiquidity(address(this), Engine.AddLiquidityParams(address(1), address(2), 0, 2, 1, 0), account);
     }
 

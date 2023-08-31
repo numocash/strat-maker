@@ -43,6 +43,17 @@ contract SwapTest is Test, Engine {
         vm.resumeGasMetering();
     }
 
+    function test_Swap_InvalidAmount() external {
+        vm.pauseGasMetering();
+
+        Accounts.Account memory account = Accounts.newAccount(2, 0);
+
+        vm.resumeGasMetering();
+
+        vm.expectRevert(Engine.InvalidAmountDesired.selector);
+        _swap(Engine.SwapParams(address(0), address(0), 0, Engine.SwapTokenSelector.Token1, 0), account);
+    }
+
     function test_Swap_Account() external {
         vm.pauseGasMetering();
 
@@ -74,5 +85,27 @@ contract SwapTest is Test, Engine {
         assertEq(account.erc20Data[1].balanceDelta, 0);
 
         vm.resumeGasMetering();
+    }
+
+    function test_Swap_AccountInvalidAmount() external {
+        vm.pauseGasMetering();
+
+        Accounts.Account memory account = Accounts.newAccount(2, 0);
+
+        vm.resumeGasMetering();
+
+        vm.expectRevert(Engine.InvalidAmountDesired.selector);
+        _swap(Engine.SwapParams(address(0), address(0), 0, Engine.SwapTokenSelector.Account, 1), account);
+    }
+
+    function test_Swap_AccountInvalidIndex() external {
+        vm.pauseGasMetering();
+
+        Accounts.Account memory account = Accounts.newAccount(2, 0);
+
+        vm.resumeGasMetering();
+
+        vm.expectRevert();
+        _swap(Engine.SwapParams(address(0), address(0), 0, Engine.SwapTokenSelector.Account, 2), account);
     }
 }

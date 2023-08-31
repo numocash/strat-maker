@@ -113,7 +113,7 @@ contract RemoveLiquidityTest is Test, Engine {
         vm.resumeGasMetering();
     }
 
-    function test_RemoveLiquidity_InsufficientInput() external {
+    function test_RemoveLiquidity_InvalidAmountDesired() external {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
@@ -122,7 +122,7 @@ contract RemoveLiquidityTest is Test, Engine {
 
         vm.resumeGasMetering();
 
-        vm.expectRevert(Engine.InsufficientInput.selector);
+        vm.expectRevert(Engine.InvalidAmountDesired.selector);
         _removeLiquidity(Engine.RemoveLiquidityParams(address(1), address(2), 0, 2, 1, 0), account);
     }
 
