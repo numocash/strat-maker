@@ -30,10 +30,6 @@ contract BorrowLiquidityTest is Test, IExecuteCallback {
     uint256 private amount0;
     uint256 private amount1;
 
-    bytes32 private id;
-    uint128 private amountPosition;
-    uint128 private amountBuffer;
-
     function setUp() external {
         engine = new Engine();
         mockERC20_0 = new MockERC20();
@@ -43,10 +39,6 @@ contract BorrowLiquidityTest is Test, IExecuteCallback {
     function executeCallback(Accounts.Account calldata, bytes calldata) external {
         if (amount0 > 0) mockERC20_0.mint(msg.sender, amount0);
         if (amount1 > 0) mockERC20_1.mint(msg.sender, amount1);
-
-        engine.transfer_AjLAUd(
-            msg.sender, Positions.ILRTATransferDetails(id, Engine.OrderType.BiDirectional, amountPosition, amountBuffer)
-        );
     }
 
     function test_BorrowLiquidity_Cold() external {

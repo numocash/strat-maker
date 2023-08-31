@@ -634,8 +634,8 @@ contract Engine is Positions {
                 }
 
                 // update accounts
-                account.updateToken(params.token0, -toInt256(amount0));
-                account.updateToken(params.token1, -toInt256(amount1));
+                account.updateToken(params.token0, toInt256(amount0));
+                account.updateToken(params.token1, toInt256(amount1));
             }
             // calculate unlocked collateral and update account
             uint128 liquidityCollateral = params.amountDesired

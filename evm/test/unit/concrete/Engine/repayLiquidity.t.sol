@@ -255,7 +255,7 @@ contract RepayLiquidityTest is Test, Engine {
         vm.pauseGasMetering();
 
         assertEq(account.erc20Data[0].token, address(1));
-        assertEq(account.erc20Data[0].balanceDelta, -0.5e18);
+        assertEq(account.erc20Data[0].balanceDelta, 0.5e18);
 
         vm.resumeGasMetering();
     }
@@ -284,7 +284,7 @@ contract RepayLiquidityTest is Test, Engine {
         vm.pauseGasMetering();
 
         assertEq(account.erc20Data[0].token, address(1));
-        assertEq(account.erc20Data[0].balanceDelta, -1.5e18);
+        assertEq(account.erc20Data[0].balanceDelta, 1.5e18);
 
         vm.resumeGasMetering();
     }
@@ -313,7 +313,7 @@ contract RepayLiquidityTest is Test, Engine {
         vm.pauseGasMetering();
 
         assertEq(account.erc20Data[0].token, address(1));
-        assertEq(account.erc20Data[0].balanceDelta, -1.5e18);
+        assertEq(account.erc20Data[0].balanceDelta, 1.5e18);
 
         vm.resumeGasMetering();
     }
