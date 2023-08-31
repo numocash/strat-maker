@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {Engine} from "src/core/Engine.sol";
 import {Pairs} from "src/core/Pairs.sol";
 
-contract AccrueTest is Test, Engine {
+contract AccrueTest is Test, Engine(address(0)) {
     using Pairs for Pairs.Pair;
     using Pairs for mapping(bytes32 => Pairs.Pair);
 

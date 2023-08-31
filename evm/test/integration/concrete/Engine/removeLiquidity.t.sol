@@ -42,7 +42,7 @@ contract RemoveLiquidityTest is Test, IExecuteCallback {
     uint128 private amountBuffer;
 
     function setUp() external {
-        engine = new Engine();
+        engine = new Engine(address(0));
         mockERC20_0 = new MockERC20();
         mockERC20_1 = new MockERC20();
     }

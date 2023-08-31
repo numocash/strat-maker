@@ -34,10 +34,12 @@ contract Router is IExecuteCallback {
         bytes signature;
     }
 
-    function route(RouteParams calldata params) external {
+    function route(RouteParams calldata params) external payable {
         CallbackData memory callbackData = CallbackData(msg.sender, params.signatureTransfer, params.signature);
 
-        engine.execute(params.to, params.commandInputs, params.numTokens, params.numLPs, abi.encode(callbackData));
+        engine.execute{value: msg.value}(
+            params.to, params.commandInputs, params.numTokens, params.numLPs, abi.encode(callbackData)
+        );
     }
 
     function executeCallback(Accounts.Account calldata account, bytes calldata data) external {

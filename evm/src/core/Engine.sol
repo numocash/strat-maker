@@ -221,9 +221,19 @@ contract Engine is Positions {
                                 STORAGE
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
+    address public immutable weth;
+
     mapping(bytes32 => Pairs.Pair) internal pairs;
 
     uint256 public locked = 1;
+
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                              CONSTRUCTOR
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
+
+    constructor(address _weth) {
+        weth = _weth;
+    }
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                 MODIFIER
@@ -257,6 +267,7 @@ contract Engine is Positions {
         bytes calldata data
     )
         external
+        payable
         nonReentrant
         returns (Accounts.Account memory)
     {
