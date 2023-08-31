@@ -30,24 +30,24 @@ function liquidityToBalance(uint128 liquidity, uint256 liquidityGrowthX128) pure
 }
 
 /// @notice Convert debt position balance to liquidity
-/// @dev liquidity = balance / liquidityGrowth
+/// @dev liquidity = balance / liquidityGrowthExp
 /// @dev Rounds up, cannot overflow because balance >= liquidity for debt positions
-function debtBalanceToLiquidity(uint128 balance, uint256 liquidityGrowthX128) pure returns (uint128) {
-    if (liquidityGrowthX128 == 0) return balance;
+function debtBalanceToLiquidity(uint128 balance, uint256 liquidityGrowthExpX128) pure returns (uint128) {
+    if (liquidityGrowthExpX128 == 0) return balance;
     unchecked {
         uint256 numerator = uint256(balance) * Q128;
-        return numerator % liquidityGrowthX128 == 0
-            ? uint128(numerator / liquidityGrowthX128)
-            : uint128(numerator / liquidityGrowthX128) + 1;
+        return numerator % liquidityGrowthExpX128 == 0
+            ? uint128(numerator / liquidityGrowthExpX128)
+            : uint128(numerator / liquidityGrowthExpX128) + 1;
     }
 }
 
 /// @notice Convert liquidity to debt position balance
 /// @dev balance = liquidity * liquidityGrowthExp
 /// @dev Rounds up
-function debtLiquidityToBalance(uint128 liquidity, uint256 liquidityGrowthX128) pure returns (uint128) {
-    if (liquidityGrowthX128 == 0) return liquidity;
-    uint256 balance = mulDivRoundingUp(liquidity, liquidityGrowthX128, Q128);
+function debtLiquidityToBalance(uint128 liquidity, uint256 liquidityGrowthExpX128) pure returns (uint128) {
+    if (liquidityGrowthExpX128 == 0) return liquidity;
+    uint256 balance = mulDivRoundingUp(liquidity, liquidityGrowthExpX128, Q128);
     if (balance > type(uint128).max) revert Overflow();
     return uint128(balance);
 }

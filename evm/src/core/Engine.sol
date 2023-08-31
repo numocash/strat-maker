@@ -27,6 +27,8 @@ import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
 
 import {IExecuteCallback} from "./interfaces/IExecuteCallback.sol";
 
+import {console2} from "forge-std/console2.sol";
+
 /// @title Engine
 /// @notice ERC20 exchange
 /// @author Kyle Scott and Robert Leifke
@@ -354,7 +356,7 @@ contract Engine is Positions {
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     /// @notice Helper swap function
-    /// @custom:team Should we admit the `to` address
+    /// @custom:team Should we emit the `to` address
     function _swap(SwapParams memory params, Accounts.Account memory account) internal {
         (bytes32 pairID, Pairs.Pair storage pair) =
             pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
@@ -500,12 +502,12 @@ contract Engine is Positions {
             }
 
             // calculate how much to mint
-            uint256 _liquidityGrowthX128 = pair.strikes[params.strike].liquidityGrowthX128.liquidityGrowthX128;
-            uint128 balance = debtLiquidityToBalance(params.amountDesiredDebt, _liquidityGrowthX128);
-            uint128 collateralBalance = debtLiquidityToBalance(liquidityCollateral, _liquidityGrowthX128);
+            uint256 _liquidityGrowthExpX128 = pair.strikes[params.strike].liquidityGrowthExpX128;
+            uint128 balance = debtLiquidityToBalance(params.amountDesiredDebt, _liquidityGrowthExpX128);
+            uint128 collateralBalance = debtLiquidityToBalance(liquidityCollateral, _liquidityGrowthExpX128);
 
             // check for overcollateralization
-            if (collateralBalance <= balance) revert InvalidAmountDesired();
+            if (balance > collateralBalance) revert InvalidAmountDesired();
 
             // mint position token
             _mintDebt(
@@ -535,8 +537,8 @@ contract Engine is Positions {
             }
 
             // calculate how much to repay
-            uint256 _liquidityGrowthX128 = pair.strikes[params.strike].liquidityGrowthX128.liquidityGrowthX128;
-            uint128 liquidityDebt = debtBalanceToLiquidity(params.amountDesired, _liquidityGrowthX128);
+            uint256 _liquidityGrowthExpX128 = pair.strikes[params.strike].liquidityGrowthExpX128;
+            uint128 liquidityDebt = debtBalanceToLiquidity(params.amountDesired, _liquidityGrowthExpX128);
 
             // repay liqudity to pair
             if (liquidityDebt == 0) revert InvalidAmountDesired();
@@ -546,7 +548,7 @@ contract Engine is Positions {
 
             // calculate unlocked collateral and update account
             uint128 liquidityCollateral =
-                params.amountDesired + debtBalanceToLiquidity(params.amountBuffer, _liquidityGrowthX128);
+                params.amountDesired + debtBalanceToLiquidity(params.amountBuffer, _liquidityGrowthExpX128);
             if (params.selectorCollateral == TokenSelector.Token0) {
                 account.updateToken(
                     params.token0,
@@ -560,7 +562,7 @@ contract Engine is Positions {
                 );
             } else {
                 account.updateToken(
-                    params.token0, -toInt256(getAmount1(scaleLiquidityUp(liquidityCollateral, params.scalingFactor)))
+                    params.token1, -toInt256(getAmount1(scaleLiquidityUp(liquidityCollateral, params.scalingFactor)))
                 );
             }
 

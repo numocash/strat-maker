@@ -45,7 +45,7 @@ library Pairs {
     }
 
     /// @notice Data needed to represent a strike (constant sum automated market market with a fixed price)
-    /// @param liquidityGrowthX128 Liquidity repaid per unit of liquidty
+    /// @param liquidityGrowthExpX128 Exponential multiplier of liquidity debt to balance
     /// @param liquidityGrowthSpreadX128 Liquidity repaid per unit of liquidty per spread
     /// @param liquidity Liquidity available
     /// @param blockLast The block where liquidity was accrued last
@@ -55,7 +55,7 @@ library Pairs {
     /// @param reference1To0 Bitmap of spreads offering 1 to 0 swaps at the price of this strike
     /// @param activeSpread The spread index where liquidity is actively being borrowed from
     struct Strike {
-        LiquidityGrowth liquidityGrowthX128;
+        uint256 liquidityGrowthExpX128;
         LiquidityGrowth[NUM_SPREADS] liquidityGrowthSpreadX128;
         Liquidity[NUM_SPREADS] liquidity;
         uint184 blockLast;
@@ -589,7 +589,7 @@ library Pairs {
     }
 
     /// @notice Accrue liquidity for a strike and return the amount of liquidity that must be repaid
-    /// @custom:team How to handle initial block last value
+    /// @custom:team How to handle overflow
     function accrue(Pair storage pair, int24 strike) internal returns (uint136) {
         unchecked {
             if (!pair.initialized) revert Initialized();
@@ -603,6 +603,7 @@ library Pairs {
             uint256 liquidityBorrowedTotal;
             for (uint256 i = 0; i <= pair.strikes[strike].activeSpread; i++) {
                 uint128 liquidityBorrowed = pair.strikes[strike].liquidity[i].borrowed;
+                uint128 liquiditySwap = pair.strikes[strike].liquidity[i].swap;
 
                 if (liquidityBorrowed > 0) {
                     // can only overflow when (i + 1) * blocks > type(uint128).max
@@ -614,14 +615,27 @@ library Pairs {
                     liquidityBorrowedTotal += liquidityBorrowed;
 
                     _updateLiqudityGrowth(
-                        pair.strikes[strike].liquidityGrowthSpreadX128[i], liquidityAccruedSpread, liquidityBorrowed
+                        pair.strikes[strike].liquidityGrowthSpreadX128[i],
+                        liquidityAccruedSpread,
+                        liquidityBorrowed + liquiditySwap
                     );
                 }
             }
 
             if (liquidityAccrued == 0) return 0;
 
-            _updateLiqudityGrowth(pair.strikes[strike].liquidityGrowthX128, liquidityAccrued, liquidityBorrowedTotal);
+            // update liqudity growth exp
+            uint256 _liquidityGrowthExp = pair.strikes[strike].liquidityGrowthExpX128;
+            uint256 denominator = liquidityBorrowedTotal - liquidityAccrued;
+            if (denominator == 0) {
+                pair.strikes[strike].liquidityGrowthExpX128 = type(uint256).max;
+            } else {
+                pair.strikes[strike].liquidityGrowthExpX128 = mulDiv(
+                    liquidityBorrowedTotal,
+                    _liquidityGrowthExp == 0 ? Q128 : _liquidityGrowthExp,
+                    liquidityBorrowedTotal - liquidityAccrued // TODO: make sure not zero
+                );
+            }
 
             // liquidityAccrued max value is NUM_SPREADS * type(uint128).max
             return uint136(liquidityAccrued);

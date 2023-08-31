@@ -53,7 +53,7 @@ contract RemoveLiquidityTest is Test, Engine {
 
         vm.pauseGasMetering();
 
-        assertEq(pair.strikes[2].liquidity[0].swap, 1);
+        assertEq(pair.strikes[2].liquidity[0].swap, 0.5e18 / 20_000 + 1);
         assertEq(pair.strikes[2].liquidity[0].borrowed, 0.5e18 - 0.5e18 / 10_000);
 
         assertEq(pair.strikes[2].blockLast, 1);

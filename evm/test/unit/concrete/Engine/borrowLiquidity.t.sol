@@ -150,7 +150,7 @@ contract BorrowLiquidityTest is Test, Engine {
         pair.initialize(0);
 
         pair.addSwapLiquidity(0, 1, 1e18);
-        pair.strikes[0].liquidityGrowthX128.liquidityGrowthX128 = 2 * Q128;
+        pair.strikes[0].liquidityGrowthExpX128 = 2 * Q128;
 
         vm.resumeGasMetering();
 
@@ -214,7 +214,7 @@ contract BorrowLiquidityTest is Test, Engine {
         vm.expectRevert(Engine.InvalidAmountDesired.selector);
         _borrowLiquidity(
             address(this),
-            Engine.BorrowLiquidityParams(address(1), address(2), 0, 0, Engine.TokenSelector.Token1, 0.5e18, 0.5e18),
+            Engine.BorrowLiquidityParams(address(1), address(2), 0, 0, Engine.TokenSelector.Token1, 0.5e18 - 1, 0.5e18),
             account
         );
     }
