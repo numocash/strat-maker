@@ -175,7 +175,27 @@ contract RemoveLiquidityTest is Test, Engine {
         vm.resumeGasMetering();
     }
 
-    function test_RemoveLiquidity_AmountsScaleZero() external {}
+    function test_RemoveLiquidity_AmountsScaleZero() external {
+        vm.pauseGasMetering();
+
+        (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
+        Accounts.Account memory account = Accounts.newAccount(1, 1);
+        pair.initialize(0);
+
+        pair.addSwapLiquidity(2, 1, 1e18);
+        _mintBiDirectional(address(this), address(1), address(2), 0, 2, 1, 1e18);
+
+        vm.resumeGasMetering();
+
+        _removeLiquidity(Engine.RemoveLiquidityParams(address(1), address(2), 0, 2, 1, 1e18), account);
+
+        vm.pauseGasMetering();
+
+        assertEq(pair.strikes[2].liquidity[0].swap, 0);
+        assertEq(pair.strikes[2].liquidity[0].borrowed, 0);
+
+        vm.resumeGasMetering();
+    }
 
     function test_RemoveLiquidity_AmountsScale() external {}
 }
