@@ -4,8 +4,6 @@ pragma solidity ^0.8.19;
 import {Engine} from "./Engine.sol";
 import {ILRTA} from "ilrta/ILRTA.sol";
 
-import {console2} from "forge-std/console2.sol";
-
 /// @notice Returns the id of a liquidity position
 function biDirectionalID(
     address token0,
@@ -164,7 +162,6 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
         pure
         returns (bool)
     {
-        console2.log("id: %x, %x", uint256(requestedTransferDetails.id), uint256(signedTransferDetails.id));
         return (
             requestedTransferDetails.amount > signedTransferDetails.amount
                 || requestedTransferDetails.amountBuffer > signedTransferDetails.amountBuffer

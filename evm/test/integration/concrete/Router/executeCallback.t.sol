@@ -13,8 +13,6 @@ import {Permit3} from "ilrta/Permit3.sol";
 import {Positions, debtID} from "src/core/Engine.sol";
 import {Router} from "src/periphery/Router.sol";
 
-import {console2} from "forge-std/console2.sol";
-
 contract ExecuteCallbackTest is Test {
     Permit3 private permit3;
     Router private router;
@@ -145,7 +143,55 @@ contract ExecuteCallbackTest is Test {
         vm.resumeGasMetering();
     }
 
-    function test_ExecuteCallback_LPDataZero() external {}
+    function test_ExecuteCallback_LPDataZero() external {
+        vm.pauseGasMetering();
+
+        uint256 privateKey = 0xC0FFEE;
+        address owner = vm.addr(privateKey);
+
+        bytes32 id = debtID(address(0), address(0), 0, 0, Engine.TokenSelector.Token1);
+
+        mockPositions.mintDebt(owner, address(0), address(0), 0, 0, Engine.TokenSelector.Token1, 1e18, 1e18);
+
+        vm.prank(owner);
+        mockPositions.approve_BKoIou(address(permit3), Positions.ILRTAApprovalDetails(true));
+
+        Accounts.Account memory account = Accounts.newAccount(0, 1);
+        account.lpData[0].id = id;
+        account.lpData[0].orderType = Engine.OrderType.Debt;
+        account.lpData[0].amountBurned = 0;
+        account.lpData[0].amountBuffer = 0;
+
+        Router.CallbackData memory callbackData;
+        callbackData.payer = owner;
+        callbackData.signatureTransfer.transferDetails = new Permit3.TransferDetails[](1);
+        callbackData.signatureTransfer.transferDetails[0].token = address(mockPositions);
+        callbackData.signatureTransfer.transferDetails[0].tokenType = Permit3.TokenType.ILRTA;
+        callbackData.signatureTransfer.transferDetails[0].functionSelector = Positions.transferFrom_OEpkUx.selector;
+        callbackData.signatureTransfer.transferDetails[0].transferDetails = abi.encode(account.lpData[0]);
+        callbackData.signatureTransfer.nonce = 0;
+        callbackData.signatureTransfer.deadline = block.timestamp;
+
+        callbackData.signature = signTransferDetails(callbackData.signatureTransfer, privateKey);
+
+        vm.resumeGasMetering();
+
+        router.executeCallback(account, abi.encode(callbackData));
+
+        vm.pauseGasMetering();
+
+        Positions.ILRTAData memory position = mockPositions.dataOf_cGJnTo(owner, id);
+
+        assertEq(position.balance, 1e18);
+        assertEq(position.buffer, 1e18);
+
+        position = mockPositions.dataOf_cGJnTo(address(this), id);
+
+        assertEq(position.balance, 0);
+        assertEq(position.buffer, 0);
+
+        vm.resumeGasMetering();
+    }
 
     function test_ExecuteCallback_LPData() external {
         vm.pauseGasMetering();
@@ -176,15 +222,6 @@ contract ExecuteCallbackTest is Test {
         callbackData.signatureTransfer.nonce = 0;
         callbackData.signatureTransfer.deadline = block.timestamp;
 
-        console2.log(
-            "id: %x",
-            uint256(
-                abi.decode(
-                    callbackData.signatureTransfer.transferDetails[0].transferDetails, (Positions.ILRTATransferDetails)
-                ).id
-            )
-        );
-
         callbackData.signature = signTransferDetails(callbackData.signatureTransfer, privateKey);
 
         vm.resumeGasMetering();
@@ -192,6 +229,16 @@ contract ExecuteCallbackTest is Test {
         router.executeCallback(account, abi.encode(callbackData));
 
         vm.pauseGasMetering();
+
+        Positions.ILRTAData memory position = mockPositions.dataOf_cGJnTo(owner, id);
+
+        assertEq(position.balance, 0);
+        assertEq(position.buffer, 0.5e18);
+
+        position = mockPositions.dataOf_cGJnTo(address(this), id);
+
+        assertEq(position.balance, 1e18);
+        assertEq(position.buffer, 0.5e18);
 
         vm.resumeGasMetering();
     }
