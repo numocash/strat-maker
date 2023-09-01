@@ -59,8 +59,6 @@ library Accounts {
 
     /// @notice Update a token's intermediate account balance, creating a new one if one doesn't already exist
     function updateToken(Account memory account, address token, int256 delta) internal pure {
-        // if (delta == 0) return;
-
         for (uint256 i = 0; i < account.erc20Data.length;) {
             if (account.erc20Data[i].token == token) {
                 // might not need checked math
