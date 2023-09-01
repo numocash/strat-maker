@@ -95,8 +95,8 @@ contract ExecuteCallbackTest is Test {
 
         assertEq(signer, callbackData.payer);
         assertEq(requestedTransfer.length, 1);
-        assertEq(requestedTransfer[0].to, address(0));
-        assertEq(requestedTransfer[0].transferDetails, bytes(""));
+        assertEq(requestedTransfer[0].to, address(this));
+        assertEq(requestedTransfer[0].transferDetails, abi.encode(uint256(0)));
         assertEq(signature, callbackData.signature);
 
         delete signer;

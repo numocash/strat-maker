@@ -6,7 +6,6 @@ import {Engine} from "src/core/Engine.sol";
 import {IExecuteCallback} from "src/core/interfaces/IExecuteCallback.sol";
 import {ILRTA} from "ilrta/ILRTA.sol";
 import {Permit3} from "ilrta/Permit3.sol";
-import {console2} from "forge-std/console2.sol";
 
 /// @title Router
 /// @notice Facilitates transactions with `Engine`
@@ -94,9 +93,8 @@ contract Router is IExecuteCallback {
             for (; i < account.erc20Data.length; i++) {
                 int256 delta = account.erc20Data[i].balanceDelta;
 
-                if (delta > 0) {
-                    requestedTransfer[i] = Permit3.RequestedTransferDetails(msg.sender, abi.encode(uint256(delta)));
-                }
+                requestedTransfer[i] =
+                    Permit3.RequestedTransferDetails(msg.sender, abi.encode(delta > 0 ? uint256(delta) : uint256(0)));
             }
 
             // Format position data
