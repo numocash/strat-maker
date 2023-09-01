@@ -269,6 +269,8 @@ contract Engine is Positions {
                                  LOGIC
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
+    receive() external payable {}
+
     /// @notice Execute an action on the exchange
     /// @param to Address to send the output to
     /// @param commandInputs List of command inputs

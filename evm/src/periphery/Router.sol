@@ -20,7 +20,7 @@ contract Router is IExecuteCallback {
         bytes signature;
     }
 
-    constructor(address _engine, address _permit3) {
+    constructor(address payable _engine, address _permit3) {
         engine = Engine(_engine);
         permit3 = Permit3(_permit3);
     }
