@@ -258,7 +258,6 @@ contract Engine is Positions {
     /// @param to Address to send the output to
     /// @param commandInputs List of command inputs
     /// @param data Untouched data passed back to the callback
-    /// @custom:team Try changing commandInputs to memory
     function execute(
         address to,
         CommandInput[] calldata commandInputs,

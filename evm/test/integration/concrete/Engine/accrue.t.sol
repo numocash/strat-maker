@@ -58,7 +58,7 @@ contract AccrueTest is Test {
 
         amount0 = getAmount0(1e18, getRatioAtStrike(0), 0, true);
 
-        engine.execute(address(0), commandInputs, 1, 0, bytes(""));
+        engine.execute(address(0), commandInputs, 2, 0, bytes(""));
 
         delete commandInputs;
         delete amount0;

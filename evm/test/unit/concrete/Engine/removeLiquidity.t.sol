@@ -20,7 +20,7 @@ contract RemoveLiquidityTest is Test, Engine(address(0)) {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 1);
+        Accounts.Account memory account = Accounts.newAccount(2, 1);
         pair.initialize(0);
 
         pair.addSwapLiquidity(2, 1, 1e18);
@@ -41,7 +41,7 @@ contract RemoveLiquidityTest is Test, Engine(address(0)) {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 1);
+        Accounts.Account memory account = Accounts.newAccount(2, 1);
         pair.initialize(0);
 
         pair.addSwapLiquidity(2, 1, 1e18);
@@ -65,7 +65,7 @@ contract RemoveLiquidityTest is Test, Engine(address(0)) {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 1);
+        Accounts.Account memory account = Accounts.newAccount(2, 1);
         pair.initialize(0);
 
         pair.addSwapLiquidity(2, 1, 1e18);
@@ -90,7 +90,7 @@ contract RemoveLiquidityTest is Test, Engine(address(0)) {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 1);
+        Accounts.Account memory account = Accounts.newAccount(2, 1);
         pair.initialize(0);
 
         pair.addSwapLiquidity(2, 1, 1e18);
@@ -117,7 +117,7 @@ contract RemoveLiquidityTest is Test, Engine(address(0)) {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 1);
+        Accounts.Account memory account = Accounts.newAccount(2, 1);
         pair.initialize(0);
 
         vm.resumeGasMetering();
@@ -130,7 +130,7 @@ contract RemoveLiquidityTest is Test, Engine(address(0)) {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 1);
+        Accounts.Account memory account = Accounts.newAccount(2, 1);
         pair.initialize(0);
 
         pair.addSwapLiquidity(2, 1, 1e18);
@@ -152,7 +152,7 @@ contract RemoveLiquidityTest is Test, Engine(address(0)) {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 1);
+        Accounts.Account memory account = Accounts.newAccount(2, 1);
         pair.initialize(0);
 
         pair.accrue(3);
@@ -179,7 +179,7 @@ contract RemoveLiquidityTest is Test, Engine(address(0)) {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 1);
+        Accounts.Account memory account = Accounts.newAccount(2, 1);
         pair.initialize(0);
 
         pair.addSwapLiquidity(2, 1, 1e18);
@@ -203,7 +203,7 @@ contract RemoveLiquidityTest is Test, Engine(address(0)) {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 8);
-        Accounts.Account memory account = Accounts.newAccount(1, 1);
+        Accounts.Account memory account = Accounts.newAccount(2, 1);
         pair.initialize(0);
 
         pair.addSwapLiquidity(2, 1, 1e18);

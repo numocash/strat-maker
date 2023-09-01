@@ -72,7 +72,7 @@ contract RemoveLiquidityTest is Test, IExecuteCallback {
 
         amount0 = getAmount0(1e18, getRatioAtStrike(0), 0, true);
 
-        engine.execute(address(this), commandInputs, 1, 0, bytes(""));
+        engine.execute(address(this), commandInputs, 2, 0, bytes(""));
 
         delete commandInputs;
         delete amount0;
@@ -90,7 +90,7 @@ contract RemoveLiquidityTest is Test, IExecuteCallback {
         // emit RemoveLiquidity(id, 2, 1, 1e18, getAmount0(1e18, getRatioAtStrike(2), 0, false), 0);
         vm.resumeGasMetering();
 
-        Accounts.Account memory accounts = engine.execute(address(this), commandInputs, 1, 1, bytes(""));
+        Accounts.Account memory accounts = engine.execute(address(this), commandInputs, 2, 1, bytes(""));
 
         vm.pauseGasMetering();
 
@@ -137,7 +137,7 @@ contract RemoveLiquidityTest is Test, IExecuteCallback {
 
         amount0 = getAmount0(1e18, getRatioAtStrike(0), 0, true);
 
-        engine.execute(address(this), commandInputs, 1, 0, bytes(""));
+        engine.execute(address(this), commandInputs, 2, 0, bytes(""));
 
         delete commandInputs;
         delete amount0;
@@ -155,7 +155,7 @@ contract RemoveLiquidityTest is Test, IExecuteCallback {
         // emit RemoveLiquidity(id, 2, 1, 1e18, getAmount0(1e18, getRatioAtStrike(2), 0, false), 0);
         vm.resumeGasMetering();
 
-        Accounts.Account memory accounts = engine.execute(address(this), commandInputs, 1, 1, bytes(""));
+        Accounts.Account memory accounts = engine.execute(address(this), commandInputs, 2, 1, bytes(""));
 
         vm.pauseGasMetering();
 

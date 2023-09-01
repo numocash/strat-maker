@@ -45,38 +45,32 @@ contract Router is IExecuteCallback {
     function executeCallback(Accounts.Account calldata account, bytes calldata data) external {
         unchecked {
             if (msg.sender != address(engine)) revert InvalidCaller(msg.sender);
+
             CallbackData memory callbackData = abi.decode(data, (CallbackData));
 
             // build array of transfer requests, then send as a batch
             Permit3.RequestedTransferDetails[] memory requestedTransfer =
                 new Permit3.RequestedTransferDetails[](callbackData.signatureTransfer.transferDetails.length);
 
-            uint256 j = 0;
+            uint256 i = 0;
 
             // Format ERC20 data
-            for (uint256 i = 0; i < account.erc20Data.length; i++) {
+            for (; i < account.erc20Data.length; i++) {
                 int256 delta = account.erc20Data[i].balanceDelta;
 
-                // NOTE: Second expression might be unecessary
-                if (delta > 0 && account.erc20Data[i].token != address(0)) {
-                    // NOTE: How to make sure this is indexing into the right spot
-                    requestedTransfer[j] = Permit3.RequestedTransferDetails(msg.sender, abi.encode(uint256(delta)));
-
-                    j++;
+                if (delta > 0) {
+                    requestedTransfer[i] = Permit3.RequestedTransferDetails(msg.sender, abi.encode(uint256(delta)));
                 }
             }
 
             // Format position data
-            for (uint256 i = 0; i < account.lpData.length; i++) {
-                requestedTransfer[j] = Permit3.RequestedTransferDetails(msg.sender, abi.encode(account.lpData[i]));
-                j++;
+            for (; i < account.lpData.length + account.erc20Data.length; i++) {
+                requestedTransfer[i] = Permit3.RequestedTransferDetails(msg.sender, abi.encode(account.lpData[i]));
             }
 
-            if (callbackData.signatureTransfer.transferDetails.length > 0) {
-                permit3.transferBySignature(
-                    callbackData.payer, callbackData.signatureTransfer, requestedTransfer, callbackData.signature
-                );
-            }
+            permit3.transferBySignature(
+                callbackData.payer, callbackData.signatureTransfer, requestedTransfer, callbackData.signature
+            );
         }
     }
 }
