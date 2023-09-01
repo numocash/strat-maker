@@ -54,7 +54,7 @@ contract UnwrapWETHTest is Test, Engine(payable(new WETH())) {
         vm.resumeGasMetering();
     }
 
-    function test_WrapWETH_Negative() external payable {
+    function test_WrapWETH_Negative() external {
         vm.pauseGasMetering();
 
         Accounts.Account memory account = Accounts.newAccount(1, 0);

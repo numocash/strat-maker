@@ -6,25 +6,38 @@ import {Engine} from "src/core/Engine.sol";
 import {IExecuteCallback} from "src/core/interfaces/IExecuteCallback.sol";
 import {ILRTA} from "ilrta/ILRTA.sol";
 import {Permit3} from "ilrta/Permit3.sol";
+import {console2} from "forge-std/console2.sol";
 
+/// @title Router
+/// @notice Facilitates transactions with `Engine`
 /// @author Robert Leifke and Kyle Scott
 contract Router is IExecuteCallback {
-    Engine private immutable engine;
-    Permit3 private immutable permit3;
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                                 ERRORS
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
+    /// @notice Thrown when callback is called by an invalid address
     error InvalidCaller(address caller);
 
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                               DATA TYPES
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
+
+    /// @notice Data type for callback
+    /// @param payer Address of signer of signature transfers
+    /// @param signatureTransfer Permit3 data structure specifying a batch of tranfers
+    /// @param signature Signature validations transfers in `signatureTransfer`
     struct CallbackData {
         address payer;
         Permit3.SignatureTransferBatch signatureTransfer;
         bytes signature;
     }
 
-    constructor(address payable _engine, address _permit3) {
-        engine = Engine(_engine);
-        permit3 = Permit3(_permit3);
-    }
-
+    /// @notice Data type of route parameters
+    /// @param to Address to receive the output of the transaction
+    /// @param commandInputs Actions to run on `engine`
+    /// @param signatureTransfer Permit3 data structure specifying a batch of tranfers
+    /// @param signature Signature validations transfers in `signatureTransfer`
     struct RouteParams {
         address to;
         Engine.CommandInput[] commandInputs;
@@ -34,6 +47,28 @@ contract Router is IExecuteCallback {
         bytes signature;
     }
 
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                                STORAGE
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
+
+    Engine public immutable engine;
+
+    Permit3 public immutable permit3;
+
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                              CONSTRUCTOR
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
+
+    constructor(address payable _engine, address _permit3) {
+        engine = Engine(_engine);
+        permit3 = Permit3(_permit3);
+    }
+
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                                 LOGIC
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
+
+    /// @custom:team should we return the account
     function route(RouteParams calldata params) external payable {
         CallbackData memory callbackData = CallbackData(msg.sender, params.signatureTransfer, params.signature);
 
@@ -42,6 +77,7 @@ contract Router is IExecuteCallback {
         );
     }
 
+    /// @notice Callback called by `engine` that expects payment for actions taken
     function executeCallback(Accounts.Account calldata account, bytes calldata data) external {
         unchecked {
             if (msg.sender != address(engine)) revert InvalidCaller(msg.sender);

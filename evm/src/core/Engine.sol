@@ -30,7 +30,7 @@ import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
 import {IExecuteCallback} from "./interfaces/IExecuteCallback.sol";
 
 /// @title Engine
-/// @notice ERC20 exchange
+/// @notice ERC20 exchange protocol
 /// @author Kyle Scott and Robert Leifke
 /// @custom:team Add minted position info to account
 contract Engine is Positions {
