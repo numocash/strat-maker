@@ -125,6 +125,14 @@ function swapCommand(
     );
 }
 
+function wrapCommand() pure returns (Engine.CommandInput memory commandInput) {
+    return Engine.CommandInput(Engine.Commands.WrapWETH, bytes(""));
+}
+
+function unwrapCommand(uint256 wethIndex) pure returns (Engine.CommandInput memory commandInput) {
+    return Engine.CommandInput(Engine.Commands.UnwrapWETH, abi.encode(Engine.UnwrapWETHParams(wethIndex)));
+}
+
 function createCommandInput() pure returns (Engine.CommandInput[] memory) {
     return new Engine.CommandInput[](0);
 }

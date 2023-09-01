@@ -134,11 +134,6 @@ contract Engine is Positions {
         int256 amountDesired;
     }
 
-    /// @notice Data to pass to a wrap weth action
-    struct WrapWETHParams {
-        uint256 wethIndex;
-    }
-
     /// @notice Data to pass to a unwrap weth action
     struct UnwrapWETHParams {
         uint256 wethIndex;
@@ -269,7 +264,10 @@ contract Engine is Positions {
                                  LOGIC
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    receive() external payable {}
+    /// @notice Allow contract to receive ether from weth
+    receive() external payable {
+        if (msg.sender != weth) revert();
+    }
 
     /// @notice Execute an action on the exchange
     /// @param to Address to send the output to
@@ -296,7 +294,7 @@ contract Engine is Positions {
                     if (commandInputs[i].command == Commands.Swap) {
                         _swap(abi.decode(commandInputs[i].input, (SwapParams)), account);
                     } else {
-                        _wrapWETH(abi.decode(commandInputs[i].input, (WrapWETHParams)), account);
+                        _wrapWETH(account);
                     }
                 } else {
                     if (commandInputs[i].command == Commands.UnwrapWETH) {
@@ -411,10 +409,8 @@ contract Engine is Positions {
     }
 
     /// @notice Helper wrap weth function
-    function _wrapWETH(WrapWETHParams memory params, Accounts.Account memory account) internal {
-        if (account.erc20Data[params.wethIndex].token != weth) revert InvalidWETHIndex();
-
-        account.erc20Data[params.wethIndex].balanceDelta -= toInt256(msg.value);
+    function _wrapWETH(Accounts.Account memory account) internal {
+        account.updateToken(weth, -toInt256(msg.value));
 
         WETH(weth).deposit{value: msg.value}();
     }
