@@ -10,7 +10,7 @@ import {Pairs} from "src/core/Pairs.sol";
 import {computeSwapStep} from "src/core/math/SwapMath.sol";
 import {getRatioAtStrike} from "src/core/math/StrikeMath.sol";
 
-contract SwapTest is Test, Engine(address(0)) {
+contract SwapTest is Test, Engine(payable(address(0))) {
     using Accounts for Accounts.Account;
     using Pairs for Pairs.Pair;
     using Pairs for mapping(bytes32 => Pairs.Pair);

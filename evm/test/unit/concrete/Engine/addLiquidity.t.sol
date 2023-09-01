@@ -11,7 +11,7 @@ import {Positions, biDirectionalID} from "src/core/Positions.sol";
 import {getAmounts} from "src/core/math/LiquidityMath.sol";
 import {Q128} from "src/core/math/StrikeMath.sol";
 
-contract AddLiquidityTest is Test, Engine(address(0)) {
+contract AddLiquidityTest is Test, Engine(payable(address(0))) {
     using Accounts for Accounts.Account;
     using Pairs for Pairs.Pair;
     using Pairs for mapping(bytes32 => Pairs.Pair);

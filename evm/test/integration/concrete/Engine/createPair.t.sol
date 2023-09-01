@@ -14,7 +14,7 @@ contract CreatePairTest is Test {
     Engine private engine;
 
     function setUp() external {
-        engine = new Engine(address(0));
+        engine = new Engine(payable(address(0)));
     }
 
     function test_CreatePair() external {

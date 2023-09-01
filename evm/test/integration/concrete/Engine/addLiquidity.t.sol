@@ -32,7 +32,7 @@ contract AddLiquidityTest is Test, IExecuteCallback {
     uint256 private amount1;
 
     function setUp() external {
-        engine = new Engine(address(0));
+        engine = new Engine(payable(address(0)));
         mockERC20_0 = new MockERC20();
         mockERC20_1 = new MockERC20();
     }

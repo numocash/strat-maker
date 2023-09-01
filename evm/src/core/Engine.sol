@@ -22,6 +22,8 @@ import {
 } from "./math/PositionMath.sol";
 import {getRatioAtStrike} from "./math/StrikeMath.sol";
 
+import {WETH} from "solmate/src/tokens/WETH.sol";
+
 import {BalanceLib} from "src/libraries/BalanceLib.sol";
 import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
 
@@ -69,6 +71,7 @@ contract Engine is Positions {
     error InsufficientInput();
     error InvalidAmountDesired();
     error InvalidTokenOrder();
+    error InvalidWETHIndex();
     error Reentrancy();
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
@@ -78,6 +81,8 @@ contract Engine is Positions {
     /// @notice Types of commands to execute
     enum Commands {
         Swap,
+        WrapWETH,
+        UnwrapWETH,
         AddLiquidity,
         RemoveLiquidity,
         BorrowLiquidity,
@@ -129,6 +134,16 @@ contract Engine is Positions {
         int256 amountDesired;
     }
 
+    /// @notice Data to pass to a wrap weth action
+    struct WrapWETHParams {
+        uint256 wethIndex;
+    }
+
+    /// @notice Data to pass to a unwrap weth action
+    struct UnwrapWETHParams {
+        uint256 wethIndex;
+    }
+
     /// @notice Data to pass to an add liquidity action
     /// @param token0 Token in the 0 position of the pair
     /// @param token1 Token in the 1 position of the pair
@@ -137,6 +152,22 @@ contract Engine is Positions {
     /// @param spread The spread to impose on the liquidity
     /// @param amountDesired The amount of liquidity to add
     struct AddLiquidityParams {
+        address token0;
+        address token1;
+        uint8 scalingFactor;
+        int24 strike;
+        uint8 spread;
+        uint128 amountDesired;
+    }
+
+    /// @notice Data to pass to a remove liquidity action
+    /// @param token0 Token in the 0 position of the pair
+    /// @param token1 Token in the 1 position of the pair
+    /// @param scalingFactor Amount to divide liquidity by to make it fit in a uint128
+    /// @param strike The strike to remove liquidity from
+    /// @param spread The spread on the liquidity
+    /// @param amountDesired The amount of balance to remove
+    struct RemoveLiquidityParams {
         address token0;
         address token1;
         uint8 scalingFactor;
@@ -181,22 +212,6 @@ contract Engine is Positions {
         uint128 amountBuffer;
     }
 
-    /// @notice Data to pass to a remove liquidity action
-    /// @param token0 Token in the 0 position of the pair
-    /// @param token1 Token in the 1 position of the pair
-    /// @param scalingFactor Amount to divide liquidity by to make it fit in a uint128
-    /// @param strike The strike to remove liquidity from
-    /// @param spread The spread on the liquidity
-    /// @param amountDesired The amount of balance to remove
-    struct RemoveLiquidityParams {
-        address token0;
-        address token1;
-        uint8 scalingFactor;
-        int24 strike;
-        uint8 spread;
-        uint128 amountDesired;
-    }
-
     /// @notice Data to pass to an accrue action
     /// @param pairID ID of the pair
     /// @param strike The strike to accrue interest to
@@ -221,7 +236,7 @@ contract Engine is Positions {
                                 STORAGE
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    address public immutable weth;
+    address payable immutable weth;
 
     mapping(bytes32 => Pairs.Pair) internal pairs;
 
@@ -231,7 +246,7 @@ contract Engine is Positions {
                               CONSTRUCTOR
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-    constructor(address _weth) {
+    constructor(address payable _weth) {
         weth = _weth;
     }
 
@@ -274,25 +289,31 @@ contract Engine is Positions {
 
         // find command helper with binary search
         for (uint256 i = 0; i < commandInputs.length;) {
-            if (commandInputs[i].command < Commands.BorrowLiquidity) {
-                if (commandInputs[i].command == Commands.Swap) {
-                    _swap(abi.decode(commandInputs[i].input, (SwapParams)), account);
-                } else {
-                    if (commandInputs[i].command == Commands.AddLiquidity) {
-                        _addLiquidity(to, abi.decode(commandInputs[i].input, (AddLiquidityParams)), account);
+            if (commandInputs[i].command < Commands.RemoveLiquidity) {
+                if (commandInputs[i].command < Commands.UnwrapWETH) {
+                    if (commandInputs[i].command == Commands.Swap) {
+                        _swap(abi.decode(commandInputs[i].input, (SwapParams)), account);
                     } else {
-                        _removeLiquidity(abi.decode(commandInputs[i].input, (RemoveLiquidityParams)), account);
+                        _wrapWETH(abi.decode(commandInputs[i].input, (WrapWETHParams)), account);
+                    }
+                } else {
+                    if (commandInputs[i].command == Commands.UnwrapWETH) {
+                        _unwrapWETH(to, abi.decode(commandInputs[i].input, (UnwrapWETHParams)), account);
+                    } else {
+                        _addLiquidity(to, abi.decode(commandInputs[i].input, (AddLiquidityParams)), account);
                     }
                 }
             } else {
-                if (commandInputs[i].command < Commands.Accrue) {
-                    if (commandInputs[i].command == Commands.BorrowLiquidity) {
-                        _borrowLiquidity(to, abi.decode(commandInputs[i].input, (BorrowLiquidityParams)), account);
+                if (commandInputs[i].command < Commands.RepayLiquidity) {
+                    if (commandInputs[i].command == Commands.RemoveLiquidity) {
+                        _removeLiquidity(abi.decode(commandInputs[i].input, (RemoveLiquidityParams)), account);
                     } else {
-                        _repayLiquidity(abi.decode(commandInputs[i].input, (RepayLiquidityParams)), account);
+                        _borrowLiquidity(to, abi.decode(commandInputs[i].input, (BorrowLiquidityParams)), account);
                     }
                 } else {
-                    if (commandInputs[i].command == Commands.Accrue) {
+                    if (commandInputs[i].command == Commands.RepayLiquidity) {
+                        _repayLiquidity(abi.decode(commandInputs[i].input, (RepayLiquidityParams)), account);
+                    } else if (commandInputs[i].command == Commands.Accrue) {
                         _accrue(abi.decode(commandInputs[i].input, (AccrueParams)));
                     } else {
                         _createPair(abi.decode(commandInputs[i].input, (CreatePairParams)));
@@ -385,6 +406,31 @@ contract Engine is Positions {
         account.updateToken(params.token1, amount1);
 
         emit Swap(pairID, amount0, amount1);
+    }
+
+    /// @notice Helper wrap weth function
+    function _wrapWETH(WrapWETHParams memory params, Accounts.Account memory account) internal {
+        if (account.erc20Data[params.wethIndex].token != weth) revert InvalidWETHIndex();
+
+        account.erc20Data[params.wethIndex].balanceDelta -= toInt256(msg.value);
+
+        WETH(weth).deposit{value: msg.value}();
+    }
+
+    /// @notice Helper unwrap weth function
+    function _unwrapWETH(address to, UnwrapWETHParams memory params, Accounts.Account memory account) internal {
+        if (account.erc20Data[params.wethIndex].token != weth) revert InvalidWETHIndex();
+
+        int256 balanceDelta = account.erc20Data[params.wethIndex].balanceDelta;
+
+        if (balanceDelta < 0) {
+            uint256 amount = uint256(-balanceDelta);
+
+            account.erc20Data[params.wethIndex].balanceDelta = 0;
+
+            WETH(weth).withdraw(amount);
+            SafeTransferLib.safeTransferETH(to, amount);
+        }
     }
 
     /// @notice Helper add liquidity function
