@@ -7,24 +7,36 @@ import {IExecuteCallback} from "src/core/interfaces/IExecuteCallback.sol";
 import {ILRTA} from "ilrta/ILRTA.sol";
 import {Permit3} from "ilrta/Permit3.sol";
 
+/// @title Router
+/// @notice Facilitates transactions with `Engine`
 /// @author Robert Leifke and Kyle Scott
 contract Router is IExecuteCallback {
-    Engine private immutable engine;
-    Permit3 private immutable permit3;
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                                 ERRORS
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
+    /// @notice Thrown when callback is called by an invalid address
     error InvalidCaller(address caller);
 
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                               DATA TYPES
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
+
+    /// @notice Data type for callback
+    /// @param payer Address of signer of signature transfers
+    /// @param signatureTransfer Permit3 data structure specifying a batch of tranfers
+    /// @param signature Signature validations transfers in `signatureTransfer`
     struct CallbackData {
         address payer;
         Permit3.SignatureTransferBatch signatureTransfer;
         bytes signature;
     }
 
-    constructor(address _engine, address _permit3) {
-        engine = Engine(_engine);
-        permit3 = Permit3(_permit3);
-    }
-
+    /// @notice Data type of route parameters
+    /// @param to Address to receive the output of the transaction
+    /// @param commandInputs Actions to run on `engine`
+    /// @param signatureTransfer Permit3 data structure specifying a batch of tranfers
+    /// @param signature Signature validations transfers in `signatureTransfer`
     struct RouteParams {
         address to;
         Engine.CommandInput[] commandInputs;
@@ -34,47 +46,65 @@ contract Router is IExecuteCallback {
         bytes signature;
     }
 
-    function route(RouteParams calldata params) external {
-        CallbackData memory callbackData = CallbackData(msg.sender, params.signatureTransfer, params.signature);
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                                STORAGE
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
-        engine.execute(params.to, params.commandInputs, params.numTokens, params.numLPs, abi.encode(callbackData));
+    Engine public immutable engine;
+
+    Permit3 public immutable permit3;
+
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                              CONSTRUCTOR
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
+
+    constructor(address payable _engine, address _permit3) {
+        engine = Engine(_engine);
+        permit3 = Permit3(_permit3);
     }
 
+    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
+                                 LOGIC
+    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
+
+    /// @custom:team should we return the account
+    function route(RouteParams calldata params) external payable {
+        CallbackData memory callbackData = CallbackData(msg.sender, params.signatureTransfer, params.signature);
+
+        engine.execute{value: msg.value}(
+            params.to, params.commandInputs, params.numTokens, params.numLPs, abi.encode(callbackData)
+        );
+    }
+
+    /// @notice Callback called by `engine` that expects payment for actions taken
     function executeCallback(Accounts.Account calldata account, bytes calldata data) external {
         unchecked {
             if (msg.sender != address(engine)) revert InvalidCaller(msg.sender);
+
             CallbackData memory callbackData = abi.decode(data, (CallbackData));
 
             // build array of transfer requests, then send as a batch
             Permit3.RequestedTransferDetails[] memory requestedTransfer =
                 new Permit3.RequestedTransferDetails[](callbackData.signatureTransfer.transferDetails.length);
 
-            uint256 j = 0;
+            uint256 i = 0;
 
             // Format ERC20 data
-            for (uint256 i = 0; i < account.erc20Data.length; i++) {
+            for (; i < account.erc20Data.length; i++) {
                 int256 delta = account.erc20Data[i].balanceDelta;
 
-                // NOTE: Second expression might be unecessary
-                if (delta > 0 && account.erc20Data[i].token != address(0)) {
-                    // NOTE: How to make sure this is indexing into the right spot
-                    requestedTransfer[j] = Permit3.RequestedTransferDetails(msg.sender, abi.encode(uint256(delta)));
-
-                    j++;
-                }
+                requestedTransfer[i] =
+                    Permit3.RequestedTransferDetails(msg.sender, abi.encode(delta > 0 ? uint256(delta) : uint256(0)));
             }
 
             // Format position data
-            for (uint256 i = 0; i < account.lpData.length; i++) {
-                requestedTransfer[j] = Permit3.RequestedTransferDetails(msg.sender, abi.encode(account.lpData[i]));
-                j++;
+            for (; i < account.lpData.length + account.erc20Data.length; i++) {
+                requestedTransfer[i] = Permit3.RequestedTransferDetails(msg.sender, abi.encode(account.lpData[i]));
             }
 
-            if (callbackData.signatureTransfer.transferDetails.length > 0) {
-                permit3.transferBySignature(
-                    callbackData.payer, callbackData.signatureTransfer, requestedTransfer, callbackData.signature
-                );
-            }
+            permit3.transferBySignature(
+                callbackData.payer, callbackData.signatureTransfer, requestedTransfer, callbackData.signature
+            );
         }
     }
 }

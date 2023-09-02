@@ -10,7 +10,7 @@ import {Positions, debtID} from "src/core/Positions.sol";
 
 import {Q128} from "src/core/math/StrikeMath.sol";
 
-contract BorrowLiquidityTest is Test, Engine {
+contract BorrowLiquidityTest is Test, Engine(payable(address(0))) {
     using Accounts for Accounts.Account;
     using Pairs for Pairs.Pair;
     using Pairs for mapping(bytes32 => Pairs.Pair);

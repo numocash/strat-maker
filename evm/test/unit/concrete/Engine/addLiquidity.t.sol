@@ -11,7 +11,7 @@ import {Positions, biDirectionalID} from "src/core/Positions.sol";
 import {getAmounts} from "src/core/math/LiquidityMath.sol";
 import {Q128} from "src/core/math/StrikeMath.sol";
 
-contract AddLiquidityTest is Test, Engine {
+contract AddLiquidityTest is Test, Engine(payable(address(0))) {
     using Accounts for Accounts.Account;
     using Pairs for Pairs.Pair;
     using Pairs for mapping(bytes32 => Pairs.Pair);
@@ -20,7 +20,7 @@ contract AddLiquidityTest is Test, Engine {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 0);
+        Accounts.Account memory account = Accounts.newAccount(2, 0);
         pair.initialize(0);
 
         vm.resumeGasMetering();
@@ -33,7 +33,7 @@ contract AddLiquidityTest is Test, Engine {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 0);
+        Accounts.Account memory account = Accounts.newAccount(2, 0);
         pair.initialize(0);
 
         vm.resumeGasMetering();
@@ -52,7 +52,7 @@ contract AddLiquidityTest is Test, Engine {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 0);
+        Accounts.Account memory account = Accounts.newAccount(2, 0);
         pair.initialize(0);
 
         pair.addSwapLiquidity(2, 1, 1e18);
@@ -75,7 +75,7 @@ contract AddLiquidityTest is Test, Engine {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 0);
+        Accounts.Account memory account = Accounts.newAccount(2, 0);
         pair.initialize(0);
 
         vm.resumeGasMetering();
@@ -94,7 +94,7 @@ contract AddLiquidityTest is Test, Engine {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 0);
+        Accounts.Account memory account = Accounts.newAccount(2, 0);
         pair.initialize(0);
 
         pair.accrue(3);
@@ -119,7 +119,7 @@ contract AddLiquidityTest is Test, Engine {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 0);
+        Accounts.Account memory account = Accounts.newAccount(2, 0);
         pair.initialize(0);
 
         vm.resumeGasMetering();
@@ -139,7 +139,7 @@ contract AddLiquidityTest is Test, Engine {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 8);
-        Accounts.Account memory account = Accounts.newAccount(1, 0);
+        Accounts.Account memory account = Accounts.newAccount(2, 0);
         pair.initialize(0);
 
         vm.resumeGasMetering();
@@ -159,7 +159,7 @@ contract AddLiquidityTest is Test, Engine {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 0);
+        Accounts.Account memory account = Accounts.newAccount(2, 0);
         pair.initialize(0);
 
         vm.resumeGasMetering();
@@ -180,7 +180,7 @@ contract AddLiquidityTest is Test, Engine {
         vm.pauseGasMetering();
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(address(1), address(2), 0);
-        Accounts.Account memory account = Accounts.newAccount(1, 0);
+        Accounts.Account memory account = Accounts.newAccount(2, 0);
         pair.initialize(0);
         pair.strikes[2].liquidityGrowthSpreadX128[0].liquidityGrowthX128 = 2 * Q128;
 

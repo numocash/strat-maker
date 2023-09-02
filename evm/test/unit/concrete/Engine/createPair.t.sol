@@ -7,7 +7,7 @@ import {Engine} from "src/core/Engine.sol";
 import {Pairs} from "src/core/Pairs.sol";
 import {MIN_STRIKE, MAX_STRIKE} from "src/core/math/StrikeMath.sol";
 
-contract CreatePairTest is Test, Engine {
+contract CreatePairTest is Test, Engine(payable(address(0))) {
     using Pairs for Pairs.Pair;
     using Pairs for mapping(bytes32 => Pairs.Pair);
 

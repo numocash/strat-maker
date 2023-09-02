@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {Engine} from "src/core/Engine.sol";
 import {Pairs, NUM_SPREADS} from "src/core/Pairs.sol";
 
-contract GetPairTest is Test, Engine {
+contract GetPairTest is Test, Engine(payable(address(0))) {
     using Pairs for Pairs.Pair;
     using Pairs for mapping(bytes32 => Pairs.Pair);
 

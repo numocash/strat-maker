@@ -32,7 +32,7 @@ contract AddLiquidityTest is Test, IExecuteCallback {
     uint256 private amount1;
 
     function setUp() external {
-        engine = new Engine();
+        engine = new Engine(payable(address(0)));
         mockERC20_0 = new MockERC20();
         mockERC20_1 = new MockERC20();
     }
@@ -62,7 +62,7 @@ contract AddLiquidityTest is Test, IExecuteCallback {
         emit AddLiquidity(Pairs.getPairID(address(mockERC20_0), address(mockERC20_1), 0), 0, 1, 1e18, amount0, 0);
         vm.resumeGasMetering();
 
-        Accounts.Account memory accounts = engine.execute(address(this), commandInputs, 1, 0, bytes(""));
+        Accounts.Account memory accounts = engine.execute(address(this), commandInputs, 2, 0, bytes(""));
 
         vm.pauseGasMetering();
 
@@ -102,13 +102,13 @@ contract AddLiquidityTest is Test, IExecuteCallback {
 
         amount0 = getAmount0(1e18, getRatioAtStrike(0), 0, true);
 
-        engine.execute(address(this), commandInputs, 1, 0, bytes(""));
+        engine.execute(address(this), commandInputs, 2, 0, bytes(""));
 
         vm.expectEmit(true, true, true, true);
         emit AddLiquidity(Pairs.getPairID(address(mockERC20_0), address(mockERC20_1), 0), 0, 1, 1e18, amount0, 0);
         vm.resumeGasMetering();
 
-        Accounts.Account memory accounts = engine.execute(address(this), commandInputs, 1, 0, bytes(""));
+        Accounts.Account memory accounts = engine.execute(address(this), commandInputs, 2, 0, bytes(""));
 
         vm.pauseGasMetering();
 

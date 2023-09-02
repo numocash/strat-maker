@@ -34,7 +34,7 @@ contract RepayLiquidityTest is Test, IExecuteCallback {
     uint128 private amountBuffer;
 
     function setUp() external {
-        engine = new Engine();
+        engine = new Engine(payable(address(0)));
         mockERC20_0 = new MockERC20();
         mockERC20_1 = new MockERC20();
     }
@@ -64,7 +64,7 @@ contract RepayLiquidityTest is Test, IExecuteCallback {
 
         amount0 = getAmount0(1e18, getRatioAtStrike(0), 0, true);
 
-        engine.execute(address(this), commandInputs, 1, 0, bytes(""));
+        engine.execute(address(this), commandInputs, 2, 0, bytes(""));
 
         delete commandInputs;
         delete amount0;
@@ -152,7 +152,7 @@ contract RepayLiquidityTest is Test, IExecuteCallback {
 
         amount0 = getAmount0(1e18, getRatioAtStrike(0), 0, true);
 
-        engine.execute(address(this), commandInputs, 1, 0, bytes(""));
+        engine.execute(address(this), commandInputs, 2, 0, bytes(""));
 
         delete commandInputs;
         delete amount0;
