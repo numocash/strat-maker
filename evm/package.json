@@ -15,7 +15,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "rome": "^12.1.3"
+    "rome": "^12.1.3",
+    "solmate": "^6.2.0"
   },
   "devDependencies": {
     "husky": "^8.0.3",

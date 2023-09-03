@@ -20,6 +20,9 @@ importers:
       rome:
         specifier: ^12.1.3
         version: 12.1.3
+      solmate:
+        specifier: ^6.2.0
+        version: 6.2.0
     devDependencies:
       husky:
         specifier: ^8.0.3
@@ -2254,6 +2257,10 @@ packages:
     optionalDependencies:
       prettier: 2.8.8
     dev: true
+
+  /solmate@6.2.0:
+    resolution: {integrity: sha512-AM38ioQ2P8zRsA42zenb9or6OybRjOLXIu3lhIT8rhddUuduCt76pUEuLxOIg9GByGojGz+EbpFdCB6B+QZVVA==}
+    dev: false
 
   /source-map-js@1.0.2:
     resolution: {integrity: sha512-R0XvVJ9WusLiqTCEiGCmICCMplcCkIwwR11mOSD9CR5u+IXYdiseeEuXCVAjS54zqwkLcPNnmU4OeJ6tUrWhDw==}
