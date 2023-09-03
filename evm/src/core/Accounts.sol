@@ -2,7 +2,8 @@
 pragma solidity ^0.8.19;
 
 import {Engine} from "./Engine.sol";
-import {BalanceLib} from "src/libraries/BalanceLib.sol";
+
+import {ERC20} from "solmate/src/tokens/ERC20.sol";
 
 /// @title Accounts
 /// @notice Library for storing and updating intermediate balance changes in memory
@@ -118,7 +119,7 @@ library Accounts {
         unchecked {
             for (uint256 i = 0; i < account.erc20Data.length; i++) {
                 if (account.erc20Data[i].balanceDelta > 0) {
-                    account.erc20Data[i].balanceBefore = BalanceLib.getBalance(account.erc20Data[i].token);
+                    account.erc20Data[i].balanceBefore = ERC20(account.erc20Data[i].token).balanceOf(address(this));
                 }
             }
         }

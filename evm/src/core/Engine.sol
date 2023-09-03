@@ -22,10 +22,9 @@ import {
 } from "./math/PositionMath.sol";
 import {getRatioAtStrike} from "./math/StrikeMath.sol";
 
+import {ERC20} from "solmate/src/tokens/ERC20.sol";
+import {SafeTransferLib} from "solmate/src/utils/SafeTransferLib.sol";
 import {WETH} from "solmate/src/tokens/WETH.sol";
-
-import {BalanceLib} from "src/libraries/BalanceLib.sol";
-import {SafeTransferLib} from "src/libraries/SafeTransferLib.sol";
 
 import {IExecuteCallback} from "./interfaces/IExecuteCallback.sol";
 
@@ -335,7 +334,7 @@ contract Engine is Positions {
             address token = account.erc20Data[i].token;
 
             if (token == address(0)) break;
-            if (balanceDelta < 0) SafeTransferLib.safeTransfer(token, to, uint256(-balanceDelta));
+            if (balanceDelta < 0) SafeTransferLib.safeTransfer(ERC20(token), to, uint256(-balanceDelta));
 
             unchecked {
                 i++;
@@ -354,7 +353,7 @@ contract Engine is Positions {
 
             if (token == address(0)) break;
             if (balanceDelta > 0) {
-                uint256 balance = BalanceLib.getBalance(token);
+                uint256 balance = ERC20(token).balanceOf(address(this));
                 if (balance < account.erc20Data[i].balanceBefore + uint256(balanceDelta)) revert InsufficientInput();
             }
 
