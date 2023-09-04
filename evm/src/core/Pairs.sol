@@ -254,7 +254,7 @@ library Pairs {
                         uint256 _liquiditySwapSpread = state.liquiditySwapSpread[i];
                         uint256 liquidityRemainingSpread =
                             mulDiv(state.liquidityRemaining, _liquiditySwapSpread, state.liquidityTotal);
-                        uint256 liquidityNew = ((i + 1) * (_liquiditySwapSpread - liquidityRemainingSpread)) / 10_000;
+                        uint256 liquidityNew = ((i + 1) * (_liquiditySwapSpread - liquidityRemainingSpread)) / 1_000_000;
 
                         _updateLiqudityGrowth(
                             pair.strikes[spreadStrike].liquidityGrowthSpreadX128[i],
@@ -609,7 +609,7 @@ library Pairs {
                     // can only overflow when (i + 1) * blocks > type(uint128).max
                     uint256 fee = (i + 1) * blocks;
                     uint256 liquidityAccruedSpread =
-                        fee >= 10_000 ? liquidityBorrowed : (fee * uint256(liquidityBorrowed)) / 10_000;
+                        fee >= 2_000_000 ? liquidityBorrowed : (fee * uint256(liquidityBorrowed)) / 2_000_000;
 
                     liquidityAccrued += liquidityAccruedSpread;
                     liquidityBorrowedTotal += liquidityBorrowed;

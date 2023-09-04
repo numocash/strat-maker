@@ -44,8 +44,8 @@ contract AccrueTest is Test, Engine(payable(address(0))) {
         vm.pauseGasMetering();
 
         assertEq(pair.strikes[0].blockLast, 1);
-        assertEq(pair.strikes[0].liquidity[0].swap, 0.5e18 + 0.5e18 / 10_000);
-        assertEq(pair.strikes[0].liquidity[0].borrowed, 0.5e18 - 0.5e18 / 10_000);
+        assertEq(pair.strikes[0].liquidity[0].swap, 0.5e18 + 0.5e18 / 2_000_000);
+        assertEq(pair.strikes[0].liquidity[0].borrowed, 0.5e18 - 0.5e18 / 2_000_000);
 
         vm.resumeGasMetering();
     }

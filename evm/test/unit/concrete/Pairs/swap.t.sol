@@ -227,7 +227,7 @@ contract SwapTest is Test {
 
         (,, uint256 liquidityRemaining) = computeSwapStep(getRatioAtStrike(0), 1e18 - 1, true, 0.5e18);
 
-        uint256 liquidityNew = uint256(1e18 - liquidityRemaining - 1) / 10_000;
+        uint256 liquidityNew = uint256(1e18 - liquidityRemaining - 1) / 1_000_000;
         uint256 liquidityGrowth = Q128 + (liquidityNew * Q128) / (1e18);
         assertEq(pair.strikes[1].liquidityGrowthSpreadX128[0].liquidityGrowthX128, liquidityGrowth);
 
@@ -251,7 +251,7 @@ contract SwapTest is Test {
 
         (,, uint256 liquidityRemaining) = computeSwapStep(getRatioAtStrike(0), 1e18 - 1, false, 0.5e18);
 
-        uint256 liquidityNew = uint256(1e18 - liquidityRemaining - 1) / 10_000;
+        uint256 liquidityNew = uint256(1e18 - liquidityRemaining - 1) / 1_000_000;
         uint256 liquidityGrowth = Q128 + (liquidityNew * Q128) / (1e18);
         assertEq(pair.strikes[1].liquidityGrowthSpreadX128[0].liquidityGrowthX128, liquidityGrowth);
 
@@ -281,11 +281,11 @@ contract SwapTest is Test {
 
         (,, uint256 liquidityRemaining) = computeSwapStep(getRatioAtStrike(0), 1e18 - 1, false, 0.5e18);
 
-        uint256 liquidityNew = uint256(1e18 - (liquidityRemaining / 2) - 1) / 10_000;
+        uint256 liquidityNew = uint256(1e18 - (liquidityRemaining / 2) - 1) / 1_000_000;
         uint256 liquidityGrowth = Q128 + (liquidityNew * Q128) / (1e18);
         assertEq(pair.strikes[-1].liquidityGrowthSpreadX128[0].liquidityGrowthX128, liquidityGrowth);
 
-        liquidityNew = uint256(1e18 - (liquidityRemaining / 2) - 1) / 5000;
+        liquidityNew = uint256(1e18 - (liquidityRemaining / 2) - 1) / 500_000;
         liquidityGrowth = Q128 + (liquidityNew * Q128) / (1e18);
         assertEq(pair.strikes[-2].liquidityGrowthSpreadX128[1].liquidityGrowthX128, liquidityGrowth);
 
