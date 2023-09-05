@@ -606,6 +606,10 @@ contract Engine is Positions {
                 ((liquidityCollateral - params.amountDesiredDebt) * Q128) / params.amountDesiredDebt;
             if (_multiplierX128 > type(uint136).max || _multiplierX128 < MIN_MULTIPLIER) revert InvalidAmountDesired();
 
+            // update pair repay multiplier
+            pair.strikes[params.strike].liquidityRepayRateX128 +=
+                mulDiv(params.amountDesiredDebt, Q128, _multiplierX128);
+
             // mint position token
             _mint(
                 to,
@@ -646,6 +650,10 @@ contract Engine is Positions {
             // repay liqudity to pair
             if (liquidityDebt == 0) revert InvalidAmountDesired();
             pair.removeBorrowedLiquidity(params.strike, liquidityDebt);
+
+            // update pair repay multiplier
+            pair.strikes[params.strike].liquidityRepayRateX128 -=
+                mulDiv(params.amountDesired, Q128, params.multiplierX128);
 
             // calculate how much tokens to repay
             {
