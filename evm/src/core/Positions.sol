@@ -34,7 +34,7 @@ function debtID(
     int24 strike,
     Engine.TokenSelector selector,
     uint256 liquidityGrowthX128Last,
-    uint256 multiplierX128
+    uint136 multiplierX128
 )
     pure
     returns (bytes32)
@@ -120,7 +120,7 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
         int24 strike;
         Engine.TokenSelector selector;
         uint256 liquidityGrowthX128Last;
-        uint256 multiplierX128;
+        uint136 multiplierX128;
     }
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
@@ -189,7 +189,7 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
 
     /// @notice Transfer from `from` to `to` described by `transferDetails` if the allowance is adequate, else revert
     /// @dev Function selector is keccak256("transferFrom()")
-    function transferFrom_OEpkUx(
+    function transferFrom_OSclqX(
         address from,
         address to,
         ILRTATransferDetails calldata transferDetails

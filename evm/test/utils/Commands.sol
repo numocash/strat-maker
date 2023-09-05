@@ -47,7 +47,7 @@ function repayLiquidityCommand(
     int24 strike,
     Engine.TokenSelector selectorCollateral,
     uint256 liquidityGrowthX128Last,
-    uint256 multiplierX128,
+    uint136 multiplierX128,
     uint128 amountDesired
 )
     pure

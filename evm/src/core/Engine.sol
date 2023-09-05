@@ -24,6 +24,9 @@ import {WETH} from "solmate/src/tokens/WETH.sol";
 
 import {IExecuteCallback} from "./interfaces/IExecuteCallback.sol";
 
+// Multiplier corresponding to 2000x leverage
+uint256 constant MIN_MULTIPLIER = Q128 / 2000;
+
 /// @title Engine
 /// @notice ERC20 exchange protocol
 /// @author Kyle Scott and Robert Leifke
@@ -200,7 +203,7 @@ contract Engine is Positions {
         int24 strike;
         TokenSelector selectorCollateral;
         uint256 liquidityGrowthX128Last;
-        uint256 multiplierX128;
+        uint136 multiplierX128;
         uint128 amountDesired;
     }
 
@@ -599,8 +602,9 @@ contract Engine is Positions {
 
             // calculate how much to mint
             if (liquidityCollateral < params.amountDesiredDebt) revert InvalidAmountDesired();
-            uint256 multiplierX128 =
+            uint256 _multiplierX128 =
                 ((liquidityCollateral - params.amountDesiredDebt) * Q128) / params.amountDesiredDebt;
+            if (_multiplierX128 > type(uint136).max || _multiplierX128 < MIN_MULTIPLIER) revert InvalidAmountDesired();
 
             // mint position token
             _mint(
@@ -612,7 +616,7 @@ contract Engine is Positions {
                     params.strike,
                     params.selectorCollateral,
                     pair.strikes[params.strike].liquidityGrowthX128,
-                    multiplierX128
+                    uint136(_multiplierX128)
                 ),
                 params.amountDesiredDebt
             );

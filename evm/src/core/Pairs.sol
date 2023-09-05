@@ -47,6 +47,8 @@ library Pairs {
     /// @notice Data needed to represent a strike (constant sum automated market market with a fixed price)
     /// @param liquidityGrowthX128 Liquidity repaid per unit of borrowed liquidity
     /// @param liquidityGrowthSpreadX128 Liquidity repaid per unit of liquidty per spread
+    /// @param liquidityRepayRateX128 Rate at which liquidity is repaid, summation of balance / multiplier for all
+    /// positions
     /// @param liquidity Liquidity available
     /// @param blockLast The block where liquidity was accrued last
     /// @param next0To1 Strike where the next 0 to 1 swap is available, < this strike
@@ -56,6 +58,7 @@ library Pairs {
     /// @param activeSpread The spread index where liquidity is actively being borrowed from
     struct Strike {
         uint256 liquidityGrowthX128;
+        uint256 liquidityRepayRateX128;
         LiquidityGrowth[NUM_SPREADS] liquidityGrowthSpreadX128;
         Liquidity[NUM_SPREADS] liquidity;
         uint184 blockLast;
@@ -590,6 +593,7 @@ library Pairs {
 
     /// @notice Accrue liquidity for a strike and return the amount of liquidity that must be repaid
     /// @custom:team How to handle overflow
+    /// @custom:team Need to update to only accrue a maximum amount in order to cap leverage
     function accrue(Pair storage pair, int24 strike) internal returns (uint136) {
         unchecked {
             if (!pair.initialized) revert Initialized();
@@ -624,11 +628,10 @@ library Pairs {
 
             if (liquidityAccrued == 0) return 0;
 
-            // update liqudity growth exp
+            // update liqudity growth
             pair.strikes[strike].liquidityGrowthX128 += mulDiv(liquidityAccrued, Q128, liquidityBorrowedTotal);
 
-            // liquidityAccrued max value is NUM_SPREADS * type(uint128).max
-            return uint136(liquidityAccrued);
+            return uint136(mulDiv(pair.strikes[strike].liquidityRepayRateX128, liquidityAccrued, Q128));
         }
     }
 

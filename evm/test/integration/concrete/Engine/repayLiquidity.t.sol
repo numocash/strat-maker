@@ -85,11 +85,11 @@ contract RepayLiquidityTest is Test, IExecuteCallback {
         commandInputs = pushCommandInputs(
             commandInputs,
             repayLiquidityCommand(
-                address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, Q128, 0.5e18
+                address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, uint136(Q128), 0.5e18
             )
         );
 
-        id = debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, Q128);
+        id = debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, uint136(Q128));
         amountPosition = 0.5e18;
         amount0 = 0.5e18;
 
@@ -117,14 +117,14 @@ contract RepayLiquidityTest is Test, IExecuteCallback {
 
         Positions.ILRTAData memory position = engine.dataOf_cGJnTo(
             address(this),
-            debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, Q128)
+            debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, uint136(Q128))
         );
 
         assertEq(position.balance, 0);
 
         position = engine.dataOf_cGJnTo(
             address(engine),
-            debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, Q128)
+            debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, uint136(Q128))
         );
 
         assertEq(position.balance, 0);
@@ -172,11 +172,11 @@ contract RepayLiquidityTest is Test, IExecuteCallback {
         commandInputs = pushCommandInputs(
             commandInputs,
             repayLiquidityCommand(
-                address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, Q128, 0.25e18
+                address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, uint136(Q128), 0.25e18
             )
         );
 
-        id = debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, Q128);
+        id = debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, uint136(Q128));
         amountPosition = 0.25e18;
         amount0 = 0.25e18;
 
@@ -204,14 +204,14 @@ contract RepayLiquidityTest is Test, IExecuteCallback {
 
         Positions.ILRTAData memory position = engine.dataOf_cGJnTo(
             address(this),
-            debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, Q128)
+            debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, uint136(Q128))
         );
 
         assertEq(position.balance, 0.25e18);
 
         position = engine.dataOf_cGJnTo(
             address(engine),
-            debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, Q128)
+            debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, uint136(Q128))
         );
 
         assertEq(position.balance, 0);

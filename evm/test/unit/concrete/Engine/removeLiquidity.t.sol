@@ -46,6 +46,7 @@ contract RemoveLiquidityTest is Test, Engine(payable(address(0))) {
 
         pair.addSwapLiquidity(2, 1, 1e18);
         pair.addBorrowedLiquidity(2, 0.5e18);
+        pair.strikes[2].liquidityRepayRateX128 = Q128;
 
         vm.resumeGasMetering();
 

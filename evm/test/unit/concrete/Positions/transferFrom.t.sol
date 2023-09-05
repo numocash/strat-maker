@@ -22,7 +22,7 @@ contract TransferFromTest is Test {
     }
 
     function test_TransferFrom_Selector() external {
-        assertEq(Positions.transferFrom_OEpkUx.selector, bytes4(keccak256("transferFrom()")));
+        assertEq(Positions.transferFrom_OSclqX.selector, bytes4(keccak256("transferFrom()")));
     }
 
     function test_TransferFrom_Approved() external {
@@ -36,7 +36,7 @@ contract TransferFromTest is Test {
 
         vm.resumeGasMetering();
         vm.prank(cuh);
-        positions.transferFrom_OEpkUx(address(this), cuh, Positions.ILRTATransferDetails(0, 1e18));
+        positions.transferFrom_OSclqX(address(this), cuh, Positions.ILRTATransferDetails(0, 1e18));
         vm.pauseGasMetering();
 
         Positions.ILRTAData memory data = positions.dataOf_cGJnTo(address(this), 0);
@@ -52,6 +52,6 @@ contract TransferFromTest is Test {
 
     function test_TransferFrom_NotApproved() external {
         vm.expectRevert();
-        positions.transferFrom_OEpkUx(address(this), cuh, Positions.ILRTATransferDetails(0, 1));
+        positions.transferFrom_OSclqX(address(this), cuh, Positions.ILRTATransferDetails(0, 1));
     }
 }

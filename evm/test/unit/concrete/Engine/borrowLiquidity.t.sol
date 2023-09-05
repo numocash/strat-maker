@@ -50,6 +50,7 @@ contract BorrowLiquidityTest is Test, Engine(payable(address(0))) {
 
         pair.addSwapLiquidity(0, 1, 1e18);
         pair.addBorrowedLiquidity(0, 0.5e18);
+        pair.strikes[0].liquidityRepayRateX128 = Q128;
 
         vm.resumeGasMetering();
 
@@ -134,7 +135,7 @@ contract BorrowLiquidityTest is Test, Engine(payable(address(0))) {
         vm.pauseGasMetering();
 
         Positions.ILRTAData memory data =
-            _dataOf[address(this)][debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token1, 0, Q128)];
+            _dataOf[address(this)][debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token1, 0, uint136(Q128))];
 
         assertEq(data.balance, 0.5e18);
 
@@ -161,8 +162,9 @@ contract BorrowLiquidityTest is Test, Engine(payable(address(0))) {
 
         vm.pauseGasMetering();
 
-        Positions.ILRTAData memory data =
-            _dataOf[address(this)][debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token1, 2 * Q128, Q128)];
+        Positions.ILRTAData memory data = _dataOf[address(this)][debtID(
+            address(1), address(2), 0, 0, Engine.TokenSelector.Token1, 2 * Q128, uint136(Q128)
+        )];
 
         assertEq(data.balance, 0.5e18);
 
@@ -189,7 +191,7 @@ contract BorrowLiquidityTest is Test, Engine(payable(address(0))) {
         vm.pauseGasMetering();
 
         Positions.ILRTAData memory data =
-            _dataOf[address(this)][debtID(address(1), address(2), 8, 0, Engine.TokenSelector.Token1, 0, Q128)];
+            _dataOf[address(this)][debtID(address(1), address(2), 8, 0, Engine.TokenSelector.Token1, 0, uint136(Q128))];
 
         assertEq(data.balance, 0.5e18);
 

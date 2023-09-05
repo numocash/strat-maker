@@ -163,7 +163,7 @@ contract ExecuteCallbackTest is Test {
         callbackData.signatureTransfer.transferDetails = new Permit3.TransferDetails[](1);
         callbackData.signatureTransfer.transferDetails[0].token = address(mockPositions);
         callbackData.signatureTransfer.transferDetails[0].tokenType = Permit3.TokenType.ILRTA;
-        callbackData.signatureTransfer.transferDetails[0].functionSelector = Positions.transferFrom_OEpkUx.selector;
+        callbackData.signatureTransfer.transferDetails[0].functionSelector = Positions.transferFrom_OSclqX.selector;
         callbackData.signatureTransfer.transferDetails[0].transferDetails = abi.encode(account.lpData[0]);
         callbackData.signatureTransfer.nonce = 0;
         callbackData.signatureTransfer.deadline = block.timestamp;
@@ -207,7 +207,7 @@ contract ExecuteCallbackTest is Test {
         callbackData.signatureTransfer.transferDetails = new Permit3.TransferDetails[](1);
         callbackData.signatureTransfer.transferDetails[0].token = address(mockPositions);
         callbackData.signatureTransfer.transferDetails[0].tokenType = Permit3.TokenType.ILRTA;
-        callbackData.signatureTransfer.transferDetails[0].functionSelector = Positions.transferFrom_OEpkUx.selector;
+        callbackData.signatureTransfer.transferDetails[0].functionSelector = Positions.transferFrom_OSclqX.selector;
         callbackData.signatureTransfer.transferDetails[0].transferDetails = abi.encode(account.lpData[0]);
         callbackData.signatureTransfer.nonce = 0;
         callbackData.signatureTransfer.deadline = block.timestamp;

@@ -98,7 +98,7 @@ contract BorrowLiquidityTest is Test, IExecuteCallback {
 
         Positions.ILRTAData memory position = engine.dataOf_cGJnTo(
             address(this),
-            debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, Q128)
+            debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, uint136(Q128))
         );
 
         assertEq(position.balance, 0.5e18);
@@ -165,7 +165,7 @@ contract BorrowLiquidityTest is Test, IExecuteCallback {
 
         Positions.ILRTAData memory position = engine.dataOf_cGJnTo(
             address(this),
-            debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, Q128)
+            debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, uint136(Q128))
         );
 
         assertEq(position.balance, 1e18);
