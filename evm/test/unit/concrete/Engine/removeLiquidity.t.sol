@@ -79,9 +79,7 @@ contract RemoveLiquidityTest is Test, Engine(payable(address(0))) {
         assertEq(pair.strikes[2].liquidity[0].swap, 0);
 
         assertEq(account.lpData[0].id, biDirectionalID(address(1), address(2), 0, 2, 1));
-        assertEq(uint8(account.lpData[0].orderType), uint8(Engine.OrderType.BiDirectional));
         assertEq(account.lpData[0].amountBurned, 1e18);
-        assertEq(account.lpData[0].amountBuffer, 0);
 
         vm.resumeGasMetering();
     }
@@ -106,9 +104,7 @@ contract RemoveLiquidityTest is Test, Engine(payable(address(0))) {
         assertEq(pair.strikes[2].liquidity[0].swap, 0);
 
         assertEq(account.lpData[0].id, biDirectionalID(address(1), address(2), 0, 2, 1));
-        assertEq(uint8(account.lpData[0].orderType), uint8(Engine.OrderType.BiDirectional));
         assertEq(account.lpData[0].amountBurned, 1e18);
-        assertEq(account.lpData[0].amountBuffer, 0);
 
         vm.resumeGasMetering();
     }
@@ -134,7 +130,7 @@ contract RemoveLiquidityTest is Test, Engine(payable(address(0))) {
         pair.initialize(0);
 
         pair.addSwapLiquidity(2, 1, 1e18);
-        _mintBiDirectional(address(this), address(1), address(2), 0, 2, 1, 1e18);
+        _mint(address(this), biDirectionalID(address(1), address(2), 0, 2, 1), 1e18);
 
         vm.resumeGasMetering();
 
@@ -183,7 +179,7 @@ contract RemoveLiquidityTest is Test, Engine(payable(address(0))) {
         pair.initialize(0);
 
         pair.addSwapLiquidity(2, 1, 1e18);
-        _mintBiDirectional(address(this), address(1), address(2), 0, 2, 1, 1e18);
+        _mint(address(this), biDirectionalID(address(1), address(2), 0, 2, 1), 1e18);
 
         vm.resumeGasMetering();
 
@@ -207,7 +203,7 @@ contract RemoveLiquidityTest is Test, Engine(payable(address(0))) {
         pair.initialize(0);
 
         pair.addSwapLiquidity(2, 1, 1e18);
-        _mintBiDirectional(address(this), address(1), address(2), 8, 2, 1, 1e18);
+        _mint(address(this), biDirectionalID(address(1), address(2), 8, 2, 1), 1e18);
 
         vm.resumeGasMetering();
 

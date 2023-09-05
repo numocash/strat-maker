@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {MockPositions} from "../../../mocks/MockPositions.sol";
 import {Positions} from "src/core/Positions.sol";
 
-contract BurnTest is Test {
+contract MintTest is Test {
     event Transfer(address indexed from, address indexed to, bytes transferDetailsBytes);
 
     MockPositions private positions;
@@ -15,44 +15,38 @@ contract BurnTest is Test {
         positions = new MockPositions();
     }
 
-    function test_Burn_Full() external {
+    function test_Mint_Cold() external {
         vm.pauseGasMetering();
 
-        positions.mint(address(this), 0, 1e18);
-
         vm.expectEmit(true, true, false, true);
-        emit Transfer(address(this), address(0), abi.encode(Positions.ILRTATransferDetails(0, 1e18)));
+        emit Transfer(address(0), address(this), abi.encode(Positions.ILRTATransferDetails(0, 1e18)));
 
         vm.resumeGasMetering();
-
-        positions.burn(address(this), 0, 1e18);
-
+        positions.mint(address(this), 0, 1e18);
         vm.pauseGasMetering();
 
         Positions.ILRTAData memory data = positions.dataOf_cGJnTo(address(this), 0);
 
-        assertEq(data.balance, 0);
+        assertEq(data.balance, 1e18);
 
         vm.resumeGasMetering();
     }
 
-    function test_Burn_Partial() external {
+    function test_Mint_Hot() external {
         vm.pauseGasMetering();
 
         positions.mint(address(this), 0, 1e18);
 
         vm.expectEmit(true, true, false, true);
-        emit Transfer(address(this), address(0), abi.encode(Positions.ILRTATransferDetails(0, 0.5e18)));
+        emit Transfer(address(0), address(this), abi.encode(Positions.ILRTATransferDetails(0, 1e18)));
 
         vm.resumeGasMetering();
-
-        positions.burn(address(this), 0, 0.5e18);
-
+        positions.mint(address(this), 0, 1e18);
         vm.pauseGasMetering();
 
         Positions.ILRTAData memory data = positions.dataOf_cGJnTo(address(this), 0);
 
-        assertEq(data.balance, 0.5e18);
+        assertEq(data.balance, 2e18);
 
         vm.resumeGasMetering();
     }

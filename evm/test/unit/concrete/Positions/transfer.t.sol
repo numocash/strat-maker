@@ -1,11 +1,10 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
 
 import {MockPositions} from "../../../mocks/MockPositions.sol";
-import {Positions, biDirectionalID, debtID} from "src/core/Positions.sol";
-import {Engine} from "src/core/Engine.sol";
+import {Positions} from "src/core/Positions.sol";
 
 contract TransferTest is Test {
     event Transfer(address indexed from, address indexed to, bytes transferDetailsBytes);
@@ -23,279 +22,97 @@ contract TransferTest is Test {
     }
 
     function test_Transfer_Selector() external {
-        assertEq(Positions.transfer_AjLAUd.selector, bytes4(keccak256("transfer()")));
+        assertEq(Positions.transfer_oHLEec.selector, bytes4(keccak256("transfer()")));
     }
 
     /// @notice Transfer more tokens than you have, causing a revert
     function test_Transfer_Underflow() external {
         vm.pauseGasMetering();
 
-        positions.mintBiDirectional(address(this), address(1), address(2), 0, 0, 1, 1e18);
+        positions.mint(address(this), 0, 1e18);
 
         vm.expectRevert();
         vm.resumeGasMetering();
-        positions.transfer_AjLAUd(
-            cuh,
-            Positions.ILRTATransferDetails(
-                biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 1e18 + 1, 0
-            )
-        );
+        positions.transfer_oHLEec(cuh, Positions.ILRTATransferDetails(0, 1e18 + 1));
     }
 
     function test_Transfer_Overflow() external {
         vm.pauseGasMetering();
 
-        positions.mintBiDirectional(address(this), address(1), address(2), 0, 0, 1, 1e18);
-        positions.mintBiDirectional(cuh, address(1), address(2), 0, 0, 1, type(uint128).max);
+        positions.mint(address(this), 0, 1e18);
+        positions.mint(cuh, 0, type(uint128).max);
 
         vm.expectRevert();
         vm.resumeGasMetering();
-        positions.transfer_AjLAUd(
-            cuh,
-            Positions.ILRTATransferDetails(
-                biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 1e18, 0
-            )
-        );
+        positions.transfer_oHLEec(cuh, Positions.ILRTATransferDetails(0, 1e18));
     }
 
-    function test_Transfer_BiDirectionalFull() external {
+    function test_Transfer_Full() external {
         vm.pauseGasMetering();
 
-        positions.mintBiDirectional(address(this), address(1), address(2), 0, 0, 1, 1e18);
+        positions.mint(address(this), 0, 1e18);
 
         vm.expectEmit(true, true, false, true);
-        emit Transfer(
-            address(this),
-            cuh,
-            abi.encode(
-                Positions.ILRTATransferDetails(
-                    biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 1e18, 0
-                )
-            )
-        );
+        emit Transfer(address(this), cuh, abi.encode(Positions.ILRTATransferDetails(0, 1e18)));
 
         vm.resumeGasMetering();
-        positions.transfer_AjLAUd(
-            cuh,
-            Positions.ILRTATransferDetails(
-                biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 1e18, 0
-            )
-        );
+        positions.transfer_oHLEec(cuh, Positions.ILRTATransferDetails(0, 1e18));
         vm.pauseGasMetering();
 
-        Positions.ILRTAData memory data =
-            positions.dataOf_cGJnTo(address(this), biDirectionalID(address(1), address(2), 0, 0, 1));
+        Positions.ILRTAData memory data = positions.dataOf_cGJnTo(address(this), 0);
 
         assertEq(data.balance, 0);
-        assertEq(data.buffer, 0);
 
-        data = positions.dataOf_cGJnTo(cuh, biDirectionalID(address(1), address(2), 0, 0, 1));
-
-        assertEq(data.balance, 1e18);
-        assertEq(data.buffer, 0);
-
-        vm.resumeGasMetering();
-    }
-
-    function test_Transfer_BiDirectional_PartialCold() external {
-        vm.pauseGasMetering();
-
-        positions.mintBiDirectional(address(this), address(1), address(2), 0, 0, 1, 1e18);
-
-        vm.expectEmit(true, true, false, true);
-        emit Transfer(
-            address(this),
-            cuh,
-            abi.encode(
-                Positions.ILRTATransferDetails(
-                    biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 0.5e18, 0
-                )
-            )
-        );
-
-        vm.resumeGasMetering();
-        positions.transfer_AjLAUd(
-            cuh,
-            Positions.ILRTATransferDetails(
-                biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 0.5e18, 0
-            )
-        );
-        vm.pauseGasMetering();
-
-        Positions.ILRTAData memory data =
-            positions.dataOf_cGJnTo(address(this), biDirectionalID(address(1), address(2), 0, 0, 1));
-
-        assertEq(data.balance, 0.5e18);
-        assertEq(data.buffer, 0);
-
-        data = positions.dataOf_cGJnTo(cuh, biDirectionalID(address(1), address(2), 0, 0, 1));
-
-        assertEq(data.balance, 0.5e18);
-        assertEq(data.buffer, 0);
-
-        vm.resumeGasMetering();
-    }
-
-    function test_Transfer_BiDirectionalPartialHot() external {
-        vm.pauseGasMetering();
-
-        positions.mintBiDirectional(address(this), address(1), address(2), 0, 0, 1, 1e18);
-        positions.mintBiDirectional(cuh, address(1), address(2), 0, 0, 1, 1e18);
-
-        vm.expectEmit(true, true, false, true);
-        emit Transfer(
-            address(this),
-            cuh,
-            abi.encode(
-                Positions.ILRTATransferDetails(
-                    biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 0.5e18, 0
-                )
-            )
-        );
-
-        vm.resumeGasMetering();
-        positions.transfer_AjLAUd(
-            cuh,
-            Positions.ILRTATransferDetails(
-                biDirectionalID(address(1), address(2), 0, 0, 1), Engine.OrderType.BiDirectional, 0.5e18, 0
-            )
-        );
-        vm.pauseGasMetering();
-
-        Positions.ILRTAData memory data =
-            positions.dataOf_cGJnTo(address(this), biDirectionalID(address(1), address(2), 0, 0, 1));
-
-        assertEq(data.balance, 0.5e18);
-        assertEq(data.buffer, 0);
-
-        data = positions.dataOf_cGJnTo(cuh, biDirectionalID(address(1), address(2), 0, 0, 1));
-
-        assertEq(data.balance, 1.5e18);
-        assertEq(data.buffer, 0);
-
-        vm.resumeGasMetering();
-    }
-
-    function test_Transfer_DebtFull() external {
-        vm.pauseGasMetering();
-
-        positions.mintDebt(address(this), address(1), address(2), 0, 0, Engine.TokenSelector.Token0, 1e18, 1e18);
-
-        vm.expectEmit(true, true, false, true);
-        emit Transfer(
-            address(this),
-            cuh,
-            abi.encode(
-                Positions.ILRTATransferDetails(
-                    debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0), Engine.OrderType.Debt, 1e18, 1e18
-                )
-            )
-        );
-
-        vm.resumeGasMetering();
-        positions.transfer_AjLAUd(
-            cuh,
-            Positions.ILRTATransferDetails(
-                debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0), Engine.OrderType.Debt, 1e18, 1e18
-            )
-        );
-        vm.pauseGasMetering();
-
-        Positions.ILRTAData memory data =
-            positions.dataOf_cGJnTo(address(this), debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0));
-
-        assertEq(data.balance, 0);
-        assertEq(data.buffer, 0);
-
-        data = positions.dataOf_cGJnTo(cuh, debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0));
+        data = positions.dataOf_cGJnTo(cuh, 0);
 
         assertEq(data.balance, 1e18);
-        assertEq(data.buffer, 1e18);
 
         vm.resumeGasMetering();
     }
 
-    function test_Transfer_DebtPartialCold() external {
+    function test_Transfer_PartialCold() external {
         vm.pauseGasMetering();
 
-        positions.mintDebt(address(this), address(1), address(2), 0, 0, Engine.TokenSelector.Token0, 1e18, 1e18);
+        positions.mint(address(this), 0, 1e18);
 
         vm.expectEmit(true, true, false, true);
-        emit Transfer(
-            address(this),
-            cuh,
-            abi.encode(
-                Positions.ILRTATransferDetails(
-                    debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0),
-                    Engine.OrderType.Debt,
-                    0.5e18,
-                    0.5e18
-                )
-            )
-        );
+        emit Transfer(address(this), cuh, abi.encode(Positions.ILRTATransferDetails(0, 0.5e18)));
 
         vm.resumeGasMetering();
-        positions.transfer_AjLAUd(
-            cuh,
-            Positions.ILRTATransferDetails(
-                debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0), Engine.OrderType.Debt, 0.5e18, 0.5e18
-            )
-        );
+        positions.transfer_oHLEec(cuh, Positions.ILRTATransferDetails(0, 0.5e18));
         vm.pauseGasMetering();
 
-        Positions.ILRTAData memory data =
-            positions.dataOf_cGJnTo(address(this), debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0));
+        Positions.ILRTAData memory data = positions.dataOf_cGJnTo(address(this), 0);
 
         assertEq(data.balance, 0.5e18);
-        assertEq(data.buffer, 0.5e18);
 
-        data = positions.dataOf_cGJnTo(cuh, debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0));
+        data = positions.dataOf_cGJnTo(cuh, 0);
 
         assertEq(data.balance, 0.5e18);
-        assertEq(data.buffer, 0.5e18);
 
         vm.resumeGasMetering();
     }
 
-    function test_Transfer_DebtPartialHot() external {
+    function test_Transfer_PartialHot() external {
         vm.pauseGasMetering();
 
-        positions.mintDebt(address(this), address(1), address(2), 0, 0, Engine.TokenSelector.Token0, 1e18, 1e18);
-        positions.mintDebt(cuh, address(1), address(2), 0, 0, Engine.TokenSelector.Token0, 1e18, 1e18);
+        positions.mint(address(this), 0, 1e18);
+        positions.mint(cuh, 0, 1e18);
 
         vm.expectEmit(true, true, false, true);
-        emit Transfer(
-            address(this),
-            cuh,
-            abi.encode(
-                Positions.ILRTATransferDetails(
-                    debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0),
-                    Engine.OrderType.Debt,
-                    0.5e18,
-                    0.5e18
-                )
-            )
-        );
+        emit Transfer(address(this), cuh, abi.encode(Positions.ILRTATransferDetails(0, 0.5e18)));
 
         vm.resumeGasMetering();
-        positions.transfer_AjLAUd(
-            cuh,
-            Positions.ILRTATransferDetails(
-                debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0), Engine.OrderType.Debt, 0.5e18, 0.5e18
-            )
-        );
+        positions.transfer_oHLEec(cuh, Positions.ILRTATransferDetails(0, 0.5e18));
         vm.pauseGasMetering();
 
-        Positions.ILRTAData memory data =
-            positions.dataOf_cGJnTo(address(this), debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0));
+        Positions.ILRTAData memory data = positions.dataOf_cGJnTo(address(this), 0);
 
         assertEq(data.balance, 0.5e18);
-        assertEq(data.buffer, 0.5e18);
 
-        data = positions.dataOf_cGJnTo(cuh, debtID(address(1), address(2), 0, 0, Engine.TokenSelector.Token0));
+        data = positions.dataOf_cGJnTo(cuh, 0);
 
         assertEq(data.balance, 1.5e18);
-        assertEq(data.buffer, 1.5e18);
 
         vm.resumeGasMetering();
     }

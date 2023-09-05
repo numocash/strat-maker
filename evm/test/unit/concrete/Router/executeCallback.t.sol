@@ -4,7 +4,6 @@ pragma solidity ^0.8.0;
 import {Test} from "forge-std/Test.sol";
 
 import {Accounts} from "src/core/Accounts.sol";
-import {Engine} from "src/core/Engine.sol";
 import {Permit3} from "ilrta/Permit3.sol";
 import {Router} from "src/periphery/Router.sol";
 
@@ -142,9 +141,7 @@ contract ExecuteCallbackTest is Test {
 
         Accounts.Account memory account = Accounts.newAccount(0, 1);
         account.lpData[0].id = bytes32(uint256(2));
-        account.lpData[0].orderType = Engine.OrderType.Debt;
         account.lpData[0].amountBurned = 1e18;
-        account.lpData[0].amountBuffer = 2e18;
 
         Router.CallbackData memory callbackData;
         callbackData.signatureTransfer.transferDetails = new Permit3.TransferDetails[](1);
@@ -173,13 +170,9 @@ contract ExecuteCallbackTest is Test {
 
         Accounts.Account memory account = Accounts.newAccount(0, 2);
         account.lpData[0].id = bytes32(uint256(2));
-        account.lpData[0].orderType = Engine.OrderType.Debt;
         account.lpData[0].amountBurned = 1e18;
-        account.lpData[0].amountBuffer = 2e18;
         account.lpData[1].id = bytes32(uint256(3));
-        account.lpData[1].orderType = Engine.OrderType.Debt;
         account.lpData[1].amountBurned = 2e18;
-        account.lpData[1].amountBuffer = 3e18;
 
         Router.CallbackData memory callbackData;
         callbackData.signatureTransfer.transferDetails = new Permit3.TransferDetails[](2);

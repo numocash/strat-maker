@@ -171,7 +171,6 @@ contract AddLiquidityTest is Test, Engine(payable(address(0))) {
         Positions.ILRTAData memory data = _dataOf[address(this)][biDirectionalID(address(1), address(2), 0, 2, 1)];
 
         assertEq(data.balance, 1e18);
-        assertEq(data.buffer, 0);
 
         vm.resumeGasMetering();
     }
@@ -193,7 +192,6 @@ contract AddLiquidityTest is Test, Engine(payable(address(0))) {
         Positions.ILRTAData memory data = _dataOf[address(this)][biDirectionalID(address(1), address(2), 0, 2, 1)];
 
         assertEq(data.balance, 0.5e18);
-        assertEq(data.buffer, 0);
 
         vm.resumeGasMetering();
     }

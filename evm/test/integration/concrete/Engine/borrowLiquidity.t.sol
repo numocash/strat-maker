@@ -17,7 +17,7 @@ import {Accounts} from "src/core/Accounts.sol";
 import {Pairs} from "src/core/Pairs.sol";
 import {Positions, debtID} from "src/core/Positions.sol";
 import {getAmount0} from "src/core/math/LiquidityMath.sol";
-import {getRatioAtStrike} from "src/core/math/StrikeMath.sol";
+import {getRatioAtStrike, Q128} from "src/core/math/StrikeMath.sol";
 import {IExecuteCallback} from "src/core/interfaces/IExecuteCallback.sol";
 
 contract BorrowLiquidityTest is Test, IExecuteCallback {
@@ -97,11 +97,11 @@ contract BorrowLiquidityTest is Test, IExecuteCallback {
         assertEq(mockERC20_1.balanceOf(address(engine)), 1e18);
 
         Positions.ILRTAData memory position = engine.dataOf_cGJnTo(
-            address(this), debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1)
+            address(this),
+            debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, Q128)
         );
 
         assertEq(position.balance, 0.5e18);
-        assertEq(position.buffer, 0.5e18);
 
         vm.resumeGasMetering();
     }
@@ -164,11 +164,11 @@ contract BorrowLiquidityTest is Test, IExecuteCallback {
         assertEq(mockERC20_1.balanceOf(address(engine)), 2e18);
 
         Positions.ILRTAData memory position = engine.dataOf_cGJnTo(
-            address(this), debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1)
+            address(this),
+            debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, Q128)
         );
 
         assertEq(position.balance, 1e18);
-        assertEq(position.buffer, 1e18);
 
         vm.resumeGasMetering();
     }

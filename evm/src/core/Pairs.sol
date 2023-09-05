@@ -45,7 +45,7 @@ library Pairs {
     }
 
     /// @notice Data needed to represent a strike (constant sum automated market market with a fixed price)
-    /// @param liquidityGrowthExpX128 Exponential multiplier of liquidity debt to balance
+    /// @param liquidityGrowthX128 Liquidity repaid per unit of borrowed liquidity
     /// @param liquidityGrowthSpreadX128 Liquidity repaid per unit of liquidty per spread
     /// @param liquidity Liquidity available
     /// @param blockLast The block where liquidity was accrued last
@@ -55,7 +55,7 @@ library Pairs {
     /// @param reference1To0 Bitmap of spreads offering 1 to 0 swaps at the price of this strike
     /// @param activeSpread The spread index where liquidity is actively being borrowed from
     struct Strike {
-        uint256 liquidityGrowthExpX128;
+        uint256 liquidityGrowthX128;
         LiquidityGrowth[NUM_SPREADS] liquidityGrowthSpreadX128;
         Liquidity[NUM_SPREADS] liquidity;
         uint184 blockLast;
@@ -625,17 +625,7 @@ library Pairs {
             if (liquidityAccrued == 0) return 0;
 
             // update liqudity growth exp
-            uint256 _liquidityGrowthExp = pair.strikes[strike].liquidityGrowthExpX128;
-            uint256 denominator = liquidityBorrowedTotal - liquidityAccrued;
-            if (denominator == 0) {
-                pair.strikes[strike].liquidityGrowthExpX128 = type(uint256).max;
-            } else {
-                pair.strikes[strike].liquidityGrowthExpX128 = mulDiv(
-                    liquidityBorrowedTotal,
-                    _liquidityGrowthExp == 0 ? Q128 : _liquidityGrowthExp,
-                    liquidityBorrowedTotal - liquidityAccrued
-                );
-            }
+            pair.strikes[strike].liquidityGrowthX128 += mulDiv(liquidityAccrued, Q128, liquidityBorrowedTotal);
 
             // liquidityAccrued max value is NUM_SPREADS * type(uint128).max
             return uint136(liquidityAccrued);
