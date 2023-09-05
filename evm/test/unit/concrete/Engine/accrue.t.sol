@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {Engine} from "src/core/Engine.sol";
 import {Pairs} from "src/core/Pairs.sol";
+import {Q128} from "src/core/math/StrikeMath.sol";
 
 contract AccrueTest is Test, Engine(payable(address(0))) {
     using Pairs for Pairs.Pair;
@@ -36,6 +37,7 @@ contract AccrueTest is Test, Engine(payable(address(0))) {
         pair.initialize(0);
         pair.addSwapLiquidity(0, 1, 1e18);
         pair.addBorrowedLiquidity(0, 0.5e18);
+        pair.strikes[0].liquidityRepayRateX128 = Q128;
 
         vm.resumeGasMetering();
 
@@ -44,8 +46,8 @@ contract AccrueTest is Test, Engine(payable(address(0))) {
         vm.pauseGasMetering();
 
         assertEq(pair.strikes[0].blockLast, 1);
-        assertEq(pair.strikes[0].liquidity[0].swap, 0.5e18 + 0.5e18 / 10_000);
-        assertEq(pair.strikes[0].liquidity[0].borrowed, 0.5e18 - 0.5e18 / 10_000);
+        assertEq(pair.strikes[0].liquidity[0].swap, 0.5e18 + 0.5e18 / 2_000_000);
+        assertEq(pair.strikes[0].liquidity[0].borrowed, 0.5e18 - 0.5e18 / 2_000_000);
 
         vm.resumeGasMetering();
     }

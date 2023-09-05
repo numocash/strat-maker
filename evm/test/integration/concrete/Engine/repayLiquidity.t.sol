@@ -18,7 +18,7 @@ import {Accounts} from "src/core/Accounts.sol";
 import {Pairs} from "src/core/Pairs.sol";
 import {Positions, debtID} from "src/core/Positions.sol";
 import {getAmount0} from "src/core/math/LiquidityMath.sol";
-import {getRatioAtStrike} from "src/core/math/StrikeMath.sol";
+import {getRatioAtStrike, Q128} from "src/core/math/StrikeMath.sol";
 import {IExecuteCallback} from "src/core/interfaces/IExecuteCallback.sol";
 
 contract RepayLiquidityTest is Test, IExecuteCallback {
@@ -31,7 +31,6 @@ contract RepayLiquidityTest is Test, IExecuteCallback {
 
     bytes32 private id;
     uint128 private amountPosition;
-    uint128 private amountBuffer;
 
     function setUp() external {
         engine = new Engine(payable(address(0)));
@@ -43,9 +42,7 @@ contract RepayLiquidityTest is Test, IExecuteCallback {
         if (amount0 > 0) mockERC20_0.mint(msg.sender, amount0);
         if (amount1 > 0) mockERC20_1.mint(msg.sender, amount1);
 
-        engine.transfer_AjLAUd(
-            msg.sender, Positions.ILRTATransferDetails(id, Engine.OrderType.Debt, amountPosition, amountBuffer)
-        );
+        engine.transfer_oHLEec(msg.sender, Positions.ILRTATransferDetails(id, amountPosition));
     }
 
     function test_RepayLiquidity_Full() external {
@@ -88,13 +85,12 @@ contract RepayLiquidityTest is Test, IExecuteCallback {
         commandInputs = pushCommandInputs(
             commandInputs,
             repayLiquidityCommand(
-                address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0.5e18, 0.5e18
+                address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, uint136(Q128), 0.5e18
             )
         );
 
-        id = debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1);
+        id = debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, uint136(Q128));
         amountPosition = 0.5e18;
-        amountBuffer = 0.5e18;
         amount0 = 0.5e18;
 
         vm.resumeGasMetering();
@@ -120,18 +116,18 @@ contract RepayLiquidityTest is Test, IExecuteCallback {
         assertEq(mockERC20_1.balanceOf(address(engine)), 0);
 
         Positions.ILRTAData memory position = engine.dataOf_cGJnTo(
-            address(this), debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1)
+            address(this),
+            debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, uint136(Q128))
         );
 
         assertEq(position.balance, 0);
-        assertEq(position.buffer, 0);
 
         position = engine.dataOf_cGJnTo(
-            address(engine), debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1)
+            address(engine),
+            debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, uint136(Q128))
         );
 
         assertEq(position.balance, 0);
-        assertEq(position.buffer, 0);
 
         vm.resumeGasMetering();
     }
@@ -176,13 +172,12 @@ contract RepayLiquidityTest is Test, IExecuteCallback {
         commandInputs = pushCommandInputs(
             commandInputs,
             repayLiquidityCommand(
-                address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0.25e18, 0.25e18
+                address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, uint136(Q128), 0.25e18
             )
         );
 
-        id = debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1);
+        id = debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, uint136(Q128));
         amountPosition = 0.25e18;
-        amountBuffer = 0.25e18;
         amount0 = 0.25e18;
 
         vm.resumeGasMetering();
@@ -208,18 +203,18 @@ contract RepayLiquidityTest is Test, IExecuteCallback {
         assertEq(mockERC20_1.balanceOf(address(engine)), 0.5e18);
 
         Positions.ILRTAData memory position = engine.dataOf_cGJnTo(
-            address(this), debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1)
+            address(this),
+            debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, uint136(Q128))
         );
 
         assertEq(position.balance, 0.25e18);
-        assertEq(position.buffer, 0.25e18);
 
         position = engine.dataOf_cGJnTo(
-            address(engine), debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1)
+            address(engine),
+            debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, uint136(Q128))
         );
 
         assertEq(position.balance, 0);
-        assertEq(position.buffer, 0);
 
         vm.resumeGasMetering();
     }

@@ -5,6 +5,7 @@ import {Accounts} from "./Accounts.sol";
 import {toInt256} from "./math/LiquidityMath.sol";
 import {Pairs, NUM_SPREADS} from "./Pairs.sol";
 import {Positions, biDirectionalID, debtID} from "./Positions.sol";
+import {mulDiv} from "src/core/math/FullMath.sol";
 import {
     getAmounts,
     getAmount0,
@@ -14,19 +15,17 @@ import {
     scaleLiquidityUp,
     scaleLiquidityDown
 } from "./math/LiquidityMath.sol";
-import {
-    balanceToLiquidity,
-    liquidityToBalance,
-    debtBalanceToLiquidity,
-    debtLiquidityToBalance
-} from "./math/PositionMath.sol";
-import {getRatioAtStrike} from "./math/StrikeMath.sol";
+import {balanceToLiquidity, liquidityToBalance, debtBalanceToLiquidity} from "./math/PositionMath.sol";
+import {getRatioAtStrike, Q128} from "./math/StrikeMath.sol";
 
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
 import {SafeTransferLib} from "solmate/src/utils/SafeTransferLib.sol";
 import {WETH} from "solmate/src/tokens/WETH.sol";
 
 import {IExecuteCallback} from "./interfaces/IExecuteCallback.sol";
+
+// Multiplier corresponding to 2000x leverage
+uint256 constant MIN_MULTIPLIER = Q128 / 2000;
 
 /// @title Engine
 /// @notice ERC20 exchange protocol
@@ -194,16 +193,18 @@ contract Engine is Positions {
     /// @param scalingFactor Amount to divide liquidity by to make it fit in a uint128
     /// @param strike The strike to repay liquidity to
     /// @param selectorCollateral What token is used as collateral
+    /// @param liquidityGrowthX128Last
+    /// @param multiplierX128
     /// @param amountDesired The amount of balance to repay
-    /// @param amountBuffer The amount of buffer to repay
     struct RepayLiquidityParams {
         address token0;
         address token1;
         uint8 scalingFactor;
         int24 strike;
         TokenSelector selectorCollateral;
+        uint256 liquidityGrowthX128Last;
+        uint136 multiplierX128;
         uint128 amountDesired;
-        uint128 amountBuffer;
     }
 
     /// @notice Data to pass to an accrue action
@@ -365,11 +366,10 @@ contract Engine is Positions {
         // check liquidity positions in
         for (uint256 i = 0; i < numLPs;) {
             uint128 amountBurned = account.lpData[i].amountBurned;
-            uint128 amountBuffer = account.lpData[i].amountBuffer;
             bytes32 id = account.lpData[i].id;
 
             if (id == bytes32(0)) break;
-            _burn(address(this), id, account.lpData[i].orderType, amountBurned, amountBuffer);
+            _burn(address(this), id, amountBurned);
 
             unchecked {
                 i++;
@@ -463,8 +463,10 @@ contract Engine is Positions {
             );
 
             // mint position token
-            _mintBiDirectional(
-                to, params.token0, params.token1, params.scalingFactor, params.strike, params.spread, balance
+            _mint(
+                to,
+                biDirectionalID(params.token0, params.token1, params.scalingFactor, params.strike, params.spread),
+                balance
             );
 
             emit AddLiquidity(pairID, params.strike, params.spread, params.amountDesired, _amount0, _amount1);
@@ -506,9 +508,7 @@ contract Engine is Positions {
             // update position token
             account.updateLP(
                 biDirectionalID(params.token0, params.token1, params.scalingFactor, params.strike, params.spread),
-                OrderType.BiDirectional,
-                params.amountDesired,
-                0
+                params.amountDesired
             );
 
             emit RemoveLiquidity(pairID, params.strike, params.spread, liquidity, _amount0, _amount1);
@@ -516,6 +516,7 @@ contract Engine is Positions {
     }
 
     /// @notice Helper borrow liquidity function
+    /// @custom:team Liquidity collateral overflow
     function _borrowLiquidity(
         address to,
         BorrowLiquidityParams memory params,
@@ -600,23 +601,28 @@ contract Engine is Positions {
             }
 
             // calculate how much to mint
-            uint256 _liquidityGrowthExpX128 = pair.strikes[params.strike].liquidityGrowthExpX128;
-            uint128 balance = debtLiquidityToBalance(params.amountDesiredDebt, _liquidityGrowthExpX128);
-            uint128 collateralBalance = debtLiquidityToBalance(liquidityCollateral, _liquidityGrowthExpX128);
+            if (liquidityCollateral < params.amountDesiredDebt) revert InvalidAmountDesired();
+            uint256 _multiplierX128 =
+                ((liquidityCollateral - params.amountDesiredDebt) * Q128) / params.amountDesiredDebt;
+            if (_multiplierX128 > type(uint136).max || _multiplierX128 < MIN_MULTIPLIER) revert InvalidAmountDesired();
 
-            // check for overcollateralization
-            if (balance > collateralBalance) revert InvalidAmountDesired();
+            // update pair repay multiplier
+            pair.strikes[params.strike].liquidityRepayRateX128 +=
+                mulDiv(params.amountDesiredDebt, Q128, _multiplierX128);
 
             // mint position token
-            _mintDebt(
+            _mint(
                 to,
-                params.token0,
-                params.token1,
-                params.scalingFactor,
-                params.strike,
-                params.selectorCollateral,
-                balance,
-                collateralBalance - balance
+                debtID(
+                    params.token0,
+                    params.token1,
+                    params.scalingFactor,
+                    params.strike,
+                    params.selectorCollateral,
+                    pair.strikes[params.strike].liquidityGrowthX128,
+                    uint136(_multiplierX128)
+                ),
+                params.amountDesiredDebt
             );
 
             emit BorrowLiquidity(pairID, params.strike, params.amountDesiredDebt);
@@ -635,12 +641,19 @@ contract Engine is Positions {
             }
 
             // calculate how much to repay
-            uint128 liquidityDebt =
-                debtBalanceToLiquidity(params.amountDesired, pair.strikes[params.strike].liquidityGrowthExpX128);
+            uint128 liquidityDebt = debtBalanceToLiquidity(
+                params.amountDesired,
+                params.multiplierX128,
+                pair.strikes[params.strike].liquidityGrowthX128 - params.liquidityGrowthX128Last
+            );
 
             // repay liqudity to pair
             if (liquidityDebt == 0) revert InvalidAmountDesired();
             pair.removeBorrowedLiquidity(params.strike, liquidityDebt);
+
+            // update pair repay multiplier
+            pair.strikes[params.strike].liquidityRepayRateX128 -=
+                mulDiv(params.amountDesired, Q128, params.multiplierX128);
 
             // calculate how much tokens to repay
             {
@@ -691,8 +704,8 @@ contract Engine is Positions {
                 account.updateToken(params.token1, toInt256(amount1));
             }
             // calculate unlocked collateral and update account
-            uint128 liquidityCollateral = params.amountDesired
-                + debtBalanceToLiquidity(params.amountBuffer, pair.strikes[params.strike].liquidityGrowthExpX128);
+            // Note: cannot overflow because liquidity collateral is strictly decreasing
+            uint128 liquidityCollateral = liquidityDebt + uint128(mulDiv(params.multiplierX128, liquidityDebt, Q128));
             if (params.selectorCollateral == TokenSelector.Token0) {
                 account.updateToken(
                     params.token0,
@@ -712,10 +725,16 @@ contract Engine is Positions {
 
             // update position token
             account.updateLP(
-                debtID(params.token0, params.token1, params.scalingFactor, params.strike, params.selectorCollateral),
-                OrderType.Debt,
-                params.amountDesired,
-                params.amountBuffer
+                debtID(
+                    params.token0,
+                    params.token1,
+                    params.scalingFactor,
+                    params.strike,
+                    params.selectorCollateral,
+                    params.liquidityGrowthX128Last,
+                    params.multiplierX128
+                ),
+                params.amountDesired
             );
 
             emit RepayLiquidity(pairID, params.strike, liquidityDebt);

@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.19;
 
-import {Engine} from "./Engine.sol";
-
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
 
 /// @title Accounts
@@ -35,9 +33,7 @@ library Accounts {
     /// @param orderType What type of position does this represent
     struct LPData {
         bytes32 id;
-        Engine.OrderType orderType;
         uint128 amountBurned;
-        uint128 amountBuffer;
     }
 
     /// @notice Data stored that makes up an account
@@ -81,28 +77,16 @@ library Accounts {
 
     /// @notice Update a liquidity position's intermediate account balance, creating a new one if one doesn't already
     /// exist
-    function updateLP(
-        Account memory account,
-        bytes32 id,
-        Engine.OrderType orderType,
-        uint128 amountBurned,
-        uint128 amountBuffer
-    )
-        internal
-        pure
-    {
+    function updateLP(Account memory account, bytes32 id, uint128 amountBurned) internal pure {
         if (amountBurned == 0) return;
 
         for (uint256 i = 0; i < account.lpData.length;) {
             if (account.lpData[i].id == id) {
                 account.lpData[i].amountBurned += amountBurned;
-                account.lpData[i].amountBuffer += amountBuffer;
                 return;
             } else if (account.lpData[i].id == bytes32(0)) {
                 account.lpData[i].id = id;
-                account.lpData[i].orderType = orderType;
                 account.lpData[i].amountBurned = amountBurned;
-                account.lpData[i].amountBuffer = amountBuffer;
                 return;
             }
 

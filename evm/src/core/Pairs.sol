@@ -45,8 +45,10 @@ library Pairs {
     }
 
     /// @notice Data needed to represent a strike (constant sum automated market market with a fixed price)
-    /// @param liquidityGrowthExpX128 Exponential multiplier of liquidity debt to balance
+    /// @param liquidityGrowthX128 Liquidity repaid per unit of borrowed liquidity
     /// @param liquidityGrowthSpreadX128 Liquidity repaid per unit of liquidty per spread
+    /// @param liquidityRepayRateX128 Rate at which liquidity is repaid, summation of balance / multiplier for all
+    /// positions
     /// @param liquidity Liquidity available
     /// @param blockLast The block where liquidity was accrued last
     /// @param next0To1 Strike where the next 0 to 1 swap is available, < this strike
@@ -55,7 +57,8 @@ library Pairs {
     /// @param reference1To0 Bitmap of spreads offering 1 to 0 swaps at the price of this strike
     /// @param activeSpread The spread index where liquidity is actively being borrowed from
     struct Strike {
-        uint256 liquidityGrowthExpX128;
+        uint256 liquidityGrowthX128;
+        uint256 liquidityRepayRateX128;
         LiquidityGrowth[NUM_SPREADS] liquidityGrowthSpreadX128;
         Liquidity[NUM_SPREADS] liquidity;
         uint184 blockLast;
@@ -254,7 +257,7 @@ library Pairs {
                         uint256 _liquiditySwapSpread = state.liquiditySwapSpread[i];
                         uint256 liquidityRemainingSpread =
                             mulDiv(state.liquidityRemaining, _liquiditySwapSpread, state.liquidityTotal);
-                        uint256 liquidityNew = ((i + 1) * (_liquiditySwapSpread - liquidityRemainingSpread)) / 10_000;
+                        uint256 liquidityNew = ((i + 1) * (_liquiditySwapSpread - liquidityRemainingSpread)) / 1_000_000;
 
                         _updateLiqudityGrowth(
                             pair.strikes[spreadStrike].liquidityGrowthSpreadX128[i],
@@ -590,6 +593,7 @@ library Pairs {
 
     /// @notice Accrue liquidity for a strike and return the amount of liquidity that must be repaid
     /// @custom:team How to handle overflow
+    /// @custom:team Need to update to only accrue a maximum amount in order to cap leverage
     function accrue(Pair storage pair, int24 strike) internal returns (uint136) {
         unchecked {
             if (!pair.initialized) revert Initialized();
@@ -609,7 +613,7 @@ library Pairs {
                     // can only overflow when (i + 1) * blocks > type(uint128).max
                     uint256 fee = (i + 1) * blocks;
                     uint256 liquidityAccruedSpread =
-                        fee >= 10_000 ? liquidityBorrowed : (fee * uint256(liquidityBorrowed)) / 10_000;
+                        fee >= 2_000_000 ? liquidityBorrowed : (fee * uint256(liquidityBorrowed)) / 2_000_000;
 
                     liquidityAccrued += liquidityAccruedSpread;
                     liquidityBorrowedTotal += liquidityBorrowed;
@@ -624,21 +628,10 @@ library Pairs {
 
             if (liquidityAccrued == 0) return 0;
 
-            // update liqudity growth exp
-            uint256 _liquidityGrowthExp = pair.strikes[strike].liquidityGrowthExpX128;
-            uint256 denominator = liquidityBorrowedTotal - liquidityAccrued;
-            if (denominator == 0) {
-                pair.strikes[strike].liquidityGrowthExpX128 = type(uint256).max;
-            } else {
-                pair.strikes[strike].liquidityGrowthExpX128 = mulDiv(
-                    liquidityBorrowedTotal,
-                    _liquidityGrowthExp == 0 ? Q128 : _liquidityGrowthExp,
-                    liquidityBorrowedTotal - liquidityAccrued
-                );
-            }
+            // update liqudity growth
+            pair.strikes[strike].liquidityGrowthX128 += mulDiv(liquidityAccrued, Q128, liquidityBorrowedTotal);
 
-            // liquidityAccrued max value is NUM_SPREADS * type(uint128).max
-            return uint136(liquidityAccrued);
+            return uint136(mulDiv(pair.strikes[strike].liquidityRepayRateX128, liquidityAccrued, Q128));
         }
     }
 

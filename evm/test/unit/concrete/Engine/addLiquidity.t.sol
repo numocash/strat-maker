@@ -57,6 +57,7 @@ contract AddLiquidityTest is Test, Engine(payable(address(0))) {
 
         pair.addSwapLiquidity(2, 1, 1e18);
         pair.addBorrowedLiquidity(2, 0.5e18);
+        pair.strikes[2].liquidityRepayRateX128 = Q128;
 
         vm.resumeGasMetering();
 
@@ -64,8 +65,8 @@ contract AddLiquidityTest is Test, Engine(payable(address(0))) {
 
         vm.pauseGasMetering();
 
-        assertEq(pair.strikes[2].liquidity[0].swap, 1.5e18 + 0.5e18 / 10_000);
-        assertEq(pair.strikes[2].liquidity[0].borrowed, 0.5e18 - 0.5e18 / 10_000);
+        assertEq(pair.strikes[2].liquidity[0].swap, 1.5e18 + 0.5e18 / 2_000_000);
+        assertEq(pair.strikes[2].liquidity[0].borrowed, 0.5e18 - 0.5e18 / 2_000_000);
         assertEq(pair.strikes[2].blockLast, 1);
 
         vm.resumeGasMetering();
@@ -171,7 +172,6 @@ contract AddLiquidityTest is Test, Engine(payable(address(0))) {
         Positions.ILRTAData memory data = _dataOf[address(this)][biDirectionalID(address(1), address(2), 0, 2, 1)];
 
         assertEq(data.balance, 1e18);
-        assertEq(data.buffer, 0);
 
         vm.resumeGasMetering();
     }
@@ -193,7 +193,6 @@ contract AddLiquidityTest is Test, Engine(payable(address(0))) {
         Positions.ILRTAData memory data = _dataOf[address(this)][biDirectionalID(address(1), address(2), 0, 2, 1)];
 
         assertEq(data.balance, 0.5e18);
-        assertEq(data.buffer, 0);
 
         vm.resumeGasMetering();
     }
