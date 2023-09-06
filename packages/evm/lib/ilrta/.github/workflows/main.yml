@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v3
+      - name: Setup javascript env
+        uses: ./.github/actions/setup-js
+      - name: Install foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Build contracts
+        run: pnpm build:contracts
+      - name: Codegen
+        run: pnpm codegen
+      - name: Lint
+        run: pnpm lint
+      - name: Typecheck
+        run: pnpm typecheck
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v3
+      - name: Setup javascript env
+        uses: ./.github/actions/setup-js
+      - name: Install foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Build
+        run: pnpm build
