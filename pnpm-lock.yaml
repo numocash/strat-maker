@@ -15,15 +15,15 @@ importers:
         specifier: ^5.1.6
         version: 5.1.6
 
-  evm:
+  packages/evm:
     dependencies:
-      rome:
-        specifier: ^12.1.3
-        version: 12.1.3
       solmate:
         specifier: ^6.2.0
         version: 6.2.0
     devDependencies:
+      '@biomejs/biome':
+        specifier: ^1.0.0
+        version: 1.0.0
       husky:
         specifier: ^8.0.3
         version: 8.0.3
@@ -31,7 +31,7 @@ importers:
         specifier: ^3.5.1
         version: 3.5.1
 
-  sdk:
+  packages/sdk:
     dependencies:
       dry-powder:
         specifier: workspace:^
@@ -463,6 +463,7 @@ packages:
     cpu: [arm64]
     os: [darwin]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@rometools/cli-darwin-x64@12.1.3:
@@ -470,6 +471,7 @@ packages:
     cpu: [x64]
     os: [darwin]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@rometools/cli-linux-arm64@12.1.3:
@@ -477,6 +479,7 @@ packages:
     cpu: [arm64]
     os: [linux]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@rometools/cli-linux-x64@12.1.3:
@@ -484,6 +487,7 @@ packages:
     cpu: [x64]
     os: [linux]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@rometools/cli-win32-arm64@12.1.3:
@@ -491,6 +495,7 @@ packages:
     cpu: [arm64]
     os: [win32]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@rometools/cli-win32-x64@12.1.3:
@@ -498,6 +503,7 @@ packages:
     cpu: [x64]
     os: [win32]
     requiresBuild: true
+    dev: true
     optional: true
 
   /@scure/base@1.1.1:
@@ -2228,6 +2234,7 @@ packages:
       '@rometools/cli-linux-x64': 12.1.3
       '@rometools/cli-win32-arm64': 12.1.3
       '@rometools/cli-win32-x64': 12.1.3
+    dev: true
 
   /run-parallel@1.2.0:
     resolution: {integrity: sha512-5l4VyZR86LZ/lDxZTR6jqL8AFE2S0IFLMP26AbjsLVADxHdhB/c0GUsH+y39UfCi3dzz8OlQuPmnaJOMoDHQBA==}

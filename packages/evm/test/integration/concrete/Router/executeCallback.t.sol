@@ -44,8 +44,15 @@ contract ExecuteCallbackTest is Test {
     {
         bytes32[] memory transferDetailsHashes = new bytes32[](signatureTransfer.transferDetails.length);
         for (uint256 i = 0; i < transferDetailsHashes.length; i++) {
-            transferDetailsHashes[i] =
-                keccak256(abi.encode(TRANSFER_DETAILS_TYPEHASH, signatureTransfer.transferDetails[i]));
+            transferDetailsHashes[i] = keccak256(
+                abi.encode(
+                    TRANSFER_DETAILS_TYPEHASH,
+                    signatureTransfer.transferDetails[i].token,
+                    signatureTransfer.transferDetails[i].tokenType,
+                    signatureTransfer.transferDetails[i].functionSelector,
+                    keccak256(signatureTransfer.transferDetails[i].transferDetails)
+                )
+            );
         }
 
         bytes32 signatureHash = keccak256(
