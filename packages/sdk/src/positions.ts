@@ -1,10 +1,4 @@
 import {
-  EngineAddress,
-  OrderTypeEnum,
-  TokenSelectorEnum,
-} from "./constants.js";
-import type { OrderType, Spread, Strike, TokenSelector } from "./types.js";
-import {
   type ILRTA,
   type ILRTAData,
   type ILRTARequestedTransfer,
@@ -25,6 +19,12 @@ import {
   hashTypedData,
   keccak256,
 } from "viem";
+import {
+  EngineAddress,
+  OrderTypeEnum,
+  TokenSelectorEnum,
+} from "./constants.js";
+import type { OrderType, Spread, Strike, TokenSelector } from "./types.js";
 
 export type Position<TOrderType extends OrderType> = ILRTA<"position"> & {
   name: "Numoen Dry Powder";

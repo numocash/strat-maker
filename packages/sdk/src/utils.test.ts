@@ -1,7 +1,7 @@
-import { Q128 } from "./constants.js";
-import { fractionToQ128, q128ToFraction } from "./utils.js";
 import { fractionEqualTo, makeFraction } from "reverse-mirage";
 import { describe, expect, test } from "vitest";
+import { Q128 } from "./constants.js";
+import { fractionToQ128, q128ToFraction } from "./utils.js";
 
 describe.concurrent("utils", () => {
   test("fraction to q128", () => {

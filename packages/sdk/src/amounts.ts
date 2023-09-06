@@ -1,3 +1,13 @@
+import {
+  type ERC20Amount,
+  type Fraction,
+  MaxUint128,
+  fractionMultiply,
+  fractionQuotient,
+  makeAmountFromRaw,
+  makeFraction,
+} from "reverse-mirage";
+import invariant from "tiny-invariant";
 import { MAX_STRIKE, MIN_STRIKE, NUM_SPREADS, Q128 } from "./constants.js";
 import {
   balanceToLiquidity,
@@ -20,16 +30,6 @@ import type {
   TokenSelector,
   Tuple,
 } from "./types.js";
-import {
-  type ERC20Amount,
-  type Fraction,
-  MaxUint128,
-  fractionMultiply,
-  fractionQuotient,
-  makeAmountFromRaw,
-  makeFraction,
-} from "reverse-mirage";
-import invariant from "tiny-invariant";
 
 /**
  * Initialize a pair with the given initial strike

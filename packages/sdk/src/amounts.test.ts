@@ -1,4 +1,13 @@
 import {
+  type ERC20,
+  MaxUint256,
+  fractionEqualTo,
+  makeAmountFromRaw,
+  makeFraction,
+} from "reverse-mirage";
+import { parseEther } from "viem";
+import { describe, expect, test } from "vitest";
+import {
   calculateAddLiquidity,
   calculateBorrowLiquidity,
   calculateInitialize,
@@ -8,15 +17,6 @@ import {
 } from "./amounts.js";
 import { Q128 } from "./constants.js";
 import type { Pair } from "./types.js";
-import {
-  type ERC20,
-  MaxUint256,
-  fractionEqualTo,
-  makeAmountFromRaw,
-  makeFraction,
-} from "reverse-mirage";
-import { parseEther } from "viem";
-import { describe, expect, test } from "vitest";
 
 const token0 = {
   type: "erc20",

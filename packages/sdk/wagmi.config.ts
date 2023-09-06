@@ -7,10 +7,16 @@ export default defineConfig({
   plugins: [
     foundry({
       project: "node_modules/dry-powder/",
+      include: [
+        "Engine.sol/**",
+        "Router.sol/**",
+        "Pairs.sol/**",
+        "Positions.sol/**",
+      ],
     }),
     foundry({
-      project: "node_modules/ilrta-evm/",
-      include: ["Permit3"],
+      project: "node_modules/ilrta/",
+      include: ["ILRTA.sol/**", "Permit3.sol/**", "MockERC20.sol/**"],
     }),
   ],
 });

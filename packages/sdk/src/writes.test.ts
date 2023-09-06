@@ -1,13 +1,3 @@
-import { engineABI, mockErc20ABI, permit3ABI, routerABI } from "./generated.js";
-import { makePosition } from "./positions.js";
-import {
-  engineGetPair,
-  engineGetPositionDebt,
-  engineGetStrike,
-} from "./reads.js";
-import { ALICE } from "./test/constants.js";
-import { publicClient, testClient, walletClient } from "./test/utils.js";
-import { routerRoute } from "./writes.js";
 import Engine from "dry-powder/out/Engine.sol/Engine.json";
 import MockERC20 from "dry-powder/out/MockERC20.sol/MockERC20.json";
 import Router from "dry-powder/out/Router.sol/Router.json";
@@ -29,6 +19,16 @@ import {
   expect,
   test,
 } from "vitest";
+import { engineABI, mockErc20ABI, permit3ABI, routerABI } from "./generated.js";
+import { makePosition } from "./positions.js";
+import {
+  engineGetPair,
+  engineGetPositionDebt,
+  engineGetStrike,
+} from "./reads.js";
+import { ALICE } from "./test/constants.js";
+import { publicClient, testClient, walletClient } from "./test/utils.js";
+import { routerRoute } from "./writes.js";
 
 let id: Hex;
 let token0: ERC20;

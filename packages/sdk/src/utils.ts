@@ -1,5 +1,5 @@
-import { Q128 } from "./constants.js";
 import { type Fraction, makeFraction } from "reverse-mirage";
+import { Q128 } from "./constants.js";
 
 /**
  * Convert fraction type to Q128 integer

@@ -1,7 +1,3 @@
-import { Q128 } from "./constants.js";
-import type { PositionData } from "./positions.js";
-import type { Pair, PairData, Spread, Strike } from "./types.js";
-import { fractionToQ128, q128ToFraction } from "./utils.js";
 import {
   type ERC20,
   type ERC20Amount,
@@ -15,6 +11,10 @@ import {
   makeFraction,
 } from "reverse-mirage";
 import invariant from "tiny-invariant";
+import { Q128 } from "./constants.js";
+import type { PositionData } from "./positions.js";
+import type { Pair, PairData, Spread, Strike } from "./types.js";
+import { fractionToQ128, q128ToFraction } from "./utils.js";
 
 export const getAmount0Delta = (liquidity: bigint, strike: Strike): bigint => {
   const ratio = getRatioAtStrike(strike);

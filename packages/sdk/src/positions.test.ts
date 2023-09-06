@@ -1,7 +1,7 @@
+import { describe, expect, test } from "vitest";
 import { EngineAddress } from "./constants.js";
 import { dataID } from "./positions.js";
 import { mockERC20 } from "./test/constants.js";
-import { describe, expect, test } from "vitest";
 
 describe("positions", () => {
   test("bi directional data id", () => {

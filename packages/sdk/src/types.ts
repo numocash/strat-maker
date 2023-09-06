@@ -1,3 +1,5 @@
+import type { AbiTypeToPrimitiveType } from "abitype";
+import type { ERC20, Fraction } from "reverse-mirage";
 import {
   CommandEnum,
   NUM_SPREADS,
@@ -5,8 +7,6 @@ import {
   SwapTokenSelectorEnum,
   TokenSelectorEnum,
 } from "./constants.js";
-import type { AbiTypeToPrimitiveType } from "abitype";
-import type { ERC20, Fraction } from "reverse-mirage";
 
 /**
  * A tuple of length `N` with elements of type `T`.
