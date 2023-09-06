@@ -1,9 +1,0 @@
-# dependencies
-/node_modules
-
-# Dotenv file
-.env
-
-# typescript
-*.tsbuildinfo
-
