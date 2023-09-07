@@ -4,7 +4,6 @@ import {
   CommandEnum,
   NUM_SPREADS,
   OrderTypeEnum,
-  SwapTokenSelectorEnum,
   TokenSelectorEnum,
 } from "./constants.js";
 
@@ -56,8 +55,6 @@ export type PairData = {
 
 export type TokenSelector = keyof typeof TokenSelectorEnum;
 
-export type SwapTokenSelector = keyof typeof SwapTokenSelectorEnum;
-
 export type OrderType = keyof typeof OrderTypeEnum;
 
 type CommandType<
@@ -69,8 +66,10 @@ export type SwapCommand<TPair extends Pair = Pair> = CommandType<
   "Swap",
   {
     pair: TPair;
-    selector: SwapTokenSelector;
-    amountDesired: ERC20Amount<TPair["token0"] | TPair["token1"]>;
+    amountDesired:
+      | ERC20Amount<TPair["token0"] | TPair["token1"]>
+      | "Token0Account"
+      | "Token1Account";
   }
 >;
 

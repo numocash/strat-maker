@@ -1,11 +1,4 @@
-import {
-  amountAdd,
-  amountGreaterThan,
-  fractionAdd,
-  fractionMultiply,
-  fractionQuotient,
-  readAndParse,
-} from "reverse-mirage";
+import { amountAdd, readAndParse } from "reverse-mirage";
 import type {
   ERC20,
   ERC20Amount,
@@ -26,6 +19,7 @@ import {
   calculateBorrowLiquidity,
   calculateRemoveLiquidity,
   calculateRepayLiquidity,
+  calculateSwap,
 } from "./amounts.js";
 import {
   CommandEnum,
@@ -54,7 +48,7 @@ export const routerRoute = async (
   },
 ): Promise<ReverseMirageWrite<typeof routerABI, "route">> => {
   const blockNumber = await publicClient.getBlockNumber();
-  const account: Account = { tokens: {}, liquidityPositions: {} };
+  const account: Account = { tokens: [], liquidityPositions: [] };
 
   const pairData: Record<string, PairData> = {};
 
@@ -138,29 +132,19 @@ export const routerRoute = async (
       updateToken(account, amount0);
       updateToken(account, amount1);
       updateLiquidityPosition(account, position);
-    }
-    // else if (c.command === "Swap") {
-    //   const { amount0, amount1 } = calculateSwap(
-    //     c.inputs.pair,
-    //     pairData[id]!,
-    //     c.inputs.selector === "Token0"
-    //       ? createAmountFromRaw(c.inputs.pair.token0, c.inputs.amountDesired)
-    //       : c.inputs.selector === "Token1"
-    //       ? createAmountFromRaw(c.inputs.pair.token1, c.inputs.amountDesired)
-    //       : c.inputs.selector === "Token0Account"
-    //       ? createAmountFromRaw(
-    //           c.inputs.pair.token0,
-    //           account.tokens[c.inputs.pair.token0.address]!.amount,
-    //         )
-    //       : createAmountFromRaw(
-    //           c.inputs.pair.token1,
-    //           account.tokens[c.inputs.pair.token1.address]!.amount,
-    //         ),
-    //   );
-    //   updateToken(account, amount0);
-    //   updateToken(account, amount1);
-    // }
-    else if (c.command === "Accrue") {
+    } else if (c.command === "Swap") {
+      const { amount0, amount1 } = calculateSwap(
+        c.inputs.pair,
+        pairData[id]!,
+        c.inputs.amountDesired === "Token0Account"
+          ? account.tokens.find((t) => t.token === c.inputs.pair.token0)!
+          : c.inputs.amountDesired === "Token1Account"
+          ? account.tokens.find((t) => t.token === c.inputs.pair.token1)!
+          : c.inputs.amountDesired,
+      );
+      updateToken(account, amount0);
+      updateToken(account, amount1);
+    } else if (c.command === "Accrue") {
       calculateAccrue(
         pairData[id]!,
         blockNumber,
@@ -170,23 +154,23 @@ export const routerRoute = async (
   }
 
   // filter amounts owed
-  const transferRequestsToken = Object.values(account.tokens)
-    .filter((c) => amountGreaterThan(c, 0))
-    .map((t) => ({
-      ...t,
-      amount: fractionQuotient(
-        fractionMultiply(fractionAdd(args.slippage, 1), t.amount),
-      ),
-    }));
-  const transferRequestsLP = Object.values(account.liquidityPositions)
-    .filter((lp) => lp.balance < 0n)
-    .map((lp) => ({ ...lp, balance: -lp.balance }))
-    .map((lp) => ({
-      ...lp,
-      balance: fractionQuotient(
-        fractionMultiply(fractionAdd(args.slippage, 1), lp.balance),
-      ),
-    }));
+  // const transferRequestsToken = Object.values(account.tokens)
+  //   .filter((c) => amountGreaterThan(c, 0))
+  //   .map((t) => ({
+  //     ...t,
+  //     amount: fractionQuotient(
+  //       fractionMultiply(fractionAdd(args.slippage, 1), t.amount),
+  //     ),
+  //   }));
+  // const transferRequestsLP = Object.values(account.liquidityPositions)
+  //   .filter((lp) => lp.balance < 0n)
+  //   .map((lp) => ({ ...lp, balance: -lp.balance }))
+  //   .map((lp) => ({
+  //     ...lp,
+  //     balance: fractionQuotient(
+  //       fractionMultiply(fractionAdd(args.slippage, 1), lp.balance),
+  //     ),
+  //   }));
 
   // build permit3 transfers
 
@@ -203,7 +187,7 @@ export const routerRoute = async (
         to: args.to,
         commandInputs: args.commands.map((c) => ({
           command: CommandEnum[c.command],
-          input: encodeInput(c),
+          input: encodeInput(c, account),
         })),
         numTokens: BigInt(Object.values(account.tokens).length),
         numLPs: BigInt(
@@ -227,22 +211,19 @@ export const routerRoute = async (
 };
 
 type Account = {
-  tokens: { [address: Address]: ERC20Amount<ERC20> };
-  liquidityPositions: {
-    [id_orderType: `${Hex}`]: PositionData<OrderType>;
-  };
+  tokens: ERC20Amount<ERC20>[];
+  liquidityPositions: PositionData<OrderType>[];
 };
 
 const updateToken = (account: Account, currencyAmount: ERC20Amount<ERC20>) => {
-  if (currencyAmount.amount === 0n) return;
+  for (let i = 0; i < account.tokens.length; i++) {
+    if (account.tokens[i]!.token === currencyAmount.token) {
+      account.tokens[i] = amountAdd(account.tokens[i]!, currencyAmount);
 
-  if (account.tokens[currencyAmount.token.address] !== undefined) {
-    account.tokens[currencyAmount.token.address] = amountAdd(
-      account.tokens[currencyAmount.token.address]!,
-      currencyAmount.amount,
-    );
-  } else {
-    account.tokens[currencyAmount.token.address] = currencyAmount;
+      break;
+    } else if (account.tokens[i] === undefined) {
+      account.tokens[i] = currencyAmount;
+    }
   }
 };
 
@@ -250,20 +231,19 @@ const updateLiquidityPosition = (
   account: Account,
   positionData: PositionData<OrderType>,
 ) => {
-  if (positionData.balance === 0n) return;
-
-  const id = `${dataID(positionData.token)}_${
-    positionData.token.orderType
-  }` as const;
-
-  if (account.liquidityPositions[id] === undefined) {
-    account.liquidityPositions[id] = positionData;
-  } else {
-    account.liquidityPositions[id]!.balance += positionData.balance;
+  for (let i = 0; i < account.liquidityPositions.length; i++) {
+    if (
+      dataID(account.liquidityPositions[i]!.token) ===
+      dataID(positionData.token)
+    ) {
+      account.liquidityPositions[i]!.balance += positionData.balance;
+    } else if (account.liquidityPositions[i] === undefined) {
+      account.liquidityPositions[i] = positionData;
+    }
   }
 };
 
-const encodeInput = (command: Command): Hex =>
+const encodeInput = (command: Command, account: Account): Hex =>
   command.command === "AddLiquidity"
     ? encodeAbiParameters(AddLiquidityParams, [
         command.inputs.pair.token0.address,
@@ -311,8 +291,25 @@ const encodeInput = (command: Command): Hex =>
         command.inputs.pair.token0.address,
         command.inputs.pair.token1.address,
         command.inputs.pair.scalingFactor,
-        SwapTokenSelectorEnum[command.inputs.selector],
-        command.inputs.amountDesired.amount,
+        command.inputs.amountDesired === "Token0Account" ||
+        command.inputs.amountDesired === "Token1Account"
+          ? SwapTokenSelectorEnum.Account
+          : command.inputs.amountDesired.token === command.inputs.pair.token0
+          ? SwapTokenSelectorEnum.Token0
+          : SwapTokenSelectorEnum.Token1,
+        command.inputs.amountDesired === "Token0Account"
+          ? BigInt(
+              account.tokens.findIndex(
+                (a) => a.token === command.inputs.pair.token0,
+              ),
+            )
+          : command.inputs.amountDesired === "Token1Account"
+          ? BigInt(
+              account.tokens.findIndex(
+                (a) => a.token === command.inputs.pair.token1,
+              ),
+            )
+          : command.inputs.amountDesired.amount,
       ])
     : command.command === "Accrue"
     ? encodeAbiParameters(AccrueParams, [
