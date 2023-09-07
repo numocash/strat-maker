@@ -35,7 +35,7 @@ Dry Powder is uses the invariant `Liquidity = Price * amount0 + amount1`, also r
 
 Simply put, automated market makers create a market between two classes of users. Traders want to swap token0 to token1 or vice versa, presumably because they believe it will benefit them in someway. Liquidity providers lend out a combination of token0 and token1, that is used to facilitate traders. They are rewarded for this with a portion of all traders trades. This market aims to connect traders and liquidity providers in a way that leaves them both satisfied with the opportunity.
 
-### Creating Option
+### Creating Option Token
 
 First implemented in Numoen's Power Market Maker Protocol (pmmp) is the ability to **reserve the rights to swap** by borrowing liquidity. Thereby making swaps and borrowing empirically the same. To do this, users post collateral that they know will always be more valuable than the value of the liquidity they want to borrow. With this collateral, a user would borrow liquidity and immediately withdraw into the underlying tokens in hopes that they can repay the liquidiity for a cheaper price in the future.
 
