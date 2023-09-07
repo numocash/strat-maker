@@ -1,9 +1,10 @@
 export {
+  calculateInitialize,
   calculateAddLiquidity,
   calculateRemoveLiquidity,
   calculateBorrowLiquidity,
   calculateRepayLiquidity,
-  calculateSwap,
+  // calculateSwap,
   calculateAccrue,
 } from "./amounts.js";
 
@@ -12,36 +13,44 @@ export {
   Q128,
   MAX_STRIKE,
   MIN_STRIKE,
+  MIN_MULTIPLIER,
   EngineAddress,
   RouterAddress,
 } from "./constants.js";
 
 export {
-  getAmount0Delta,
-  getAmount1Delta,
-  getLiquidityDeltaAmount0,
-  getLiquidityDeltaAmount1,
-  getAmount0FromComposition,
-  getAmount1FromComposition,
-  getAmount0ForLiquidity,
-  getAmount1ForLiquidity,
-  getAmountsForLiquidity,
+  scaleLiquidityUp,
+  scaleLiquidityDown,
+  getAmount0,
+  getAmount1,
+  getAmounts,
+  getAmount0Composition,
+  getAmount1Composition,
   getLiquidityForAmount0,
   getLiquidityForAmount1,
   balanceToLiquidity,
   liquidityToBalance,
   debtBalanceToLiquidity,
-  debtLiquidityToBalance,
   getRatioAtStrike,
   computeSwapStep,
 } from "./math.js";
 
 export {
+  type Position,
+  type PositionData,
+  createPosition,
+  positionIsBiDirectional,
+  positionIsDebt,
+  dataID,
+  transfer,
+  approve,
+  dataOf,
+  allowanceOf,
+} from "./positions.js";
+
+export {
   engineGetPair,
   engineGetStrike,
-  engineGetPositionBiDirectional,
-  // engineGetPositionLimit,
-  engineGetPositionDebt,
 } from "./reads.js";
 
 export type {
@@ -50,6 +59,7 @@ export type {
   Spread,
   PairData,
   StrikeData,
+  Command,
 } from "./types.js";
 
-export { fractionToQ128, q128ToFraction } from "./utils.js";
+export { fractionToQ128, q128ToFraction, getPairID } from "./utils.js";

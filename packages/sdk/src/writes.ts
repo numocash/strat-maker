@@ -1,12 +1,9 @@
-import { signSuperSignature } from "ilrta-sdk";
-import { getTransferBatchTypedDataHash } from "ilrta-sdk";
 import {
   amountAdd,
   amountGreaterThan,
   fractionAdd,
   fractionMultiply,
   fractionQuotient,
-  makeAmountFromRaw,
   readAndParse,
 } from "reverse-mirage";
 import type {
@@ -29,26 +26,18 @@ import {
   calculateBorrowLiquidity,
   calculateRemoveLiquidity,
   calculateRepayLiquidity,
-  calculateSwap,
 } from "./amounts.js";
 import {
   CommandEnum,
-  OrderTypeEnum,
   RouterAddress,
   SwapTokenSelectorEnum,
   TokenSelectorEnum,
 } from "./constants.js";
 import { routerABI } from "./generated.js";
-import { addDebtPositions } from "./math.js";
-import {
-  type PositionData,
-  dataID,
-  getTransferTypedDataHash as getTransferTypedDataHashLP,
-  positionIsBiDirectional,
-} from "./positions.js";
+import { type PositionData, dataID } from "./positions.js";
 import { engineGetPair, engineGetStrike } from "./reads.js";
 import type { Command, OrderType, PairData, Strike } from "./types.js";
-import { fractionToQ128 } from "./utils.js";
+import { fractionToQ128, getPairID } from "./utils.js";
 
 // TODO: write directly to engine when doing actions that don't require payment
 
@@ -128,7 +117,6 @@ export const routerRoute = async (
         pairData[id]!,
         blockNumber,
         c.inputs.strike,
-        c.inputs.selectorCollateral,
         c.inputs.amountDesiredCollateral,
         c.inputs.amountDesiredDebt,
       );
@@ -143,42 +131,53 @@ export const routerRoute = async (
         blockNumber,
         c.inputs.strike,
         c.inputs.selectorCollateral,
-        c.inputs.leverageRatio,
-        c.inputs.amountDesiredDebt,
+        c.inputs.liquidityGrowthLast,
+        c.inputs.multiplier,
+        c.inputs.amountDesired,
       );
       updateToken(account, amount0);
       updateToken(account, amount1);
       updateLiquidityPosition(account, position);
-    } else if (c.command === "Swap") {
-      const { amount0, amount1 } = calculateSwap(
-        c.inputs.pair,
-        pairData[id]!,
-        c.inputs.selector === "Token0"
-          ? makeAmountFromRaw(c.inputs.pair.token0, c.inputs.amountDesired)
-          : c.inputs.selector === "Token1"
-          ? makeAmountFromRaw(c.inputs.pair.token1, c.inputs.amountDesired)
-          : c.inputs.selector === "Token0Account"
-          ? makeAmountFromRaw(
-              c.inputs.pair.token0,
-              account.tokens[c.inputs.pair.token0.address]!.amount,
-            )
-          : makeAmountFromRaw(
-              c.inputs.pair.token1,
-              account.tokens[c.inputs.pair.token1.address]!.amount,
-            ),
-      );
-      updateToken(account, amount0);
-      updateToken(account, amount1);
-    } else if (c.command === "Accrue") {
+    }
+    // else if (c.command === "Swap") {
+    //   const { amount0, amount1 } = calculateSwap(
+    //     c.inputs.pair,
+    //     pairData[id]!,
+    //     c.inputs.selector === "Token0"
+    //       ? createAmountFromRaw(c.inputs.pair.token0, c.inputs.amountDesired)
+    //       : c.inputs.selector === "Token1"
+    //       ? createAmountFromRaw(c.inputs.pair.token1, c.inputs.amountDesired)
+    //       : c.inputs.selector === "Token0Account"
+    //       ? createAmountFromRaw(
+    //           c.inputs.pair.token0,
+    //           account.tokens[c.inputs.pair.token0.address]!.amount,
+    //         )
+    //       : createAmountFromRaw(
+    //           c.inputs.pair.token1,
+    //           account.tokens[c.inputs.pair.token1.address]!.amount,
+    //         ),
+    //   );
+    //   updateToken(account, amount0);
+    //   updateToken(account, amount1);
+    // }
+    else if (c.command === "Accrue") {
       calculateAccrue(
         pairData[id]!,
-        pairData[id]!.strikeCurrentCached,
         blockNumber,
+        pairData[id]!.strikeCurrent[0],
       );
     }
   }
 
   // filter amounts owed
+  const transferRequestsToken = Object.values(account.tokens)
+    .filter((c) => amountGreaterThan(c, 0))
+    .map((t) => ({
+      ...t,
+      amount: fractionQuotient(
+        fractionMultiply(fractionAdd(args.slippage, 1), t.amount),
+      ),
+    }));
   const transferRequestsLP = Object.values(account.liquidityPositions)
     .filter((lp) => lp.balance < 0n)
     .map((lp) => ({ ...lp, balance: -lp.balance }))
@@ -188,34 +187,12 @@ export const routerRoute = async (
         fractionMultiply(fractionAdd(args.slippage, 1), lp.balance),
       ),
     }));
-  const transferRequestsToken = Object.values(account.tokens)
-    .filter((c) => amountGreaterThan(c, 0))
-    .map((t) => ({
-      ...t,
-      amount: fractionQuotient(
-        fractionMultiply(fractionAdd(args.slippage, 1), t.amount),
-      ),
-    }));
 
-  // get datahashes
-  const lpTransferDataHash = transferRequestsLP.map((t) =>
-    getTransferTypedDataHashLP(walletClient.chain!.id, {
-      positionData: t,
-      spender: RouterAddress,
-    }),
-  );
-  const permitTransferDataHash = getTransferBatchTypedDataHash(
-    walletClient.chain!.id,
-    { transferDetails: transferRequestsToken, spender: RouterAddress },
-  );
+  // build permit3 transfers
 
   // sign
-  const signature = await signSuperSignature(walletClient, userAccount, {
-    dataHash: lpTransferDataHash.concat(permitTransferDataHash),
-    nonce: args.nonce,
-    deadline: args.deadline,
-  });
 
+  // send transaction
   const { request, result } = await publicClient.simulateContract({
     address: RouterAddress,
     abi: routerABI,
@@ -224,25 +201,22 @@ export const routerRoute = async (
     args: [
       {
         to: args.to,
-        commands: args.commands.map((c) => CommandEnum[c.command]),
-        inputs: args.commands.map((c) => encodeInput(c)),
+        commandInputs: args.commands.map((c) => ({
+          command: CommandEnum[c.command],
+          input: encodeInput(c),
+        })),
         numTokens: BigInt(Object.values(account.tokens).length),
-        numLPs: BigInt(Object.values(account.liquidityPositions).length),
-        permitTransfers: transferRequestsToken.map((t) => ({
-          token: t.token.address,
-          amount: t.amount,
-        })),
-        positionTransfers: transferRequestsLP.map((t) => ({
-          id: dataID(t.token),
-          orderType: OrderTypeEnum[t.token.orderType],
-          amount: t.balance,
-        })),
-        verify: {
-          dataHash: lpTransferDataHash.concat(permitTransferDataHash),
+        numLPs: BigInt(
+          Object.values(account.liquidityPositions).filter(
+            (lp) => lp.balance < 0,
+          ).length,
+        ),
+        signatureTransfer: {
           nonce: args.nonce,
           deadline: args.deadline,
+          transferDetails: [],
         },
-        signature,
+        signature: "0x",
       },
     ],
   });
@@ -255,7 +229,7 @@ export const routerRoute = async (
 type Account = {
   tokens: { [address: Address]: ERC20Amount<ERC20> };
   liquidityPositions: {
-    [id_orderType: `${Hex}_${OrderType}`]: PositionData<OrderType>;
+    [id_orderType: `${Hex}`]: PositionData<OrderType>;
   };
 };
 
@@ -285,14 +259,7 @@ const updateLiquidityPosition = (
   if (account.liquidityPositions[id] === undefined) {
     account.liquidityPositions[id] = positionData;
   } else {
-    if (positionIsBiDirectional(positionData.token)) {
-      account.liquidityPositions[id]!.balance += positionData.balance;
-    } else {
-      account.liquidityPositions[id] = addDebtPositions(
-        account.liquidityPositions[id]! as PositionData<"Debt">,
-        positionData as PositionData<"Debt">,
-      );
-    }
+    account.liquidityPositions[id]!.balance += positionData.balance;
   }
 };
 
@@ -321,8 +288,11 @@ const encodeInput = (command: Command): Hex =>
         command.inputs.pair.token1.address,
         command.inputs.pair.scalingFactor,
         command.inputs.strike,
-        TokenSelectorEnum[command.inputs.selectorCollateral],
-        command.inputs.amountDesiredCollateral,
+        command.inputs.amountDesiredCollateral.token ===
+        command.inputs.pair.token0
+          ? TokenSelectorEnum.Token0
+          : TokenSelectorEnum.Token1,
+        command.inputs.amountDesiredCollateral.amount,
         command.inputs.amountDesiredDebt,
       ])
     : command.command === "RepayLiquidity"
@@ -332,8 +302,9 @@ const encodeInput = (command: Command): Hex =>
         command.inputs.pair.scalingFactor,
         command.inputs.strike,
         TokenSelectorEnum[command.inputs.selectorCollateral],
-        fractionToQ128(command.inputs.leverageRatio),
-        command.inputs.amountDesiredDebt,
+        fractionToQ128(command.inputs.liquidityGrowthLast),
+        fractionToQ128(command.inputs.multiplier),
+        command.inputs.amountDesired,
       ])
     : command.command === "Swap"
     ? encodeAbiParameters(SwapParams, [
@@ -341,13 +312,11 @@ const encodeInput = (command: Command): Hex =>
         command.inputs.pair.token1.address,
         command.inputs.pair.scalingFactor,
         SwapTokenSelectorEnum[command.inputs.selector],
-        command.inputs.amountDesired,
+        command.inputs.amountDesired.amount,
       ])
     : command.command === "Accrue"
     ? encodeAbiParameters(AccrueParams, [
-        command.inputs.pair.token0.address,
-        command.inputs.pair.token1.address,
-        command.inputs.pair.scalingFactor,
+        getPairID(command.inputs.pair),
         command.inputs.strike,
       ])
     : encodeAbiParameters(CreatePairParams, [
@@ -374,6 +343,22 @@ export const AddLiquidityParams = [
   { name: "amountDesired", type: "uint128" },
 ] as const;
 
+export const UnwrapWETHParams = [
+  {
+    name: "wethIndex",
+    type: "uint256",
+  },
+];
+
+export const RemoveLiquidityParams = [
+  { name: "token0", type: "address" },
+  { name: "token1", type: "address" },
+  { name: "scalingFactor", type: "uint8" },
+  { name: "strike", type: "int24" },
+  { name: "spread", type: "uint8" },
+  { name: "amountDesired", type: "uint128" },
+] as const;
+
 export const BorrowLiquidityParams = [
   { name: "token0", type: "address" },
   { name: "token1", type: "address" },
@@ -390,23 +375,13 @@ export const RepayLiquidityParams = [
   { name: "scalingFactor", type: "uint8" },
   { name: "strike", type: "int24" },
   { name: "selectorCollateral", type: "uint8" },
-  { name: "leverageRatioX128", type: "uint256" },
-  { name: "amountDesiredDebt", type: "uint128" },
-] as const;
-
-export const RemoveLiquidityParams = [
-  { name: "token0", type: "address" },
-  { name: "token1", type: "address" },
-  { name: "scalingFactor", type: "uint8" },
-  { name: "strike", type: "int24" },
-  { name: "spread", type: "uint8" },
+  { name: "liquidityGrowthLastX128", type: "uint256" },
+  { name: "multiplierX128", type: "uint136" },
   { name: "amountDesired", type: "uint128" },
 ] as const;
 
 export const AccrueParams = [
-  { name: "token0", type: "address" },
-  { name: "token1", type: "address" },
-  { name: "scalingFactor", type: "uint8" },
+  { name: "pairID", type: "bytes32" },
   { name: "strike", type: "int24" },
 ] as const;
 

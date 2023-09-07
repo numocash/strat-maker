@@ -1,9 +1,8 @@
 import {
   type ERC20,
-  MaxUint256,
   fractionEqualTo,
-  makeAmountFromRaw,
-  makeFraction,
+  createFraction,
+  createAmountFromString,
 } from "reverse-mirage";
 import { parseEther } from "viem";
 import { describe, expect, test } from "vitest";
@@ -13,9 +12,8 @@ import {
   calculateInitialize,
   calculateRemoveLiquidity,
   calculateRepayLiquidity,
-  calculateSwap,
+  // calculateSwap,
 } from "./amounts.js";
-import { Q128 } from "./constants.js";
 import type { Pair } from "./types.js";
 
 const token0 = {
@@ -39,7 +37,6 @@ const token1 = {
 const pair = { token0, token1, scalingFactor: 0 } as const satisfies Pair;
 
 const oneEther = parseEther("1");
-const ratioAtStrikeNeg1 = 0xfff97272373d413259a407b06395f90fn;
 
 // TODO: fix sign of amounts
 describe.concurrent("amounts", () => {
@@ -47,10 +44,9 @@ describe.concurrent("amounts", () => {
     const pairData = calculateInitialize(1);
 
     expect(pairData.strikes[1]).toBeTruthy();
-    expect(pairData.bitMap0To1.centerStrike).toBe(1);
-    expect(pairData.bitMap1To0.centerStrike).toBe(1);
+    // expect(pairData.bitMap0To1.centerStrike).toBe(1);
+    // expect(pairData.bitMap1To0.centerStrike).toBe(1);
     expect(pairData.strikeCurrent).toStrictEqual([1, 1, 1, 1, 1]);
-    expect(pairData.strikeCurrentCached).toBe(1);
     expect(pairData.initialized).toBe(true);
   });
 
@@ -66,7 +62,7 @@ describe.concurrent("amounts", () => {
     );
 
     // amounts
-    expect(amount0.amount).toBe(oneEther - 1n);
+    expect(amount0.amount).toBe(oneEther);
     expect(amount1.amount).toBe(0n);
     expect(position.balance).toBe(oneEther);
     expect(amount0.token === token0).toBe(true);
@@ -74,19 +70,12 @@ describe.concurrent("amounts", () => {
 
     // pair data
     expect(pairData.strikes[0]).toBeTruthy();
-    expect(pairData.strikes[0]!.totalSupply).toStrictEqual([
-      oneEther,
-      0n,
-      0n,
-      0n,
-      0n,
-    ]);
-    expect(pairData.strikes[0]!.liquidityBiDirectional).toStrictEqual([
-      oneEther,
-      0n,
-      0n,
-      0n,
-      0n,
+    expect(pairData.strikes[0]!.liquidity).toStrictEqual([
+      { swap: oneEther, borrowed: 0n },
+      { swap: 0n, borrowed: 0n },
+      { swap: 0n, borrowed: 0n },
+      { swap: 0n, borrowed: 0n },
+      { swap: 0n, borrowed: 0n },
     ]);
   });
 
@@ -112,139 +101,110 @@ describe.concurrent("amounts", () => {
 
     // pair data
     expect(pairData.strikes[0]).toBeTruthy();
-    expect(pairData.strikes[0]!.totalSupply).toStrictEqual([
-      0n,
-      0n,
-      0n,
-      0n,
-      0n,
-    ]);
-    expect(pairData.strikes[0]!.liquidityBiDirectional).toStrictEqual([
-      0n,
-      0n,
-      0n,
-      0n,
-      0n,
+    expect(pairData.strikes[0]!.liquidity).toStrictEqual([
+      { swap: 0n, borrowed: 0n },
+      { swap: 0n, borrowed: 0n },
+      { swap: 0n, borrowed: 0n },
+      { swap: 0n, borrowed: 0n },
+      { swap: 0n, borrowed: 0n },
     ]);
   });
 
   test("calculate borrow liquidity", () => {
     const pairData = calculateInitialize(0);
-    calculateAddLiquidity(pair, pairData, 0n, 1, 1, oneEther);
+    calculateAddLiquidity(pair, pairData, 0n, 0, 1, oneEther);
     const { amount0, amount1, position } = calculateBorrowLiquidity(
       pair,
       pairData,
       0n,
-      1,
-      "Token0",
-      parseEther("1.5"),
+      0,
+      createAmountFromString(token0, "1.5"),
       parseEther("0.5"),
     );
 
     // amounts
-    expect(amount0.amount).toBe(
-      parseEther("1.5") -
-        (parseEther("0.5") * ratioAtStrikeNeg1 * Q128) / MaxUint256,
-    );
+    expect(amount0.amount).toBe(-oneEther - 1n);
     expect(amount1.amount).toBe(0n);
     expect(position.balance).toBe(parseEther("0.5"));
+    expect(fractionEqualTo(position.token.data.liquidityGrowthLast, 0n)).toBe(
+      true,
+    );
     expect(
-      fractionEqualTo(
-        position.data.leverageRatio,
-        makeFraction(
-          (parseEther("1.5") * Q128) / ratioAtStrikeNeg1,
-          parseEther("0.5"),
-        ),
-      ),
+      fractionEqualTo(position.token.data.multiplier, createFraction(2)),
     ).toBe(true);
     expect(amount0.token === token0).toBe(true);
     expect(amount1.token === token1).toBe(true);
 
     // pair data
-    expect(pairData.strikes[1]).toBeTruthy();
-    expect(pairData.strikes[1]!.liquidityBorrowed).toStrictEqual([
-      parseEther("0.5"),
-      0n,
-      0n,
-      0n,
-      0n,
+    expect(pairData.strikes[0]).toBeTruthy();
+    expect(pairData.strikes[0]!.liquidity).toStrictEqual([
+      { swap: parseEther("0.5"), borrowed: parseEther("0.5") },
+      { swap: 0n, borrowed: 0n },
+      { swap: 0n, borrowed: 0n },
+      { swap: 0n, borrowed: 0n },
+      { swap: 0n, borrowed: 0n },
     ]);
-    expect(pairData.strikes[1]!.liquidityBiDirectional).toStrictEqual([
-      parseEther("0.5"),
-      0n,
-      0n,
-      0n,
-      0n,
-    ]);
+    expect(
+      fractionEqualTo(
+        pairData.strikes[0]!.liquidityRepayRate,
+        createFraction(oneEther, 4),
+      ),
+    ).toBe(true);
   });
 
   test("calculate repay liquidity", () => {
     const pairData = calculateInitialize(0);
-    calculateAddLiquidity(pair, pairData, 0n, 1, 1, oneEther);
+    calculateAddLiquidity(pair, pairData, 0n, 0, 1, oneEther);
     calculateBorrowLiquidity(
       pair,
       pairData,
       0n,
-      1,
-      "Token0",
-      parseEther("1.5"),
+      0,
+      createAmountFromString(token0, "1.5"),
       parseEther("0.5"),
     );
     const { amount0, amount1, position } = calculateRepayLiquidity(
       pair,
       pairData,
       0n,
-      1,
+      0,
       "Token0",
-      makeFraction(
-        (parseEther("1.5") * Q128) / ratioAtStrikeNeg1,
-        parseEther("0.5"),
-      ),
+      createFraction(0),
+      createFraction(2),
       parseEther("0.5"),
     );
 
     // amounts
-    expect(amount0.amount).toBe(
-      (parseEther("0.5") * ratioAtStrikeNeg1 * Q128) / MaxUint256 -
-        parseEther("1.5") +
-        1n,
-    );
+    expect(amount0.amount).toBe(-oneEther);
     expect(amount1.amount).toBe(0n);
     expect(position.balance).toBe(-parseEther("0.5"));
     expect(amount0.token === token0).toBe(true);
     expect(amount1.token === token1).toBe(true);
 
     // pair data
-    expect(pairData.strikes[1]).toBeTruthy();
-    expect(pairData.strikes[1]!.liquidityBorrowed).toStrictEqual([
-      0n,
-      0n,
-      0n,
-      0n,
-      0n,
-    ]);
-    expect(pairData.strikes[1]!.liquidityBiDirectional).toStrictEqual([
-      oneEther,
-      0n,
-      0n,
-      0n,
-      0n,
+    expect(pairData.strikes[0]).toBeTruthy();
+    expect(pairData.strikes[0]!.liquidity).toStrictEqual([
+      { swap: parseEther("1"), borrowed: 0n },
+      { swap: 0n, borrowed: 0n },
+      { swap: 0n, borrowed: 0n },
+      { swap: 0n, borrowed: 0n },
+      { swap: 0n, borrowed: 0n },
     ]);
   });
 
-  test.todo("calculate swap token 1 exact in", () => {
-    const pairData = calculateInitialize(0);
-    calculateAddLiquidity(pair, pairData, 0n, 0, 1, oneEther);
-    const { amount0, amount1 } = calculateSwap(
-      pair,
-      pairData,
-      makeAmountFromRaw(token1, oneEther - 1n),
-    );
-    expect(amount0.amount).toBe(oneEther - 1n);
-    expect(amount1.amount).toBe(oneEther - 1n);
-    expect(amount0.token === token0).toBe(true);
-    expect(amount1.token === token1).toBe(true);
-  });
+  // test.todo("calculate swap token 1 exact in", () => {
+  //   const pairData = calculateInitialize(0);
+  //   calculateAddLiquidity(pair, pairData, 0n, 0, 1, oneEther);
+  //   const { amount0, amount1 } = calculateSwap(
+  //     pair,
+  //     pairData,
+  //     createAmountFromRaw(token1, oneEther - 1n),
+  //   );
+  //   expect(amount0.amount).toBe(oneEther - 1n);
+  //   expect(amount1.amount).toBe(oneEther - 1n);
+  //   expect(amount0.token === token0).toBe(true);
+  //   expect(amount1.token === token1).toBe(true);
+  // });
 
   test.todo("calculate accrue", () => {});
 });

@@ -1,5 +1,5 @@
 import type { AbiTypeToPrimitiveType } from "abitype";
-import type { ERC20, Fraction } from "reverse-mirage";
+import type { ERC20, ERC20Amount, Fraction } from "reverse-mirage";
 import {
   CommandEnum,
   NUM_SPREADS,
@@ -29,12 +29,14 @@ export type Spread = 1 | 2 | 3 | 4 | 5;
 
 export type StrikeData = {
   liquidityGrowth: Fraction;
+  liquidityRepayRate: Fraction;
+  liquidityGrowthSpread: Tuple<Fraction, typeof NUM_SPREADS>;
+  liquidity: Tuple<{ swap: bigint; borrowed: bigint }, typeof NUM_SPREADS>;
   blockLast: bigint;
-  totalSupply: Tuple<bigint, typeof NUM_SPREADS>;
-  liquidityBiDirectional: Tuple<bigint, typeof NUM_SPREADS>;
-  liquidityBorrowed: Tuple<bigint, typeof NUM_SPREADS>;
   next0To1: Strike;
   next1To0: Strike;
+  // reference0To1: Set<Spread>;
+  // reference1To0: Set<Spread>;
   activeSpread: 0 | 1 | 2 | 3 | 4;
 };
 
@@ -45,11 +47,10 @@ export type BitMap = {
 
 export type PairData = {
   strikes: { [strike: Strike]: StrikeData };
-  bitMap0To1: BitMap;
-  bitMap1To0: BitMap;
+  // bitMap0To1: BitMap;
+  // bitMap1To0: BitMap;
   composition: Tuple<Fraction, typeof NUM_SPREADS>;
   strikeCurrent: Tuple<Strike, typeof NUM_SPREADS>;
-  strikeCurrentCached: Strike;
   initialized: boolean;
 };
 
@@ -64,13 +65,18 @@ type CommandType<
   TInput extends object,
 > = { command: TCommand; inputs: TInput };
 
-export type CreatePairCommand = CommandType<
-  "CreatePair",
+export type SwapCommand<TPair extends Pair = Pair> = CommandType<
+  "Swap",
   {
-    pair: Pair;
-    strike: Strike;
+    pair: TPair;
+    selector: SwapTokenSelector;
+    amountDesired: ERC20Amount<TPair["token0"] | TPair["token1"]>;
   }
 >;
+
+export type WrapWETHCommand = CommandType<"WrapWETH", {}>;
+
+export type UnwrapWETHCommand = CommandType<"UnwrapWETH", {}>;
 
 export type AddLiquidityCommand = CommandType<
   "AddLiquidity",
@@ -97,8 +103,7 @@ export type BorrowLiquidityCommand = CommandType<
   {
     pair: Pair;
     strike: Strike;
-    selectorCollateral: TokenSelector;
-    amountDesiredCollateral: bigint;
+    amountDesiredCollateral: ERC20Amount<Pair["token0"] | Pair["token1"]>;
     amountDesiredDebt: bigint;
   }
 >;
@@ -109,16 +114,8 @@ export type RepayLiquidityCommand = CommandType<
     pair: Pair;
     strike: Strike;
     selectorCollateral: TokenSelector;
-    leverageRatio: Fraction;
-    amountDesiredDebt: bigint;
-  }
->;
-
-export type SwapCommand = CommandType<
-  "Swap",
-  {
-    pair: Pair;
-    selector: SwapTokenSelector;
+    liquidityGrowthLast: Fraction;
+    multiplier: Fraction;
     amountDesired: bigint;
   }
 >;
@@ -131,11 +128,21 @@ export type AccrueCommand = CommandType<
   }
 >;
 
+export type CreatePairCommand = CommandType<
+  "CreatePair",
+  {
+    pair: Pair;
+    strike: Strike;
+  }
+>;
+
 export type Command =
-  | CreatePairCommand
+  | SwapCommand
+  // | WrapWETHCommand
+  // | UnwrapWETHCommand
   | AddLiquidityCommand
   | RemoveLiquidityCommands
   | BorrowLiquidityCommand
   | RepayLiquidityCommand
-  | SwapCommand
-  | AccrueCommand;
+  | AccrueCommand
+  | CreatePairCommand;

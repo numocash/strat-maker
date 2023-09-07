@@ -1,43 +1,40 @@
 import { describe, expect, test } from "vitest";
-import { EngineAddress } from "./constants.js";
-import { dataID } from "./positions.js";
+import { createPosition, dataID } from "./positions.js";
 import { mockERC20 } from "./test/constants.js";
+import { foundry } from "viem/chains";
+import { createFraction } from "reverse-mirage";
 
 describe("positions", () => {
   test("bi directional data id", () => {
-    const position = {
-      orderType: "BiDirectional",
-      name: "Numoen Dry Powder",
-      symbol: "DP",
-      address: EngineAddress,
-      data: {
+    const position = createPosition(
+      "BiDirectional",
+      {
         token0: mockERC20,
         token1: mockERC20,
         scalingFactor: 0,
         strike: 0,
         spread: 1,
       },
-    } as const;
+      foundry.id,
+    );
     const id = dataID(position);
     expect(id).toBeTruthy();
   });
 
   test("debt data id", () => {
-    const position = {
-      type: "position",
-      chainID: 1,
-      orderType: "Debt",
-      name: "Numoen Dry Powder",
-      symbol: "DP",
-      address: EngineAddress,
-      data: {
+    const position = createPosition(
+      "Debt",
+      {
         token0: mockERC20,
         token1: mockERC20,
         scalingFactor: 0,
         strike: 0,
-        selectorCollateral: "Token0",
+        selectorCollateral: "Token1",
+        liquidityGrowthLast: createFraction(1),
+        multiplier: createFraction(2),
       },
-    } as const;
+      foundry.id,
+    );
     const id = dataID(position);
     expect(id).toBeTruthy();
   });

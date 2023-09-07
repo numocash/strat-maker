@@ -1,13 +1,15 @@
 import {
   type ILRTA,
   type ILRTAData,
-  type ILRTARequestedTransfer,
-  type ILRTASignatureTransfer,
-  ILRTASuperSignatureTransfer,
-  ILRTATransfer,
   type ILRTATransferDetails,
+  type ILRTAApprovalDetails,
 } from "ilrta-sdk";
-import type { ERC20, Fraction } from "reverse-mirage";
+import type {
+  ERC20,
+  Fraction,
+  ReverseMirageRead,
+  ReverseMirageWrite,
+} from "reverse-mirage";
 import invariant from "tiny-invariant";
 import {
   type Account,
@@ -15,9 +17,8 @@ import {
   type Hex,
   type WalletClient,
   encodeAbiParameters,
-  getAddress,
-  hashTypedData,
   keccak256,
+  type PublicClient,
 } from "viem";
 import {
   EngineAddress,
@@ -25,6 +26,8 @@ import {
   TokenSelectorEnum,
 } from "./constants.js";
 import type { OrderType, Spread, Strike, TokenSelector } from "./types.js";
+import { fractionToQ128 } from "./utils.js";
+import { positionsABI } from "./generated.js";
 
 export type Position<TOrderType extends OrderType> = ILRTA<"position"> & {
   name: "Numoen Dry Powder";
@@ -44,6 +47,8 @@ export type Position<TOrderType extends OrderType> = ILRTA<"position"> & {
         scalingFactor: number;
         strike: Strike;
         selectorCollateral: TokenSelector;
+        liquidityGrowthLast: Fraction;
+        multiplier: Fraction;
       };
 };
 
@@ -51,11 +56,10 @@ export type PositionData<TOrderType extends OrderType> = ILRTAData<
   Position<TOrderType>,
   {
     balance: bigint;
-    data: TOrderType extends "BiDirectional" ? {} : { leverageRatio: Fraction };
   }
 >;
 
-export const makePosition = <TOrderType extends OrderType>(
+export const createPosition = <TOrderType extends OrderType>(
   orderType: TOrderType,
   data: Position<TOrderType>["data"],
   chainID: number,
@@ -67,34 +71,22 @@ export const makePosition = <TOrderType extends OrderType>(
   symbol: "DP",
   address: EngineAddress,
   data,
-  id: dataID({ orderType, data }),
 });
 
-export type PositionTransferDetails<TOrderType extends OrderType> =
+export type TransferDetailsType<TOrderType extends OrderType> =
   ILRTATransferDetails<Position<TOrderType>, { amount: bigint }>;
 
-export type SignatureTransfer<TOrderType extends OrderType> =
-  ILRTASignatureTransfer<PositionTransferDetails<TOrderType>>;
+export type ApprovalDetailsType<TOrderType extends OrderType> =
+  ILRTAApprovalDetails<Position<TOrderType>, { approved: boolean }>;
 
-export type RequestedTransfer<TOrderType extends OrderType> =
-  ILRTARequestedTransfer<PositionTransferDetails<TOrderType>>;
-
-export const Data = [
-  { name: "balance", type: "uint128" },
-  { name: "orderType", type: "uint8" },
-  { name: "data", type: "bytes" },
-] as const;
+export const Data = [{ name: "balance", type: "uint128" }] as const;
 
 export const TransferDetails = [
   { name: "id", type: "bytes32" },
-  { name: "orderType", type: "uint8" },
   { name: "amount", type: "uint128" },
 ] as const;
 
-export const Transfer = ILRTATransfer(TransferDetails);
-
-export const SuperSignatureTransfer =
-  ILRTASuperSignatureTransfer(TransferDetails);
+export const ApprovalDetails = [{ name: "approved", type: "bool" }] as const;
 
 export const ILRTADataID = [
   {
@@ -108,7 +100,7 @@ export const ILRTADataID = [
         type: "bytes",
       },
     ],
-    name: "ilrtaDataID",
+    name: "ILRTADataID",
     type: "tuple",
   },
 ] as const;
@@ -128,7 +120,7 @@ export const BiDirectionalID = [
       { name: "strike", type: "int24" },
       { name: "spread", type: "uint8" },
     ],
-    name: "biDirectionalID",
+    name: "BiDirectionalID",
     type: "tuple",
   },
 ] as const;
@@ -147,8 +139,10 @@ export const DebtID = [
       { name: "scalingFactor", type: "uint8" },
       { name: "strike", type: "int24" },
       { name: "selector", type: "uint8" },
+      { name: "liquidityGrowthX128Last", type: "uint256" },
+      { name: "multiplier", type: "uint136" },
     ],
-    name: "debtID",
+    name: "DebtID",
     type: "tuple",
   },
 ] as const;
@@ -195,6 +189,10 @@ export const dataID = (
               scalingFactor: position.data.scalingFactor,
               strike: position.data.strike,
               selector: TokenSelectorEnum[position.data.selectorCollateral],
+              liquidityGrowthX128Last: fractionToQ128(
+                position.data.liquidityGrowthLast,
+              ),
+              multiplier: fractionToQ128(position.data.multiplier),
             },
           ]),
         },
@@ -203,68 +201,91 @@ export const dataID = (
   }
 };
 
-export const getTransferTypedDataHash = (
-  chainID: number,
-  transfer: {
-    positionData: PositionData<OrderType>;
-    spender: Address;
-  },
-): Hex => {
-  const domain = {
-    name: "Numoen Dry Powder",
-    version: "1",
-    chainId: chainID,
-    verifyingContract: EngineAddress,
-  } as const;
-
-  const id = dataID(transfer.positionData.token);
-
-  return hashTypedData({
-    domain,
-    types: SuperSignatureTransfer,
-    primaryType: "Transfer",
-    message: {
-      transferDetails: {
-        id,
-        orderType: OrderTypeEnum[transfer.positionData.token.orderType],
-        amount: transfer.positionData.balance,
-      },
-      spender: getAddress(transfer.spender),
-    },
-  });
-};
-
-export const signTransfer = (
+export const transfer = async <TOrderType extends OrderType>(
+  publicClient: PublicClient,
   walletClient: WalletClient,
   account: Account | Address,
-  transfer: SignatureTransfer<OrderType> & { spender: Address },
-): Promise<Hex> => {
-  const chainID = walletClient.chain?.id;
-  invariant(chainID);
-
-  const domain = {
-    name: "Numoen Dry Powder",
-    version: "1",
-    chainId: chainID,
-    verifyingContract: EngineAddress,
-  } as const;
-
-  const id = dataID(transfer.transferDetails.ilrta);
-
-  return walletClient.signTypedData({
-    domain,
+  args: { to: Address; transferDetails: TransferDetailsType<TOrderType> },
+): Promise<ReverseMirageWrite<typeof positionsABI, "transfer_oHLEec">> => {
+  const { request, result } = await publicClient.simulateContract({
     account,
-    types: Transfer,
-    primaryType: "Transfer",
-    message: {
-      transferDetails: {
-        id,
-        orderType: OrderTypeEnum[transfer.transferDetails.ilrta.orderType],
-        amount: transfer.transferDetails.amount,
+    abi: positionsABI,
+    functionName: "transfer_oHLEec",
+    args: [
+      args.to,
+      {
+        id: dataID(args.transferDetails.ilrta),
+        amount: args.transferDetails.amount,
       },
-      spender: transfer.spender,
-      nonce: transfer.nonce,
-      deadline: transfer.deadline,
-    },
+    ],
+    address: args.transferDetails.ilrta.address,
   });
+  const hash = await walletClient.writeContract(request);
+  return { hash, result, request };
 };
+
+// transferFrom
+
+export const approve = async <TOrderType extends OrderType>(
+  publicClient: PublicClient,
+  walletClient: WalletClient,
+  account: Account | Address,
+  args: { spender: Address; approvalDetails: ApprovalDetailsType<TOrderType> },
+): Promise<ReverseMirageWrite<typeof positionsABI, "approve_BKoIou">> => {
+  const { request, result } = await publicClient.simulateContract({
+    account,
+    abi: positionsABI,
+    functionName: "approve_BKoIou",
+    args: [
+      args.spender,
+      {
+        approved: args.approvalDetails.approved,
+      },
+    ],
+    address: args.approvalDetails.ilrta.address,
+  });
+  const hash = await walletClient.writeContract(request);
+  return { hash, result, request };
+};
+
+export const dataOf = <TOrderType extends OrderType>(
+  publicClient: PublicClient,
+  args: { position: Position<TOrderType>; owner: Address },
+) =>
+  ({
+    read: () =>
+      publicClient.readContract({
+        abi: positionsABI,
+        address: args.position.address,
+        functionName: "dataOf_cGJnTo",
+        args: [args.owner, dataID(args.position)],
+      }),
+    parse: (data): PositionData<TOrderType> => ({
+      type: "positionData",
+      token: args.position,
+      balance: data.balance,
+    }),
+  }) satisfies ReverseMirageRead<{
+    balance: bigint;
+  }>;
+
+export const allowanceOf = <TOrderType extends OrderType>(
+  publicClient: PublicClient,
+  args: { position: Position<TOrderType>; owner: Address; spender: Address },
+) =>
+  ({
+    read: () =>
+      publicClient.readContract({
+        abi: positionsABI,
+        address: args.position.address,
+        functionName: "allowanceOf_QDmnOj",
+        args: [args.owner, args.spender, dataID(args.position)],
+      }),
+    parse: (data): ApprovalDetailsType<TOrderType> => ({
+      type: "positionApproval",
+      ilrta: args.position,
+      approved: data.approved,
+    }),
+  }) satisfies ReverseMirageRead<{
+    approved: boolean;
+  }>;

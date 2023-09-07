@@ -1,7 +1,7 @@
 import Engine from "dry-powder/out/Engine.sol/Engine.json";
 import MockERC20 from "dry-powder/out/MockERC20.sol/MockERC20.json";
 import Router from "dry-powder/out/Router.sol/Router.json";
-import Permit3 from "ilrta-evm/out/Permit3.sol/Permit3.json";
+import Permit3 from "ilrta/out/Permit3.sol/Permit3.json";
 import {
   type ERC20,
   fractionGreaterThan,

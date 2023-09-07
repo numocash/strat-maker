@@ -2,27 +2,27 @@ import { MaxUint256 } from "reverse-mirage";
 import { parseEther } from "viem";
 import { describe, expect, test } from "vitest";
 import { Q128 } from "./constants.js";
-import { getAmount0Delta, getAmount1Delta } from "./math.js";
+import { getAmount0, getAmount1 } from "./math.js";
 
 const oneEther = parseEther("1");
 const ratioAtStrikeNeg1 = 0xfff97272373d413259a407b06395f90fn;
 
 describe.concurrent("math", () => {
   test("get amount 0 delta", () => {
-    expect(getAmount0Delta(oneEther, 0)).toBe(oneEther);
-    expect(getAmount0Delta(2n * oneEther, 0)).toBe(2n * oneEther);
+    expect(getAmount0(oneEther, 0, false)).toBe(oneEther);
+    expect(getAmount0(2n * oneEther, 0, false)).toBe(2n * oneEther);
 
-    expect(getAmount0Delta(oneEther, 1)).toBe(
+    expect(getAmount0(oneEther, 1, false)).toBe(
       (oneEther * ratioAtStrikeNeg1 * Q128) / MaxUint256,
     );
-    expect(getAmount0Delta(oneEther, -1)).toBe(
+    expect(getAmount0(oneEther, -1, false)).toBe(
       (oneEther * Q128) / ratioAtStrikeNeg1,
     );
   });
 
   test("get amount 1 delta", () => {
-    expect(getAmount1Delta(oneEther)).toBe(oneEther);
-    expect(getAmount1Delta(2n * oneEther)).toBe(2n * oneEther);
+    expect(getAmount1(oneEther)).toBe(oneEther);
+    expect(getAmount1(2n * oneEther)).toBe(2n * oneEther);
   });
 
   test.todo("get liquidity amount 0 delta", () => {});
@@ -39,17 +39,11 @@ describe.concurrent("math", () => {
 
   test.todo("get amounts for liquidity", () => {});
 
-  test.todo("get liquidity for amount 0", () => {});
-
-  test.todo("get liquidity for amount 1", () => {});
-
   test.todo("balance to liquidity", () => {});
 
   test.todo("liquidity to balance", () => {});
 
   test.todo("debt balance to liquidity", () => {});
-
-  test.todo("debt liquidity to balance", () => {});
 
   test.todo("get ratio at strike", () => {});
 
