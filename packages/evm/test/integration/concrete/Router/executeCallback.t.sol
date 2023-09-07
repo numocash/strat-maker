@@ -20,11 +20,11 @@ contract ExecuteCallbackTest is Test {
     MockPositions private mockPositions;
 
     bytes32 private constant TRANSFER_DETAILS_TYPEHASH =
-        keccak256("TransferDetails(address token,uint8 tokenType,bytes4 functionSelector,bytes transferDetails)");
+        keccak256("TransferDetails(address token,uint8 tokenType,uint32 functionSelector,bytes transferDetails)");
 
     bytes32 private constant TRANSFER_BATCH_TYPEHASH = keccak256(
         // solhint-disable-next-line max-line-length
-        "Transfer(TransferDetails[] transferDetails,address spender,uint256 nonce,uint256 deadline)TransferDetails(address token,uint8 tokenType,bytes4 functionSelector,bytes transferDetails)"
+        "Transfer(TransferDetails[] transferDetails,address spender,uint256 nonce,uint256 deadline)TransferDetails(address token,uint8 tokenType,uint32 functionSelector,bytes transferDetails)"
     );
 
     function setUp() external {
@@ -94,7 +94,7 @@ contract ExecuteCallbackTest is Test {
         callbackData.signatureTransfer.transferDetails = new Permit3.TransferDetails[](1);
         callbackData.signatureTransfer.transferDetails[0].token = address(mockERC20);
         callbackData.signatureTransfer.transferDetails[0].tokenType = Permit3.TokenType.ERC20;
-        callbackData.signatureTransfer.transferDetails[0].functionSelector = ERC20.transferFrom.selector;
+        callbackData.signatureTransfer.transferDetails[0].functionSelector = 0x23b872dd;
         callbackData.signatureTransfer.transferDetails[0].transferDetails = abi.encode(uint256(1e18));
         callbackData.signatureTransfer.nonce = 0;
         callbackData.signatureTransfer.deadline = block.timestamp;
@@ -131,7 +131,7 @@ contract ExecuteCallbackTest is Test {
         callbackData.signatureTransfer.transferDetails = new Permit3.TransferDetails[](1);
         callbackData.signatureTransfer.transferDetails[0].token = address(mockERC20);
         callbackData.signatureTransfer.transferDetails[0].tokenType = Permit3.TokenType.ERC20;
-        callbackData.signatureTransfer.transferDetails[0].functionSelector = ERC20.transferFrom.selector;
+        callbackData.signatureTransfer.transferDetails[0].functionSelector = 0x23b872dd;
         callbackData.signatureTransfer.transferDetails[0].transferDetails = abi.encode(uint256(1e18));
         callbackData.signatureTransfer.nonce = 0;
         callbackData.signatureTransfer.deadline = block.timestamp;
@@ -170,7 +170,7 @@ contract ExecuteCallbackTest is Test {
         callbackData.signatureTransfer.transferDetails = new Permit3.TransferDetails[](1);
         callbackData.signatureTransfer.transferDetails[0].token = address(mockPositions);
         callbackData.signatureTransfer.transferDetails[0].tokenType = Permit3.TokenType.ILRTA;
-        callbackData.signatureTransfer.transferDetails[0].functionSelector = Positions.transferFrom_OSclqX.selector;
+        callbackData.signatureTransfer.transferDetails[0].functionSelector = 0x811c34d3;
         callbackData.signatureTransfer.transferDetails[0].transferDetails = abi.encode(account.lpData[0]);
         callbackData.signatureTransfer.nonce = 0;
         callbackData.signatureTransfer.deadline = block.timestamp;
@@ -214,7 +214,7 @@ contract ExecuteCallbackTest is Test {
         callbackData.signatureTransfer.transferDetails = new Permit3.TransferDetails[](1);
         callbackData.signatureTransfer.transferDetails[0].token = address(mockPositions);
         callbackData.signatureTransfer.transferDetails[0].tokenType = Permit3.TokenType.ILRTA;
-        callbackData.signatureTransfer.transferDetails[0].functionSelector = Positions.transferFrom_OSclqX.selector;
+        callbackData.signatureTransfer.transferDetails[0].functionSelector = 0x811c34d3;
         callbackData.signatureTransfer.transferDetails[0].transferDetails = abi.encode(account.lpData[0]);
         callbackData.signatureTransfer.nonce = 0;
         callbackData.signatureTransfer.deadline = block.timestamp;
