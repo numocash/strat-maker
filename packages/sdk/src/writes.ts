@@ -1,4 +1,12 @@
-import { amountAdd, readAndParse } from "reverse-mirage";
+import { type TransferDetails, permit3SignTransferBatch } from "ilrta-sdk";
+import {
+  amountAdd,
+  createAmountFromRaw,
+  fractionAdd,
+  fractionMultiply,
+  fractionQuotient,
+  readAndParse,
+} from "reverse-mirage";
 import type {
   ERC20,
   ERC20Amount,
@@ -28,7 +36,11 @@ import {
   TokenSelectorEnum,
 } from "./constants.js";
 import { routerABI } from "./generated.js";
-import { type PositionData, dataID } from "./positions.js";
+import {
+  type PositionData,
+  PositionTransferDetails,
+  dataID,
+} from "./positions.js";
 import { engineGetPair, engineGetStrike } from "./reads.js";
 import type { Command, OrderType, PairData, Strike } from "./types.js";
 import { fractionToQ128, getPairID } from "./utils.js";
@@ -78,7 +90,7 @@ export const routerRoute = async (
     } else if (c.command === "AddLiquidity") {
       await loadStrike(c.inputs.strike);
 
-      const { amount0, amount1, position } = calculateAddLiquidity(
+      const { amount0, amount1 } = calculateAddLiquidity(
         c.inputs.pair,
         pairData[id]!,
         blockNumber,
@@ -88,7 +100,7 @@ export const routerRoute = async (
       );
       updateToken(account, amount0);
       updateToken(account, amount1);
-      updateLiquidityPosition(account, position);
+      // updateLiquidityPosition(account, position);
     } else if (c.command === "RemoveLiquidity") {
       await loadStrike(c.inputs.strike);
 
@@ -106,7 +118,7 @@ export const routerRoute = async (
     } else if (c.command === "BorrowLiquidity") {
       await loadStrike(c.inputs.strike);
 
-      const { amount0, amount1, position } = calculateBorrowLiquidity(
+      const { amount0, amount1 } = calculateBorrowLiquidity(
         c.inputs.pair,
         pairData[id]!,
         blockNumber,
@@ -116,7 +128,7 @@ export const routerRoute = async (
       );
       updateToken(account, amount0);
       updateToken(account, amount1);
-      updateLiquidityPosition(account, position);
+      // updateLiquidityPosition(account, position);
     } else if (c.command === "RepayLiquidity") {
       await loadStrike(c.inputs.strike);
       const { amount0, amount1, position } = calculateRepayLiquidity(
@@ -153,28 +165,38 @@ export const routerRoute = async (
     }
   }
 
-  // filter amounts owed
-  // const transferRequestsToken = Object.values(account.tokens)
-  //   .filter((c) => amountGreaterThan(c, 0))
-  //   .map((t) => ({
-  //     ...t,
-  //     amount: fractionQuotient(
-  //       fractionMultiply(fractionAdd(args.slippage, 1), t.amount),
-  //     ),
-  //   }));
-  // const transferRequestsLP = Object.values(account.liquidityPositions)
-  //   .filter((lp) => lp.balance < 0n)
-  //   .map((lp) => ({ ...lp, balance: -lp.balance }))
-  //   .map((lp) => ({
-  //     ...lp,
-  //     balance: fractionQuotient(
-  //       fractionMultiply(fractionAdd(args.slippage, 1), lp.balance),
-  //     ),
-  //   }));
-
   // build permit3 transfers
+  const transferDetails = (
+    account.tokens.map((t) =>
+      t.amount > 0n
+        ? {
+            ...t,
+            amount: fractionQuotient(
+              fractionMultiply(fractionAdd(args.slippage, 1), t.amount),
+            ),
+          }
+        : createAmountFromRaw(t.token, 0n),
+    ) as TransferDetails[]
+  ).concat(
+    account.liquidityPositions.map((lp) => ({
+      type: "positionTransfer",
+      ilrta: lp.token,
+      transferDetails: encodeAbiParameters(PositionTransferDetails, [
+        dataID(lp.token),
+        fractionQuotient(
+          fractionMultiply(fractionAdd(args.slippage, 1), -lp.balance),
+        ),
+      ]),
+    })),
+  );
 
   // sign
+  const signature = await permit3SignTransferBatch(walletClient, userAccount, {
+    transferDetails,
+    nonce: args.nonce,
+    deadline: args.deadline,
+    spender: RouterAddress,
+  });
 
   // send transaction
   const { request, result } = await publicClient.simulateContract({
@@ -189,18 +211,14 @@ export const routerRoute = async (
           command: CommandEnum[c.command],
           input: encodeInput(c, account),
         })),
-        numTokens: BigInt(Object.values(account.tokens).length),
-        numLPs: BigInt(
-          Object.values(account.liquidityPositions).filter(
-            (lp) => lp.balance < 0,
-          ).length,
-        ),
+        numTokens: BigInt(account.tokens.length),
+        numLPs: BigInt(account.liquidityPositions.length),
         signatureTransfer: {
           nonce: args.nonce,
           deadline: args.deadline,
           transferDetails: [],
         },
-        signature: "0x",
+        signature,
       },
     ],
   });

@@ -1,8 +1,10 @@
+import { createErc20, createFraction } from "reverse-mirage";
+import { zeroAddress } from "viem";
+import { foundry } from "viem/chains";
 import { describe, expect, test } from "vitest";
 import { createPosition, dataID } from "./positions.js";
-import { mockERC20 } from "./test/constants.js";
-import { foundry } from "viem/chains";
-import { createFraction } from "reverse-mirage";
+
+const mockERC20 = createErc20(zeroAddress, "Test", "TEST", 18, foundry.id);
 
 describe("positions", () => {
   test("bi directional data id", () => {

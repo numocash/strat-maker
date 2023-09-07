@@ -1,17 +1,3 @@
-import type { ERC20, NativeCurrency } from "reverse-mirage";
-import { getContractAddress } from "viem/utils";
-
-export const localHttpUrl = "http://127.0.0.1:8545";
-export const localWsUrl = "ws://127.0.0.1:8545";
-
-export const forkBlockNumber = BigInt(
-  Number(process.env.VITE_ANVIL_BLOCK_NUMBER!),
-);
-
-export const forkUrl = process.env.VITE_ANVIL_FORK_URL!;
-
-export const blockTime = Number(process.env.VITE_ANVIL_BLOCK_TIME!);
-
 // Test accounts
 export const ACCOUNTS = [
   "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
@@ -28,22 +14,3 @@ export const ACCOUNTS = [
 
 // Named accounts
 export const [ALICE, BOB] = ACCOUNTS;
-
-const mockERC20Address = getContractAddress({ from: ALICE, nonce: 375n });
-
-export const mockERC20 = {
-  type: "erc20",
-  chainID: 1,
-  address: mockERC20Address,
-  decimals: 18,
-  name: "Mock ERC20",
-  symbol: "MOCK",
-} as const satisfies ERC20;
-
-export const anvilEther = {
-  type: "nativeCurrency",
-  chainID: 1,
-  decimals: 18,
-  name: "Anvil Ether",
-  symbol: "ETH",
-} as const satisfies NativeCurrency;

@@ -1,8 +1,8 @@
 import {
   type ILRTA,
+  type ILRTAApprovalDetails,
   type ILRTAData,
   type ILRTATransferDetails,
-  type ILRTAApprovalDetails,
 } from "ilrta-sdk";
 import type {
   ERC20,
@@ -15,19 +15,19 @@ import {
   type Account,
   type Address,
   type Hex,
+  type PublicClient,
   type WalletClient,
   encodeAbiParameters,
   keccak256,
-  type PublicClient,
 } from "viem";
 import {
   EngineAddress,
   OrderTypeEnum,
   TokenSelectorEnum,
 } from "./constants.js";
+import { positionsABI } from "./generated.js";
 import type { OrderType, Spread, Strike, TokenSelector } from "./types.js";
 import { fractionToQ128 } from "./utils.js";
-import { positionsABI } from "./generated.js";
 
 export type Position<TOrderType extends OrderType> = ILRTA<"position"> & {
   name: "Numoen Dry Powder";
@@ -81,12 +81,14 @@ export type ApprovalDetailsType<TOrderType extends OrderType> =
 
 export const Data = [{ name: "balance", type: "uint128" }] as const;
 
-export const TransferDetails = [
+export const PositionTransferDetails = [
   { name: "id", type: "bytes32" },
   { name: "amount", type: "uint128" },
 ] as const;
 
-export const ApprovalDetails = [{ name: "approved", type: "bool" }] as const;
+export const PositionApprovalDetails = [
+  { name: "approved", type: "bool" },
+] as const;
 
 export const ILRTADataID = [
   {
