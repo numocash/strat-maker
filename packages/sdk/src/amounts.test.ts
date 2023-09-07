@@ -3,15 +3,18 @@ import {
   fractionEqualTo,
   createFraction,
   createAmountFromString,
+  createAmountFromRaw,
 } from "reverse-mirage";
 import { parseEther } from "viem";
 import { describe, expect, test } from "vitest";
 import {
+  calculateAccrue,
   calculateAddLiquidity,
   calculateBorrowLiquidity,
   calculateInitialize,
   calculateRemoveLiquidity,
   calculateRepayLiquidity,
+  calculateSwap,
   // calculateSwap,
 } from "./amounts.js";
 import type { Pair } from "./types.js";
@@ -38,14 +41,11 @@ const pair = { token0, token1, scalingFactor: 0 } as const satisfies Pair;
 
 const oneEther = parseEther("1");
 
-// TODO: fix sign of amounts
 describe.concurrent("amounts", () => {
   test("initialized", () => {
     const pairData = calculateInitialize(1);
 
     expect(pairData.strikes[1]).toBeTruthy();
-    // expect(pairData.bitMap0To1.centerStrike).toBe(1);
-    // expect(pairData.bitMap1To0.centerStrike).toBe(1);
     expect(pairData.strikeCurrent).toStrictEqual([1, 1, 1, 1, 1]);
     expect(pairData.initialized).toBe(true);
   });
@@ -82,7 +82,7 @@ describe.concurrent("amounts", () => {
   test("calculate remove liquidity", () => {
     const pairData = calculateInitialize(0);
 
-    calculateAddLiquidity(pair, pairData, 0n, 0, 1, oneEther);
+    pairData.strikes[0]!.liquidity[0].swap = oneEther;
     const { amount0, amount1, position } = calculateRemoveLiquidity(
       pair,
       pairData,
@@ -112,7 +112,7 @@ describe.concurrent("amounts", () => {
 
   test("calculate borrow liquidity", () => {
     const pairData = calculateInitialize(0);
-    calculateAddLiquidity(pair, pairData, 0n, 0, 1, oneEther);
+    pairData.strikes[0]!.liquidity[0].swap = oneEther;
     const { amount0, amount1, position } = calculateBorrowLiquidity(
       pair,
       pairData,
@@ -123,7 +123,7 @@ describe.concurrent("amounts", () => {
     );
 
     // amounts
-    expect(amount0.amount).toBe(-oneEther - 1n);
+    expect(amount0.amount).toBe(oneEther + 1n);
     expect(amount1.amount).toBe(0n);
     expect(position.balance).toBe(parseEther("0.5"));
     expect(fractionEqualTo(position.token.data.liquidityGrowthLast, 0n)).toBe(
@@ -154,15 +154,10 @@ describe.concurrent("amounts", () => {
 
   test("calculate repay liquidity", () => {
     const pairData = calculateInitialize(0);
-    calculateAddLiquidity(pair, pairData, 0n, 0, 1, oneEther);
-    calculateBorrowLiquidity(
-      pair,
-      pairData,
-      0n,
-      0,
-      createAmountFromString(token0, "1.5"),
-      parseEther("0.5"),
-    );
+    pairData.strikes[0]!.liquidity[0].swap = parseEther("0.5");
+    pairData.strikes[0]!.liquidity[0].borrowed = parseEther("0.5");
+    pairData.strikes[0]!.liquidityRepayRate = createFraction(oneEther, 4);
+
     const { amount0, amount1, position } = calculateRepayLiquidity(
       pair,
       pairData,
@@ -192,19 +187,77 @@ describe.concurrent("amounts", () => {
     ]);
   });
 
-  // test.todo("calculate swap token 1 exact in", () => {
-  //   const pairData = calculateInitialize(0);
-  //   calculateAddLiquidity(pair, pairData, 0n, 0, 1, oneEther);
-  //   const { amount0, amount1 } = calculateSwap(
-  //     pair,
-  //     pairData,
-  //     createAmountFromRaw(token1, oneEther - 1n),
-  //   );
-  //   expect(amount0.amount).toBe(oneEther - 1n);
-  //   expect(amount1.amount).toBe(oneEther - 1n);
-  //   expect(amount0.token === token0).toBe(true);
-  //   expect(amount1.token === token1).toBe(true);
-  // });
+  test("calculate swap token 0 exact in", () => {
+    const pairData = calculateInitialize(0);
+    calculateAccrue(pairData, 0n, 1);
+    pairData.strikes[1]!.liquidity[0].swap = oneEther;
+    pairData.strikeCurrent[0] = 1;
+
+    const { amount0, amount1 } = calculateSwap(
+      pair,
+      pairData,
+      createAmountFromRaw(token0, oneEther / 2n),
+    );
+    expect(amount0.amount).toBe(oneEther / 2n);
+    expect(amount1.amount).toBe(-oneEther / 2n);
+    expect(amount0.token === token0).toBe(true);
+    expect(amount1.token === token1).toBe(true);
+    expect(pairData.strikeCurrent[0]).toBe(1);
+  });
+
+  test("calculate swap token 1 exact out", () => {
+    const pairData = calculateInitialize(0);
+    calculateAccrue(pairData, 0n, 1);
+    pairData.strikes[1]!.liquidity[0].swap = oneEther;
+    pairData.strikeCurrent[0] = 1;
+
+    const { amount0, amount1 } = calculateSwap(
+      pair,
+      pairData,
+      createAmountFromRaw(token1, -oneEther / 2n),
+    );
+    expect(amount0.amount).toBe(oneEther / 2n);
+    expect(amount1.amount).toBe(-oneEther / 2n);
+    expect(amount0.token === token0).toBe(true);
+    expect(amount1.token === token1).toBe(true);
+    expect(pairData.strikeCurrent[0]).toBe(1);
+  });
+
+  test("calculate swap token 0 exact out", () => {
+    const pairData = calculateInitialize(0);
+    calculateAccrue(pairData, 0n, -1);
+    pairData.strikes[-1]!.liquidity[0].swap = oneEther;
+    pairData.strikeCurrent[0] = -1;
+
+    const { amount0, amount1 } = calculateSwap(
+      pair,
+      pairData,
+      createAmountFromRaw(token0, -oneEther / 2n),
+    );
+    expect(amount0.amount).toBe(-oneEther / 2n);
+    expect(amount1.amount).toBe(oneEther / 2n);
+    expect(amount0.token === token0).toBe(true);
+    expect(amount1.token === token1).toBe(true);
+    expect(pairData.strikeCurrent[0]).toBe(-1);
+  });
+
+  test("calculate swap token 1 exact in", () => {
+    const pairData = calculateInitialize(0);
+    calculateAccrue(pairData, 0n, -1);
+    pairData.strikes[-1]!.liquidity[0].swap = oneEther;
+    pairData.strikeCurrent[0] = -1;
+
+    const { amount0, amount1 } = calculateSwap(
+      pair,
+      pairData,
+      createAmountFromRaw(token1, oneEther / 2n),
+    );
+    expect(amount0.amount).toBe(-oneEther / 2n);
+    expect(amount1.amount).toBe(oneEther / 2n);
+    expect(amount0.token === token0).toBe(true);
+    expect(amount1.token === token1).toBe(true);
+    expect(pairData.strikeCurrent[0]).toBe(-1);
+  });
 
   test.todo("calculate accrue", () => {});
 });

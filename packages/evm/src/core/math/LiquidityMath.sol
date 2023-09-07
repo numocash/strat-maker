@@ -76,6 +76,7 @@ function getAmount1(uint256 liquidity, uint128 composition, bool roundUp) pure r
 /// @notice Calculate the amount of token 0 and token 1 for `liquidity` units of liquidity with `pair`
 /// @param pair Storage pointer to a pair struct, used to conditionally sload composition
 /// @dev Assumes spread is valid
+/// @custom:team simplify math by computing the amount of liqudity in this function
 function getAmounts(
     Pairs.Pair storage pair,
     uint256 liquidity,

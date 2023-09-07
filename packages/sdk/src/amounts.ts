@@ -12,9 +12,16 @@ import {
   fractionInvert,
 } from "reverse-mirage";
 import invariant from "tiny-invariant";
-import { MAX_STRIKE, MIN_MULTIPLIER, MIN_STRIKE, Q128 } from "./constants.js";
+import {
+  MAX_STRIKE,
+  MIN_MULTIPLIER,
+  MIN_STRIKE,
+  NUM_SPREADS,
+  Q128,
+} from "./constants.js";
 import {
   balanceToLiquidity,
+  computeSwapStep,
   debtBalanceToLiquidity,
   getAmount0,
   getAmount1,
@@ -24,7 +31,14 @@ import {
   liquidityToBalance,
 } from "./math.js";
 import { type PositionData, createPosition } from "./positions.js";
-import type { Pair, PairData, Spread, Strike, TokenSelector } from "./types.js";
+import type {
+  Pair,
+  PairData,
+  Spread,
+  Strike,
+  TokenSelector,
+  Tuple,
+} from "./types.js";
 import { fractionToQ128, q128ToFraction } from "./utils.js";
 
 /**
@@ -262,8 +276,8 @@ export const calculateBorrowLiquidity = (
         false,
       );
 
-      amount0 += _amount0;
-      amount1 += _amount1;
+      amount0 -= _amount0;
+      amount1 -= _amount1;
 
       break;
     }
@@ -277,8 +291,8 @@ export const calculateBorrowLiquidity = (
         false,
       );
 
-      amount0 += _amount0;
-      amount1 += _amount1;
+      amount0 -= _amount0;
+      amount1 -= _amount1;
 
       liquidity -= pairData.strikes[strike]!.liquidity[activeSpread]!.borrowed;
     }
@@ -292,9 +306,9 @@ export const calculateBorrowLiquidity = (
       : getLiquidityForAmount1(amountDesiredCollateral.amount);
 
   if (amountDesiredCollateral.token === pair.token0) {
-    amount0 -= amountDesiredCollateral.amount;
+    amount0 += amountDesiredCollateral.amount;
   } else {
-    amount1 -= amountDesiredCollateral.amount;
+    amount1 += amountDesiredCollateral.amount;
   }
 
   invariant(
@@ -459,185 +473,155 @@ export const calculateAccrue = (
 };
 
 // TODO: load strikes conditionally
-// export const calculateSwap = (
-//   pair: Pair,
-//   pairData: PairData,
-//   amountDesired: ERC20Amount<Pair["token0"] | Pair["token1"]>,
-// ): {
-//   amount0: ERC20Amount<Pair["token0"]>;
-//   amount1: ERC20Amount<Pair["token1"]>;
-// } => {
-//   invariant(pairData.initialized, "Dry Powder SDK: Pair is not initialized");
+export const calculateSwap = (
+  pair: Pair,
+  pairData: PairData,
+  amountDesired: ERC20Amount<Pair["token0"] | Pair["token1"]>,
+): {
+  amount0: ERC20Amount<Pair["token0"]>;
+  amount1: ERC20Amount<Pair["token1"]>;
+} => {
+  invariant(pairData.initialized, "Dry Powder SDK: Pair is not initialized");
 
-//   const isSwap0To1 =
-//     amountDesired.amount > 0 === (amountDesired.token === pair.token0);
+  const isSwap0To1 =
+    amountDesired.amount > 0 === (amountDesired.token === pair.token0);
 
-//   const swapState: {
-//     liquiditySwap: bigint;
-//     liquidityTotal: bigint;
-//     liquiditySwapSpread: Tuple<bigint, typeof NUM_SPREADS>;
-//     liquidityTotalSpread: Tuple<bigint, typeof NUM_SPREADS>;
-//     amountA: bigint;
-//     amountB: bigint;
-//     amountDesired: ERC20Amount<Pair["token0"] | Pair["token1"]>;
-//   } = {
-//     liquiditySwap: 0n,
-//     liquidityTotal: 0n,
-//     liquiditySwapSpread: [0n, 0n, 0n, 0n, 0n],
-//     liquidityTotalSpread: [0n, 0n, 0n, 0n, 0n],
-//     amountA: 0n,
-//     amountB: 0n,
-//     amountDesired: createAmountFromRaw(
-//       amountDesired.token,
-//       amountDesired.amount,
-//     ),
-//   };
+  const swapState: {
+    liquiditySwap: bigint;
+    liquidityTotal: bigint;
+    liquidityRemaining: bigint;
+    liquiditySwapSpread: Tuple<bigint, typeof NUM_SPREADS>;
+    liquidityTotalSpread: Tuple<bigint, typeof NUM_SPREADS>;
+    amountA: bigint;
+    amountB: bigint;
+    strike: Strike;
+    amountDesired: ERC20Amount<Pair["token0"] | Pair["token1"]>;
+  } = {
+    liquiditySwap: 0n,
+    liquidityTotal: 0n,
+    liquidityRemaining: 0n,
+    liquiditySwapSpread: [0n, 0n, 0n, 0n, 0n],
+    liquidityTotalSpread: [0n, 0n, 0n, 0n, 0n],
+    amountA: 0n,
+    amountB: 0n,
+    strike: pairData.strikeCurrent[0], // I think this is wrong
+    amountDesired,
+  };
 
-//   for (let i = 1; i <= NUM_SPREADS; i++) {
-//     const activeStrike = isSwap0To1
-//       ? pairData.strikeCurrentCached + i
-//       : pairData.strikeCurrentCached - i;
-//     const spreadStrikeCurrent = pairData.strikeCurrent[i]!;
+  // search for liquidity in neighboring strikes
 
-//     if (activeStrike === spreadStrikeCurrent) {
-//       const liquidityTotal =
-//         pairData.strikes[activeStrike]!.liquidityBiDirectional[i - 1]!;
-//       const liquditySwap =
-//         ((isSwap0To1
-//           ? pairData.composition[i - 1]!.numerator
-//           : MaxUint128 - pairData.composition[i - 1]!.numerator) *
-//           liquidityTotal) /
-//         pairData.composition[i - 1]!.denominator;
+  const countLiquidity = () => {
+    for (let i = 0; i < NUM_SPREADS; i++) {
+      const spreadStrike = isSwap0To1
+        ? swapState.strike + (i + 1)
+        : swapState.strike - (i + 1);
 
-//       swapState.liquiditySwap += liquditySwap;
-//       swapState.liquidityTotal += liquidityTotal;
-//       swapState.liquiditySwapSpread[i - 1] = liquditySwap;
-//       swapState.liquidityTotalSpread[i - 1] = liquidityTotal;
-//     } else {
-//       break;
-//     }
-//   }
+      if (spreadStrike === pairData.strikeCurrent[i]) {
+        const liquidityTotal =
+          pairData.strikes[spreadStrike]!.liquidity[i]!.swap;
+        const liquiditySwap = fractionQuotient(
+          fractionMultiply(
+            isSwap0To1
+              ? pairData.composition[i]!
+              : fractionSubtract(createFraction(1), pairData.composition[i]!),
+            liquidityTotal,
+          ),
+        );
 
-//   while (true) {
-//     const { amountIn, amountOut } = computeSwapStep(
-//       pair,
-//       pairData.strikeCurrentCached,
-//       swapState.liquiditySwap,
-//       swapState.amountDesired,
-//     );
+        swapState.liquidityTotalSpread[i] = liquidityTotal;
+        swapState.liquiditySwapSpread[i] = liquiditySwap;
+        swapState.liquidityTotal += liquidityTotal;
+        swapState.liquiditySwap += liquiditySwap;
+      }
+    }
+  };
 
-//     if (swapState.amountDesired.amount > 0) {
-//       swapState.amountDesired.amount -= amountIn;
-//       swapState.amountA += amountIn;
-//       swapState.amountB -= amountOut;
-//     } else {
-//       swapState.amountDesired.amount += amountOut;
-//       swapState.amountA -= amountOut;
-//       swapState.amountB += amountIn;
-//     }
+  countLiquidity();
 
-//     // calculate fees
+  while (true) {
+    const { amountIn, amountOut } = computeSwapStep(
+      pair,
+      swapState.strike,
+      swapState.liquiditySwap,
+      swapState.amountDesired,
+    );
 
-//     if (swapState.amountDesired.amount === 0n) {
-//       // calculate composition
-//       break;
-//     }
+    if (swapState.amountDesired.amount > 0) {
+      swapState.amountDesired.amount -= amountIn;
+      swapState.amountA += amountIn;
+      swapState.amountB -= amountOut;
+    } else {
+      swapState.amountDesired.amount += amountOut;
+      swapState.amountA -= amountOut;
+      swapState.amountB += amountIn;
+    }
 
-//     // move to next strike
-//     if (isSwap0To1) {
-//       pairData.strikeCurrentCached =
-//         pairData.strikes[pairData.strikeCurrentCached]!.next0To1;
-//       swapState.liquiditySwap = 0n;
-//       swapState.liquidityTotal = 0n;
+    // calculate fees
 
-//       for (let i = 1; i <= NUM_SPREADS; i++) {
-//         const activeStrike = pairData.strikeCurrentCached + i;
+    if (swapState.amountDesired.amount === 0n) {
+      // calculate composition
 
-//         if (
-//           pairData.strikeCurrent[i - 1]! > activeStrike &&
-//           pairData.strikes[i - 1] !== undefined
-//         ) {
-//           pairData.strikeCurrent[i - 1] = activeStrike;
-//           const liquidity =
-//             pairData.strikes[activeStrike]!.liquidityBiDirectional[i - 1]!;
+      break;
+    }
 
-//           swapState.liquiditySwap = liquidity;
-//           swapState.liquidityTotal = liquidity;
-//           swapState.liquiditySwapSpread[i - 1] = liquidity;
-//           swapState.liquidityTotalSpread[i - 1] = liquidity;
-//         } else if (
-//           pairData.strikeCurrent[i - 1]! === activeStrike &&
-//           pairData.strikes[i - 1] !== undefined
-//         ) {
-//           const liquidity =
-//             pairData.strikes[activeStrike]!.liquidityBiDirectional[i - 1]!;
-//           const composition = pairData.composition[i - 1]!;
-//           const liquiditySwap =
-//             (liquidity * composition.numerator) / composition.denominator;
+    // move to next strike
+    if (isSwap0To1) {
+      for (let i = 0; i < NUM_SPREADS; i++) {
+        if (pairData.strikeCurrent[i]! === swapState.strike) {
+          pairData.strikeCurrent[i] =
+            pairData.strikes[swapState.strike]!.next0To1 + (i + 1);
+          pairData.composition[i] = createFraction(1);
+        }
+      }
 
-//           swapState.liquiditySwap = liquiditySwap;
-//           swapState.liquidityTotal = liquidity;
-//           swapState.liquiditySwapSpread[i - 1] = liquiditySwap;
-//           swapState.liquidityTotalSpread[i - 1] = liquidity;
-//         } else {
-//           break;
-//         }
-//       }
-//     } else {
-//       pairData.strikeCurrentCached =
-//         pairData.strikes[pairData.strikeCurrentCached]!.next1To0;
-//       swapState.liquiditySwap = 0n;
-//       swapState.liquidityTotal = 0n;
+      invariant(
+        swapState.strike !== MIN_STRIKE,
+        "Dry Powder SDK: Swap out of bounds",
+      );
+      swapState.strike = pairData.strikes[swapState.strike]!.next0To1;
 
-//       for (let i = 1; i <= NUM_SPREADS; i++) {
-//         const activeStrike = pairData.strikeCurrentCached - i;
+      swapState.liquiditySwap = 0n;
+      swapState.liquidityTotal = 0n;
+      swapState.liquiditySwapSpread = [0n, 0n, 0n, 0n, 0n];
+      swapState.liquidityTotalSpread = [0n, 0n, 0n, 0n, 0n];
 
-//         if (
-//           pairData.strikeCurrent[i - 1]! > activeStrike &&
-//           pairData.strikes[i - 1] !== undefined
-//         ) {
-//           pairData.strikeCurrent[i - 1] = activeStrike;
-//           const liquidity =
-//             pairData.strikes[activeStrike]!.liquidityBiDirectional[i - 1]!;
+      countLiquidity();
+    } else {
+      for (let i = 0; i < NUM_SPREADS; i++) {
+        if (pairData.strikeCurrent[i]! === swapState.strike) {
+          pairData.strikeCurrent[i] =
+            pairData.strikes[swapState.strike]!.next0To1 - (i + 1);
+          pairData.composition[i] = createFraction(0);
+        }
+      }
 
-//           swapState.liquiditySwap = liquidity;
-//           swapState.liquidityTotal = liquidity;
-//           swapState.liquiditySwapSpread[i - 1] = liquidity;
-//           swapState.liquidityTotalSpread[i - 1] = liquidity;
-//         } else if (
-//           pairData.strikeCurrent[i - 1]! === activeStrike &&
-//           pairData.strikes[i - 1] !== undefined
-//         ) {
-//           const liquidity =
-//             pairData.strikes[activeStrike]!.liquidityBiDirectional[i - 1]!;
-//           const composition = pairData.composition[i - 1]!;
-//           const liquiditySwap =
-//             (liquidity * (Q128 - composition.numerator)) /
-//             composition.denominator;
+      invariant(
+        swapState.strike !== MAX_STRIKE,
+        "Dry Powder SDK: Swap out of bounds",
+      );
+      swapState.strike = pairData.strikes[swapState.strike]!.next1To0;
 
-//           swapState.liquiditySwap = liquiditySwap;
-//           swapState.liquidityTotal = liquidity;
-//           swapState.liquiditySwapSpread[i - 1] = liquiditySwap;
-//           swapState.liquidityTotalSpread[i - 1] = liquidity;
-//         } else {
-//           break;
-//         }
-//       }
-//     }
-//   }
+      swapState.liquiditySwap = 0n;
+      swapState.liquidityTotal = 0n;
+      swapState.liquiditySwapSpread = [0n, 0n, 0n, 0n, 0n];
+      swapState.liquidityTotalSpread = [0n, 0n, 0n, 0n, 0n];
 
-//   if (amountDesired.token === pair.token0) {
-//     return {
-//       amount0: createAmountFromRaw(pair.token0, swapState.amountA),
-//       amount1: createAmountFromRaw(pair.token1, swapState.amountB),
-//     };
-//   } else {
-//     return {
-//       amount0: createAmountFromRaw(pair.token0, swapState.amountB),
-//       amount1: createAmountFromRaw(pair.token1, swapState.amountA),
-//     };
-//   }
-// };
+      countLiquidity();
+    }
+  }
+
+  if (amountDesired.token === pair.token0) {
+    return {
+      amount0: createAmountFromRaw(pair.token0, swapState.amountA),
+      amount1: createAmountFromRaw(pair.token1, swapState.amountB),
+    };
+  } else {
+    return {
+      amount0: createAmountFromRaw(pair.token0, swapState.amountB),
+      amount1: createAmountFromRaw(pair.token1, swapState.amountA),
+    };
+  }
+};
 
 const _addSwapLiquidity = (
   pairData: PairData,

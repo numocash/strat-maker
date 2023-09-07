@@ -458,6 +458,7 @@ library Pairs {
 
     /// @notice Remove liquidity from a specific strike
     /// @dev liquidity > 0
+    /// @custom:team Check removing more liquidity than is available
     function removeSwapLiquidity(
         Pair storage pair,
         int24 strike,
@@ -474,6 +475,7 @@ library Pairs {
             uint256 _activeSpread = pair.strikes[strike].activeSpread;
 
             if (spread - 1 < _activeSpread) {
+                // all liquidity is borrowed
                 pair.strikes[strike].liquidity[spread - 1].borrowed -= liquidity;
 
                 return liquidity;
@@ -481,10 +483,14 @@ library Pairs {
                 uint128 existingLiquidity = pair.strikes[strike].liquidity[spread - 1].swap;
 
                 if (liquidity < existingLiquidity) {
+                    // enough liquidity to just remove swap liquiidty
                     pair.strikes[strike].liquidity[spread - 1].swap = existingLiquidity - liquidity;
                     return 0;
                 } else {
-                    if (liquidity >= existingLiquidity) {
+                    // remove all swap liquidity first, then borrowed liquidity
+
+                    {
+                        // remove strikes from strike list
                         int24 strike0To1 = strike - int8(spread);
                         int24 strike1To0 = strike + int8(spread);
 
@@ -495,7 +501,7 @@ library Pairs {
 
                     uint128 remainingLiquidity = liquidity - existingLiquidity;
 
-                    if (spread - 1 == _activeSpread) pair.strikes[strike].liquidity[spread - 1].swap = 0;
+                    pair.strikes[strike].liquidity[spread - 1].swap = 0;
                     pair.strikes[strike].liquidity[spread - 1].borrowed -= remainingLiquidity;
 
                     return remainingLiquidity;
