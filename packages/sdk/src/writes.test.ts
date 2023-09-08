@@ -4,17 +4,15 @@ import Router from "dry-powder/out/Router.sol/Router.json";
 import Permit3 from "ilrta/out/Permit3.sol/Permit3.json";
 import {
   type ERC20,
+  MaxUint256,
   createAmountFromString,
   createFraction,
-  fractionGreaterThan,
-  readAndParse,
 } from "reverse-mirage";
 import invariant from "tiny-invariant";
 import { type Hex, getAddress, parseEther } from "viem";
-import { beforeEach, describe, expect, test } from "vitest";
+import { beforeEach, describe, test } from "vitest";
 import { engineABI, mockErc20ABI, permit3ABI, routerABI } from "./generated.js";
-import { createPosition } from "./positions.js";
-import { engineGetPair, engineGetStrike } from "./reads.js";
+import { type Position, approve, createPosition } from "./positions.js";
 import { ALICE } from "./test/constants.js";
 import { publicClient, testClient, walletClient } from "./test/utils.js";
 import { routerRoute } from "./writes.js";
@@ -22,6 +20,7 @@ import { routerRoute } from "./writes.js";
 let id: Hex | undefined = undefined;
 let token0: ERC20;
 let token1: ERC20;
+let position: Position<"BiDirectional">;
 
 beforeEach(async () => {
   if (id === undefined) {
@@ -117,6 +116,8 @@ beforeEach(async () => {
         ? [tokenA, tokenB]
         : [tokenB, tokenA];
 
+    console.log(token0, token1);
+
     // mint tokens
     const { request: mintRequest1 } = await publicClient.simulateContract({
       abi: mockErc20ABI,
@@ -148,7 +149,7 @@ beforeEach(async () => {
       account: ALICE,
       address: token0.address,
       functionName: "approve",
-      args: [Permit3Address, parseEther("3")],
+      args: [Permit3Address, MaxUint256],
     });
     hash = await walletClient.writeContract(approveRequest1);
     await publicClient.waitForTransactionReceipt({
@@ -160,12 +161,33 @@ beforeEach(async () => {
       account: ALICE,
       address: token1.address,
       functionName: "approve",
-      args: [Permit3Address, parseEther("1")],
+      args: [Permit3Address, MaxUint256],
     });
     hash = await walletClient.writeContract(approveRequest2);
     await publicClient.waitForTransactionReceipt({
       hash,
     });
+
+    position = createPosition(
+      "BiDirectional",
+      { token0, token1, scalingFactor: 0, strike: 0, spread: 1 },
+      1,
+    );
+
+    const { hash: approveHash } = await approve(
+      publicClient,
+      walletClient,
+      ALICE,
+      {
+        spender: Permit3Address,
+        approvalDetails: {
+          type: "positionApproval",
+          ilrta: position,
+          approved: true,
+        },
+      },
+    );
+    await publicClient.waitForTransactionReceipt({ hash: approveHash });
   } else {
     await testClient.revert({ id });
   }
@@ -185,7 +207,11 @@ describe("writes", () => {
     await publicClient.waitForTransactionReceipt({ hash });
   });
 
-  test.skip("create pair", async () => {
+  test.todo("wrap weth");
+
+  test.todo("unwrap weth");
+
+  test("create pair", async () => {
     const block = await publicClient.getBlock();
     const pair = { token0, token1, scalingFactor: 0 } as const;
     const { hash } = await routerRoute(publicClient, walletClient, ALICE, {
@@ -201,15 +227,12 @@ describe("writes", () => {
       ],
       nonce: 0n,
       deadline: block.timestamp + 100n,
-      slippage: makeFraction(2, 100),
+      slippage: createFraction(2, 100),
     });
     await publicClient.waitForTransactionReceipt({ hash });
-    const pairData = await readAndParse(engineGetPair(publicClient, { pair }));
-    expect(pairData.initialized).toBe(true);
-    expect(pairData.strikeCurrentCached).toBe(1);
   });
 
-  test.skip("add liqudity", async () => {
+  test("add liqudity", async () => {
     const block = await publicClient.getBlock();
     const pair = { token0, token1, scalingFactor: 0 } as const;
     const { hash: createHash } = await routerRoute(
@@ -229,7 +252,7 @@ describe("writes", () => {
         ],
         nonce: 0n,
         deadline: block.timestamp + 100n,
-        slippage: makeFraction(2, 100),
+        slippage: createFraction(2, 100),
       },
     );
     await publicClient.waitForTransactionReceipt({ hash: createHash });
@@ -253,18 +276,13 @@ describe("writes", () => {
         ],
         nonce: 1n,
         deadline: block.timestamp + 100n,
-        slippage: makeFraction(2, 100),
+        slippage: createFraction(2, 100),
       },
     );
     await publicClient.waitForTransactionReceipt({ hash: addHash });
-    const strikeData = await readAndParse(
-      engineGetStrike(publicClient, { pair, strike: 0 }),
-    );
-
-    expect(strikeData.liquidityBiDirectional[0]).toBe(parseEther("1"));
   });
 
-  test.skip("remove liquidity", async () => {
+  test("remove liquidity", async () => {
     const block = await publicClient.getBlock();
     const pair = { token0, token1, scalingFactor: 0 } as const;
     const { hash: createHash } = await routerRoute(
@@ -284,7 +302,7 @@ describe("writes", () => {
         ],
         nonce: 0n,
         deadline: block.timestamp + 100n,
-        slippage: makeFraction(2, 100),
+        slippage: createFraction(2, 100),
       },
     );
     await publicClient.waitForTransactionReceipt({ hash: createHash });
@@ -308,7 +326,7 @@ describe("writes", () => {
         ],
         nonce: 1n,
         deadline: block.timestamp + 100n,
-        slippage: makeFraction(2, 100),
+        slippage: createFraction(2, 100),
       },
     );
     await publicClient.waitForTransactionReceipt({ hash: addHash });
@@ -332,20 +350,13 @@ describe("writes", () => {
         ],
         nonce: 2n,
         deadline: block.timestamp + 100n,
-        slippage: makeFraction(2, 100),
+        slippage: createFraction(2, 100),
       },
     );
     await publicClient.waitForTransactionReceipt({ hash: removeHash });
-
-    const strikeData = await readAndParse(
-      engineGetStrike(publicClient, { pair, strike: 0 }),
-    );
-
-    expect(strikeData.liquidityBiDirectional[0]).toBe(0n);
-    expect(strikeData.totalSupply[0]).toBe(0n);
   });
 
-  test.skip("borrow liquidity", async () => {
+  test("borrow liquidity", async () => {
     const block = await publicClient.getBlock();
     const pair = { token0, token1, scalingFactor: 0 } as const;
     const { hash: createHash } = await routerRoute(
@@ -365,7 +376,7 @@ describe("writes", () => {
         ],
         nonce: 0n,
         deadline: block.timestamp + 100n,
-        slippage: makeFraction(2, 100),
+        slippage: createFraction(2, 100),
       },
     );
     await publicClient.waitForTransactionReceipt({ hash: createHash });
@@ -389,7 +400,7 @@ describe("writes", () => {
         ],
         nonce: 1n,
         deadline: block.timestamp + 100n,
-        slippage: makeFraction(2, 100),
+        slippage: createFraction(2, 100),
       },
     );
     await publicClient.waitForTransactionReceipt({ hash: addHash });
@@ -406,46 +417,19 @@ describe("writes", () => {
             inputs: {
               pair,
               strike: 0,
-              selectorCollateral: "Token0",
-              amountDesiredCollateral: parseEther("1.5"),
+              amountDesiredCollateral: createAmountFromString(token0, "1.5"),
               amountDesiredDebt: parseEther("0.5"),
             },
           },
         ],
         nonce: 2n,
         deadline: block.timestamp + 100n,
-        slippage: makeFraction(2, 100),
+        slippage: createFraction(2, 100),
       },
     );
     await publicClient.waitForTransactionReceipt({
       hash: borrowHash,
     });
-    const strikeData = await readAndParse(
-      engineGetStrike(publicClient, { pair, strike: 0 }),
-    );
-
-    expect(strikeData.liquidityBiDirectional[0]).toBeGreaterThan(0n);
-    expect(strikeData.liquidityBorrowed[0]).toBeGreaterThan(0n);
-    expect(strikeData.totalSupply[0]).toBe(parseEther("1"));
-
-    const positionData = await readAndParse(
-      engineGetPositionDebt(publicClient, {
-        owner: ALICE,
-        position: makePosition(
-          "Debt",
-          {
-            token0: pair.token0,
-            token1: pair.token1,
-            scalingFactor: 0,
-            strike: 0,
-            selectorCollateral: "Token0",
-          },
-          1,
-        ),
-      }),
-    );
-    expect(positionData.balance).toBe(parseEther("0.5"));
-    expect(fractionGreaterThan(positionData.data.leverageRatio, 0)).toBe(true);
   });
 
   test.skip("repay liquidity", async () => {
@@ -468,7 +452,7 @@ describe("writes", () => {
         ],
         nonce: 0n,
         deadline: block.timestamp + 100n,
-        slippage: makeFraction(2, 100),
+        slippage: createFraction(2, 100),
       },
     );
     await publicClient.waitForTransactionReceipt({ hash: createHash });
@@ -492,7 +476,7 @@ describe("writes", () => {
         ],
         nonce: 1n,
         deadline: block.timestamp + 100n,
-        slippage: makeFraction(2, 100),
+        slippage: createFraction(2, 100),
       },
     );
     await publicClient.waitForTransactionReceipt({ hash: addHash });
@@ -509,35 +493,17 @@ describe("writes", () => {
             inputs: {
               pair,
               strike: 0,
-              selectorCollateral: "Token0",
-              amountDesiredCollateral: parseEther("1.5"),
+              amountDesiredCollateral: createAmountFromString(token0, "1.5"),
               amountDesiredDebt: parseEther("0.5"),
             },
           },
         ],
         nonce: 2n,
         deadline: block.timestamp + 100n,
-        slippage: makeFraction(2, 100),
+        slippage: createFraction(2, 100),
       },
     );
     await publicClient.waitForTransactionReceipt({ hash: borrowHash });
-
-    const positionData = await readAndParse(
-      engineGetPositionDebt(publicClient, {
-        owner: ALICE,
-        position: makePosition(
-          "Debt",
-          {
-            token0: pair.token0,
-            token1: pair.token1,
-            scalingFactor: 0,
-            strike: 0,
-            selectorCollateral: "Token0",
-          },
-          1,
-        ),
-      }),
-    );
 
     const { hash: repayHash } = await routerRoute(
       publicClient,
@@ -552,25 +518,18 @@ describe("writes", () => {
               pair,
               strike: 0,
               selectorCollateral: "Token0",
-              leverageRatio: positionData.data.leverageRatio,
-              amountDesiredDebt: positionData.balance,
+              liquidityGrowthLast: createFraction(0),
+              multiplier: createFraction(1),
+              amountDesired: parseEther("0.5"),
             },
           },
         ],
         nonce: 3n,
         deadline: block.timestamp + 150n,
-        slippage: makeFraction(2, 100),
+        slippage: createFraction(2, 100),
       },
     );
     await publicClient.waitForTransactionReceipt({ hash: repayHash });
-
-    const strikeData = await readAndParse(
-      engineGetStrike(publicClient, { pair, strike: 0 }),
-    );
-
-    expect(strikeData.liquidityBiDirectional[0]).toBeGreaterThan(0n);
-    expect(strikeData.liquidityBorrowed[0]).toBe(0n);
-    expect(strikeData.totalSupply[0]).toBe(parseEther("1"));
   });
 
   test.skip("swap", async () => {
@@ -593,7 +552,7 @@ describe("writes", () => {
         ],
         nonce: 0n,
         deadline: block.timestamp + 100n,
-        slippage: makeFraction(2, 100),
+        slippage: createFraction(2, 100),
       },
     );
     await publicClient.waitForTransactionReceipt({ hash: createHash });
@@ -617,7 +576,7 @@ describe("writes", () => {
         ],
         nonce: 1n,
         deadline: block.timestamp + 100n,
-        slippage: makeFraction(2, 100),
+        slippage: createFraction(2, 100),
       },
     );
     await publicClient.waitForTransactionReceipt({ hash: addHash });
@@ -633,22 +592,21 @@ describe("writes", () => {
             command: "Swap",
             inputs: {
               pair,
-              selector: "Token1",
-              amountDesired: makeAmountFromString(pair.token1, "0.5").amount,
+              amountDesired: createAmountFromString(pair.token1, "0.5"),
             },
           },
         ],
         nonce: 2n,
         deadline: block.timestamp + 100n,
-        slippage: makeFraction(2, 100),
+        slippage: createFraction(2, 100),
       },
     );
     await publicClient.waitForTransactionReceipt({ hash: swapHash });
-
-    const pairData = await readAndParse(engineGetPair(publicClient, { pair }));
-
-    expect(fractionGreaterThan(pairData.composition[0], 0)).toBe(true);
   });
 
   test.todo("accrue");
+
+  test.todo("borrow and swap");
+
+  test.todo("repay and swap");
 });

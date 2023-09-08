@@ -1,4 +1,4 @@
-import { fractionEqualTo, createFraction } from "reverse-mirage";
+import { createFraction, fractionEqualTo } from "reverse-mirage";
 import { describe, expect, test } from "vitest";
 import { Q128 } from "./constants.js";
 import { fractionToQ128, q128ToFraction } from "./utils.js";

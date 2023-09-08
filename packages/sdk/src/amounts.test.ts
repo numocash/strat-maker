@@ -1,9 +1,9 @@
 import {
   type ERC20,
-  fractionEqualTo,
-  createFraction,
-  createAmountFromString,
   createAmountFromRaw,
+  createAmountFromString,
+  createFraction,
+  fractionEqualTo,
 } from "reverse-mirage";
 import { parseEther } from "viem";
 import { describe, expect, test } from "vitest";

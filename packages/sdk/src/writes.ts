@@ -1,4 +1,8 @@
-import { type TransferDetails, permit3SignTransferBatch } from "ilrta-sdk";
+import {
+  type TransferDetails,
+  encodeTransferDetails,
+  permit3SignTransferBatch,
+} from "ilrta-sdk";
 import {
   amountAdd,
   createAmountFromRaw,
@@ -25,6 +29,7 @@ import {
   calculateAccrue,
   calculateAddLiquidity,
   calculateBorrowLiquidity,
+  calculateInitialize,
   calculateRemoveLiquidity,
   calculateRepayLiquidity,
   calculateSwap,
@@ -66,102 +71,108 @@ export const routerRoute = async (
 
   // calculate amounts
   for (const c of args.commands) {
+    // Handle account only commands
     const id = `${c.inputs.pair.token0.address}_${c.inputs.pair.token1.address}_${c.inputs.pair.scalingFactor}`;
-    if (pairData[id] === undefined) {
-      pairData[id] = await readAndParse(
-        engineGetPair(publicClient, {
-          pair: c.inputs.pair,
-        }),
-      );
-    }
 
-    const loadStrike = async (strike: Strike) => {
-      if (pairData[id]!.strikes[strike] !== undefined) return;
-      const strikeData = await readAndParse(
-        engineGetStrike(publicClient, {
-          pair: c.inputs.pair,
-          strike: strike,
-        }),
-      );
-      pairData[id]!.strikes[strike] = strikeData;
-    };
     if (c.command === "CreatePair") {
-      // TODO": a pair that isn't created
-    } else if (c.command === "AddLiquidity") {
-      await loadStrike(c.inputs.strike);
+      /// create pair
+      pairData[id] = calculateInitialize(c.inputs.strike);
+    } else {
+      if (pairData[id] === undefined) {
+        pairData[id] = await readAndParse(
+          engineGetPair(publicClient, {
+            pair: c.inputs.pair,
+          }),
+        );
+      }
 
-      const { amount0, amount1 } = calculateAddLiquidity(
-        c.inputs.pair,
-        pairData[id]!,
-        blockNumber,
-        c.inputs.strike,
-        c.inputs.spread,
-        c.inputs.amountDesired,
-      );
-      updateToken(account, amount0);
-      updateToken(account, amount1);
-      // updateLiquidityPosition(account, position);
-    } else if (c.command === "RemoveLiquidity") {
-      await loadStrike(c.inputs.strike);
+      const loadStrike = async (strike: Strike) => {
+        if (pairData[id]!.strikes[strike] !== undefined) return;
+        const strikeData = await readAndParse(
+          engineGetStrike(publicClient, {
+            pair: c.inputs.pair,
+            strike: strike,
+          }),
+        );
+        pairData[id]!.strikes[strike] = strikeData;
+      };
 
-      const { amount0, amount1, position } = calculateRemoveLiquidity(
-        c.inputs.pair,
-        pairData[id]!,
-        blockNumber,
-        c.inputs.strike,
-        c.inputs.spread,
-        c.inputs.amountDesired,
-      );
-      updateToken(account, amount0);
-      updateToken(account, amount1);
-      updateLiquidityPosition(account, position);
-    } else if (c.command === "BorrowLiquidity") {
-      await loadStrike(c.inputs.strike);
+      if (c.command === "AddLiquidity") {
+        await loadStrike(c.inputs.strike);
 
-      const { amount0, amount1 } = calculateBorrowLiquidity(
-        c.inputs.pair,
-        pairData[id]!,
-        blockNumber,
-        c.inputs.strike,
-        c.inputs.amountDesiredCollateral,
-        c.inputs.amountDesiredDebt,
-      );
-      updateToken(account, amount0);
-      updateToken(account, amount1);
-      // updateLiquidityPosition(account, position);
-    } else if (c.command === "RepayLiquidity") {
-      await loadStrike(c.inputs.strike);
-      const { amount0, amount1, position } = calculateRepayLiquidity(
-        c.inputs.pair,
-        pairData[id]!,
-        blockNumber,
-        c.inputs.strike,
-        c.inputs.selectorCollateral,
-        c.inputs.liquidityGrowthLast,
-        c.inputs.multiplier,
-        c.inputs.amountDesired,
-      );
-      updateToken(account, amount0);
-      updateToken(account, amount1);
-      updateLiquidityPosition(account, position);
-    } else if (c.command === "Swap") {
-      const { amount0, amount1 } = calculateSwap(
-        c.inputs.pair,
-        pairData[id]!,
-        c.inputs.amountDesired === "Token0Account"
-          ? account.tokens.find((t) => t.token === c.inputs.pair.token0)!
-          : c.inputs.amountDesired === "Token1Account"
-          ? account.tokens.find((t) => t.token === c.inputs.pair.token1)!
-          : c.inputs.amountDesired,
-      );
-      updateToken(account, amount0);
-      updateToken(account, amount1);
-    } else if (c.command === "Accrue") {
-      calculateAccrue(
-        pairData[id]!,
-        blockNumber,
-        pairData[id]!.strikeCurrent[0],
-      );
+        const { amount0, amount1 } = calculateAddLiquidity(
+          c.inputs.pair,
+          pairData[id]!,
+          blockNumber,
+          c.inputs.strike,
+          c.inputs.spread,
+          c.inputs.amountDesired,
+        );
+        updateToken(account, amount0);
+        updateToken(account, amount1);
+        // updateLiquidityPosition(account, position);
+      } else if (c.command === "RemoveLiquidity") {
+        await loadStrike(c.inputs.strike);
+
+        const { amount0, amount1, position } = calculateRemoveLiquidity(
+          c.inputs.pair,
+          pairData[id]!,
+          blockNumber,
+          c.inputs.strike,
+          c.inputs.spread,
+          c.inputs.amountDesired,
+        );
+        updateToken(account, amount0);
+        updateToken(account, amount1);
+        updateLiquidityPosition(account, position);
+      } else if (c.command === "BorrowLiquidity") {
+        await loadStrike(c.inputs.strike);
+
+        const { amount0, amount1 } = calculateBorrowLiquidity(
+          c.inputs.pair,
+          pairData[id]!,
+          blockNumber,
+          c.inputs.strike,
+          c.inputs.amountDesiredCollateral,
+          c.inputs.amountDesiredDebt,
+        );
+        updateToken(account, amount0);
+        updateToken(account, amount1);
+        // updateLiquidityPosition(account, position);
+      } else if (c.command === "RepayLiquidity") {
+        await loadStrike(c.inputs.strike);
+        const { amount0, amount1, position } = calculateRepayLiquidity(
+          c.inputs.pair,
+          pairData[id]!,
+          blockNumber,
+          c.inputs.strike,
+          c.inputs.selectorCollateral,
+          c.inputs.liquidityGrowthLast,
+          c.inputs.multiplier,
+          c.inputs.amountDesired,
+        );
+        updateToken(account, amount0);
+        updateToken(account, amount1);
+        updateLiquidityPosition(account, position);
+      } else if (c.command === "Swap") {
+        const { amount0, amount1 } = calculateSwap(
+          c.inputs.pair,
+          pairData[id]!,
+          c.inputs.amountDesired === "Token0Account"
+            ? account.tokens.find((t) => t.token === c.inputs.pair.token0)!
+            : c.inputs.amountDesired === "Token1Account"
+            ? account.tokens.find((t) => t.token === c.inputs.pair.token1)!
+            : c.inputs.amountDesired,
+        );
+        updateToken(account, amount0);
+        updateToken(account, amount1);
+      } else if (c.command === "Accrue") {
+        calculateAccrue(
+          pairData[id]!,
+          blockNumber,
+          pairData[id]!.strikeCurrent[0],
+        );
+      }
     }
   }
 
@@ -190,6 +201,8 @@ export const routerRoute = async (
     })),
   );
 
+  console.log(transferDetails);
+
   // sign
   const signature = await permit3SignTransferBatch(walletClient, userAccount, {
     transferDetails,
@@ -216,7 +229,7 @@ export const routerRoute = async (
         signatureTransfer: {
           nonce: args.nonce,
           deadline: args.deadline,
-          transferDetails: [],
+          transferDetails: transferDetails.map((t) => encodeTransferDetails(t)),
         },
         signature,
       },
@@ -234,14 +247,13 @@ type Account = {
 };
 
 const updateToken = (account: Account, currencyAmount: ERC20Amount<ERC20>) => {
-  for (let i = 0; i < account.tokens.length; i++) {
-    if (account.tokens[i]!.token === currencyAmount.token) {
-      account.tokens[i] = amountAdd(account.tokens[i]!, currencyAmount);
-
-      break;
-    } else if (account.tokens[i] === undefined) {
-      account.tokens[i] = currencyAmount;
-    }
+  if (account.tokens.some((t) => t.token === currencyAmount.token)) {
+    const index = account.tokens.findIndex(
+      (t) => t.token === currencyAmount.token,
+    );
+    account.tokens[index] = amountAdd(account.tokens[index]!, currencyAmount);
+  } else {
+    account.tokens.push(currencyAmount);
   }
 };
 
@@ -249,15 +261,17 @@ const updateLiquidityPosition = (
   account: Account,
   positionData: PositionData<OrderType>,
 ) => {
-  for (let i = 0; i < account.liquidityPositions.length; i++) {
-    if (
-      dataID(account.liquidityPositions[i]!.token) ===
-      dataID(positionData.token)
-    ) {
-      account.liquidityPositions[i]!.balance += positionData.balance;
-    } else if (account.liquidityPositions[i] === undefined) {
-      account.liquidityPositions[i] = positionData;
-    }
+  if (
+    account.liquidityPositions.some(
+      (lp) => dataID(lp.token) === dataID(positionData.token),
+    )
+  ) {
+    const index = account.liquidityPositions.findIndex(
+      (lp) => dataID(lp.token) === dataID(positionData.token),
+    );
+    account.liquidityPositions[index]!.balance += positionData.balance;
+  } else {
+    account.liquidityPositions.push(positionData);
   }
 };
 
@@ -363,7 +377,7 @@ export const UnwrapWETHParams = [
     name: "wethIndex",
     type: "uint256",
   },
-];
+] as const;
 
 export const RemoveLiquidityParams = [
   { name: "token0", type: "address" },

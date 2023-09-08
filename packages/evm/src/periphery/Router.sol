@@ -99,7 +99,9 @@ contract Router is IExecuteCallback {
 
             // Format position data
             for (; i < account.erc20Data.length + account.lpData.length; i++) {
-                requestedTransfer[i] = Permit3.RequestedTransferDetails(msg.sender, abi.encode(account.lpData[i]));
+                requestedTransfer[i] = Permit3.RequestedTransferDetails(
+                    msg.sender, abi.encode(account.lpData[i - account.erc20Data.length])
+                );
             }
 
             permit3.transferBySignature(

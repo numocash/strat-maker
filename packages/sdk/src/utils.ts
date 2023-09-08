@@ -1,8 +1,8 @@
 import { type Fraction, createFraction } from "reverse-mirage";
-import { Q128 } from "./constants.js";
-import type { Pair } from "./types.js";
 import { keccak256 } from "viem";
 import { encodePacked } from "viem/abi";
+import { Q128 } from "./constants.js";
+import type { Pair } from "./types.js";
 
 /**
  * Convert fraction type to Q128 integer

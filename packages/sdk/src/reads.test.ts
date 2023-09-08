@@ -1,301 +1,275 @@
 import Engine from "dry-powder/out/Engine.sol/Engine.json";
 import MockERC20 from "dry-powder/out/MockERC20.sol/MockERC20.json";
 import Router from "dry-powder/out/Router.sol/Router.json";
-import Permit3 from "ilrta-evm/out/Permit3.sol/Permit3.json";
-import { getTransferBatchTypedDataHash, signSuperSignature } from "ilrta-sdk";
-import { type ERC20, makeAmountFromString, readAndParse } from "reverse-mirage";
+import Permit3 from "ilrta/out/Permit3.sol/Permit3.json";
+import {
+  type ERC20,
+  MaxUint256,
+  createAmountFromString,
+  createFraction,
+  fractionEqualTo,
+  readAndParse,
+} from "reverse-mirage";
 import invariant from "tiny-invariant";
-import {
-  type Hex,
-  encodeAbiParameters,
-  getAddress,
-  parseEther,
-  zeroAddress,
-} from "viem";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { CommandEnum, TokenSelectorEnum } from "./constants.js";
+import { type Hex, getAddress, parseEther } from "viem";
+import { beforeEach, describe, expect, test } from "vitest";
 import { engineABI, mockErc20ABI, permit3ABI, routerABI } from "./generated.js";
-import { makePosition } from "./positions.js";
-import {
-  engineGetPair,
-  engineGetPositionBiDirectional,
-  engineGetPositionDebt,
-  engineGetStrike,
-} from "./reads.js";
+import { type Position, approve, createPosition } from "./positions.js";
+import { engineGetPair, engineGetStrike } from "./reads.js";
 import { ALICE } from "./test/constants.js";
 import { publicClient, testClient, walletClient } from "./test/utils.js";
-import {
-  AddLiquidityParams,
-  BorrowLiquidityParams,
-  CreatePairParams,
-} from "./writes.js";
+import { routerRoute } from "./writes.js";
 
+let id: Hex | undefined = undefined;
 let token0: ERC20;
 let token1: ERC20;
+let position: Position<"BiDirectional">;
 
-beforeAll(async () => {
-  // deploy permit3
-  let deployHash = await walletClient.deployContract({
-    account: ALICE,
-    abi: permit3ABI,
-    bytecode: Permit3.bytecode.object as Hex,
-  });
-
-  const { contractAddress: Permit3Address } =
-    await publicClient.waitForTransactionReceipt({
-      hash: deployHash,
+beforeEach(async () => {
+  if (id === undefined) {
+    // deploy permit3
+    let deployHash = await walletClient.deployContract({
+      account: ALICE,
+      abi: permit3ABI,
+      bytecode: Permit3.bytecode.object as Hex,
     });
-  invariant(Permit3Address);
-  console.log("permit 3 address", Permit3Address);
 
-  // deploy engine
-  deployHash = await walletClient.deployContract({
-    account: ALICE,
-    abi: engineABI,
-    bytecode: Engine.bytecode.object as Hex,
-    args: [getAddress(Permit3Address)],
-  });
+    const { contractAddress: Permit3Address } =
+      await publicClient.waitForTransactionReceipt({
+        hash: deployHash,
+      });
+    invariant(Permit3Address);
+    console.log("permit 3 address", Permit3Address);
 
-  const { contractAddress: EngineAddress } =
-    await publicClient.waitForTransactionReceipt({
-      hash: deployHash,
+    // deploy engine
+    deployHash = await walletClient.deployContract({
+      account: ALICE,
+      abi: engineABI,
+      bytecode: Engine.bytecode.object as Hex,
+      args: [getAddress(Permit3Address)],
     });
-  invariant(EngineAddress);
-  console.log("engine address", EngineAddress);
 
-  // deploy router
-  deployHash = await walletClient.deployContract({
-    account: ALICE,
-    abi: routerABI,
-    bytecode: Router.bytecode.object as Hex,
-    args: [EngineAddress, Permit3Address],
-  });
+    const { contractAddress: EngineAddress } =
+      await publicClient.waitForTransactionReceipt({
+        hash: deployHash,
+      });
+    invariant(EngineAddress);
+    console.log("engine address", EngineAddress);
 
-  const { contractAddress: RouterAddress } =
-    await publicClient.waitForTransactionReceipt({
-      hash: deployHash,
+    // deploy router
+    deployHash = await walletClient.deployContract({
+      account: ALICE,
+      abi: routerABI,
+      bytecode: Router.bytecode.object as Hex,
+      args: [EngineAddress, Permit3Address],
     });
-  invariant(RouterAddress);
-  console.log("router address", RouterAddress);
 
-  // deploy tokens
-  deployHash = await walletClient.deployContract({
-    account: ALICE,
-    abi: mockErc20ABI,
-    bytecode: MockERC20.bytecode.object as Hex,
-  });
-  const { contractAddress: tokenAAddress } =
-    await publicClient.waitForTransactionReceipt({
-      hash: deployHash,
+    const { contractAddress: RouterAddress } =
+      await publicClient.waitForTransactionReceipt({
+        hash: deployHash,
+      });
+    invariant(RouterAddress);
+    console.log("router address", RouterAddress);
+
+    // deploy tokens
+    deployHash = await walletClient.deployContract({
+      account: ALICE,
+      abi: mockErc20ABI,
+      bytecode: MockERC20.bytecode.object as Hex,
+      args: ["Mock ERC20", "MOCK", 18],
     });
-  invariant(tokenAAddress);
+    const { contractAddress: tokenAAddress } =
+      await publicClient.waitForTransactionReceipt({
+        hash: deployHash,
+      });
+    invariant(tokenAAddress);
 
-  deployHash = await walletClient.deployContract({
-    account: ALICE,
-    abi: mockErc20ABI,
-    bytecode: MockERC20.bytecode.object as Hex,
-  });
-  const { contractAddress: tokenBAddress } =
-    await publicClient.waitForTransactionReceipt({
-      hash: deployHash,
+    deployHash = await walletClient.deployContract({
+      account: ALICE,
+      abi: mockErc20ABI,
+      bytecode: MockERC20.bytecode.object as Hex,
+      args: ["Mock ERC20", "MOCK", 18],
     });
-  invariant(tokenBAddress);
+    const { contractAddress: tokenBAddress } =
+      await publicClient.waitForTransactionReceipt({
+        hash: deployHash,
+      });
+    invariant(tokenBAddress);
 
-  const tokenA = {
-    type: "erc20",
-    symbol: "TEST",
-    name: "Test ERC20",
-    decimals: 18,
-    address: getAddress(tokenAAddress),
-    chainID: 1,
-  } as const satisfies ERC20;
+    const tokenA = {
+      type: "erc20",
+      symbol: "TEST",
+      name: "Test ERC20",
+      decimals: 18,
+      address: getAddress(tokenAAddress),
+      chainID: 1,
+    } as const satisfies ERC20;
 
-  const tokenB = {
-    type: "erc20",
-    symbol: "TEST",
-    name: "Test ERC20",
-    decimals: 18,
-    address: getAddress(tokenBAddress),
-    chainID: 1,
-  } as const satisfies ERC20;
+    const tokenB = {
+      type: "erc20",
+      symbol: "TEST",
+      name: "Test ERC20",
+      decimals: 18,
+      address: getAddress(tokenBAddress),
+      chainID: 1,
+    } as const satisfies ERC20;
 
-  [token0, token1] =
-    tokenA.address.toLowerCase() < tokenB.address.toLowerCase()
-      ? [tokenA, tokenB]
-      : [tokenB, tokenA];
+    [token0, token1] =
+      tokenA.address.toLowerCase() < tokenB.address.toLowerCase()
+        ? [tokenA, tokenB]
+        : [tokenB, tokenA];
 
-  // mint tokens
-  const { request: mintRequest1 } = await publicClient.simulateContract({
-    abi: mockErc20ABI,
-    account: ALICE,
-    address: token0.address,
-    functionName: "mint",
-    args: [ALICE, parseEther("3")],
-  });
-  let hash = await walletClient.writeContract(mintRequest1);
-  await publicClient.waitForTransactionReceipt({
-    hash,
-  });
+    console.log(token0, token1);
 
-  const { request: mintRequest2 } = await publicClient.simulateContract({
-    abi: mockErc20ABI,
-    account: ALICE,
-    address: token1.address,
-    functionName: "mint",
-    args: [ALICE, parseEther("1")],
-  });
-  hash = await walletClient.writeContract(mintRequest2);
-  await publicClient.waitForTransactionReceipt({
-    hash,
-  });
+    // mint tokens
+    const { request: mintRequest1 } = await publicClient.simulateContract({
+      abi: mockErc20ABI,
+      account: ALICE,
+      address: token0.address,
+      functionName: "mint",
+      args: [ALICE, parseEther("3")],
+    });
+    let hash = await walletClient.writeContract(mintRequest1);
+    await publicClient.waitForTransactionReceipt({
+      hash,
+    });
 
-  // approve tokens
-  const { request: approveRequest1 } = await publicClient.simulateContract({
-    abi: mockErc20ABI,
-    account: ALICE,
-    address: token0.address,
-    functionName: "approve",
-    args: [Permit3Address, parseEther("3")],
-  });
-  hash = await walletClient.writeContract(approveRequest1);
-  await publicClient.waitForTransactionReceipt({
-    hash,
-  });
+    const { request: mintRequest2 } = await publicClient.simulateContract({
+      abi: mockErc20ABI,
+      account: ALICE,
+      address: token1.address,
+      functionName: "mint",
+      args: [ALICE, parseEther("1")],
+    });
+    hash = await walletClient.writeContract(mintRequest2);
+    await publicClient.waitForTransactionReceipt({
+      hash,
+    });
 
-  const { request: approveRequest2 } = await publicClient.simulateContract({
-    abi: mockErc20ABI,
-    account: ALICE,
-    address: token1.address,
-    functionName: "approve",
-    args: [Permit3Address, parseEther("1")],
-  });
-  hash = await walletClient.writeContract(approveRequest2);
-  await publicClient.waitForTransactionReceipt({
-    hash,
-  });
+    // approve tokens
+    const { request: approveRequest1 } = await publicClient.simulateContract({
+      abi: mockErc20ABI,
+      account: ALICE,
+      address: token0.address,
+      functionName: "approve",
+      args: [Permit3Address, MaxUint256],
+    });
+    hash = await walletClient.writeContract(approveRequest1);
+    await publicClient.waitForTransactionReceipt({
+      hash,
+    });
 
-  // create pair
-  const simCreatePair = await publicClient.simulateContract({
-    abi: engineABI,
-    functionName: "execute",
-    address: EngineAddress,
-    args: [
-      zeroAddress,
-      [CommandEnum.CreatePair],
-      [
-        encodeAbiParameters(CreatePairParams, [
-          token0.address,
-          token1.address,
-          0,
-          0,
-        ]),
-      ],
-      0n,
-      0n,
-      "0x",
-    ],
-  });
-  hash = await walletClient.writeContract(simCreatePair.request);
-  await publicClient.waitForTransactionReceipt({ hash });
+    const { request: approveRequest2 } = await publicClient.simulateContract({
+      abi: mockErc20ABI,
+      account: ALICE,
+      address: token1.address,
+      functionName: "approve",
+      args: [Permit3Address, MaxUint256],
+    });
+    hash = await walletClient.writeContract(approveRequest2);
+    await publicClient.waitForTransactionReceipt({
+      hash,
+    });
 
-  // add liquidity
-  const block = await publicClient.getBlock();
-  let dataHash = getTransferBatchTypedDataHash(1, {
-    transferDetails: [makeAmountFromString(token0, "1")],
-    spender: RouterAddress,
-  });
+    position = createPosition(
+      "BiDirectional",
+      { token0, token1, scalingFactor: 0, strike: 0, spread: 1 },
+      1,
+    );
 
-  let verify = {
-    dataHash: [dataHash],
-    nonce: 0n,
-    deadline: block.timestamp + 100n,
-  };
-  let signature = await signSuperSignature(walletClient, ALICE, verify);
+    const { hash: approveHash } = await approve(
+      publicClient,
+      walletClient,
+      ALICE,
+      {
+        spender: Permit3Address,
+        approvalDetails: {
+          type: "positionApproval",
+          ilrta: position,
+          approved: true,
+        },
+      },
+    );
+    await publicClient.waitForTransactionReceipt({ hash: approveHash });
 
-  const simAddLiquidity = await publicClient.simulateContract({
-    abi: routerABI,
-    functionName: "route",
-    address: RouterAddress,
-    account: ALICE,
-    args: [
+    const block = await publicClient.getBlock();
+    const pair = { token0, token1, scalingFactor: 0 } as const;
+    const { hash: createHash } = await routerRoute(
+      publicClient,
+      walletClient,
+      ALICE,
       {
         to: ALICE,
-        commands: [CommandEnum.AddLiquidity],
-        inputs: [
-          encodeAbiParameters(AddLiquidityParams, [
-            token0.address,
-            token1.address,
-            0,
-            1,
-            1,
-            parseEther("1"),
-          ]),
+        commands: [
+          {
+            command: "CreatePair",
+            inputs: {
+              pair,
+              strike: 0,
+            },
+          },
         ],
-        numTokens: 1n,
-        numLPs: 1n,
-        permitTransfers: [
-          { token: getAddress(token0.address), amount: parseEther("1") },
-        ],
-        positionTransfers: [],
-        verify,
-        signature,
+        nonce: 0n,
+        deadline: block.timestamp + 100n,
+        slippage: createFraction(2, 100),
       },
-    ],
-  });
-  hash = await walletClient.writeContract(simAddLiquidity.request);
-  await publicClient.waitForTransactionReceipt({ hash });
+    );
+    await publicClient.waitForTransactionReceipt({ hash: createHash });
 
-  // borrow liquidity
-  dataHash = getTransferBatchTypedDataHash(1, {
-    transferDetails: [makeAmountFromString(token0, "1.5")],
-    spender: RouterAddress,
-  });
-
-  verify = {
-    dataHash: [dataHash],
-    nonce: 1n,
-    deadline: block.timestamp + 100n,
-  };
-  signature = await signSuperSignature(walletClient, ALICE, verify);
-
-  const simBorrowLiquidity = await publicClient.simulateContract({
-    abi: routerABI,
-    functionName: "route",
-    address: RouterAddress,
-    account: ALICE,
-    args: [
+    const { hash: addHash } = await routerRoute(
+      publicClient,
+      walletClient,
+      ALICE,
       {
         to: ALICE,
-        commands: [CommandEnum.BorrowLiquidity],
-        inputs: [
-          encodeAbiParameters(BorrowLiquidityParams, [
-            token0.address,
-            token1.address,
-            0,
-            1,
-            TokenSelectorEnum.Token0,
-            parseEther("1.5"),
-            parseEther("0.5"),
-          ]),
+        commands: [
+          {
+            command: "AddLiquidity",
+            inputs: {
+              pair,
+              strike: 0,
+              spread: 1,
+              amountDesired: parseEther("1"),
+            },
+          },
         ],
-        numTokens: 1n,
-        numLPs: 1n,
-        permitTransfers: [
-          { token: getAddress(token0.address), amount: parseEther("1.5") },
-        ],
-        positionTransfers: [],
-        verify,
-        signature,
+        nonce: 1n,
+        deadline: block.timestamp + 100n,
+        slippage: createFraction(2, 100),
       },
-    ],
-  });
-  hash = await walletClient.writeContract(simBorrowLiquidity.request);
-  await publicClient.waitForTransactionReceipt({ hash });
-}, 200_000);
+    );
+    await publicClient.waitForTransactionReceipt({ hash: addHash });
 
-afterAll(async () => {
-  await testClient.reset();
-});
+    const { hash: borrowHash } = await routerRoute(
+      publicClient,
+      walletClient,
+      ALICE,
+      {
+        to: ALICE,
+        commands: [
+          {
+            command: "BorrowLiquidity",
+            inputs: {
+              pair,
+              strike: 0,
+              amountDesiredCollateral: createAmountFromString(token0, "1.5"),
+              amountDesiredDebt: parseEther("0.5"),
+            },
+          },
+        ],
+        nonce: 2n,
+        deadline: block.timestamp + 100n,
+        slippage: createFraction(2, 100),
+      },
+    );
+    await publicClient.waitForTransactionReceipt({
+      hash: borrowHash,
+    });
+  } else {
+    await testClient.revert({ id });
+  }
+  id = await testClient.snapshot();
+}, 100_000);
 
 describe("reads", () => {
   test("get pair", async () => {
@@ -305,67 +279,40 @@ describe("reads", () => {
       }),
     );
 
-    expect(pairData).toBeTruthy();
+    expect(fractionEqualTo(pairData.composition[0], 0)).toBe(true);
+    expect(fractionEqualTo(pairData.composition[1], 0)).toBe(true);
+    expect(fractionEqualTo(pairData.composition[2], 0)).toBe(true);
+    expect(fractionEqualTo(pairData.composition[3], 0)).toBe(true);
+    expect(fractionEqualTo(pairData.composition[4], 0)).toBe(true);
 
+    expect(pairData.strikeCurrent).toStrictEqual([0, 0, 0, 0, 0]);
     expect(pairData.initialized).toBeTruthy();
-    expect(pairData.strikeCurrentCached).toBe(0);
+    expect(pairData.strikes[0]).toBeTruthy();
+    expect(pairData.strikes[0]!.liquidity).toStrictEqual([
+      { swap: parseEther("0.5"), borrowed: parseEther("0.5") },
+      { swap: 0n, borrowed: 0n },
+      { swap: 0n, borrowed: 0n },
+      { swap: 0n, borrowed: 0n },
+      { swap: 0n, borrowed: 0n },
+    ]);
   });
 
   test("get strike", async () => {
     const strikeData = await readAndParse(
       engineGetStrike(publicClient, {
         pair: { token0, token1, scalingFactor: 0 },
-        strike: 1,
+        strike: 0,
       }),
     );
 
     expect(strikeData).toBeTruthy();
-    expect(strikeData.totalSupply[0]).toBeGreaterThan(0n);
-    expect(strikeData.liquidityBiDirectional[0]).toBeGreaterThan(0n);
-    expect(strikeData.liquidityBorrowed[0]).toBeGreaterThan(0n);
-  });
-
-  test("get bi directional", async () => {
-    const positionData = await readAndParse(
-      engineGetPositionBiDirectional(publicClient, {
-        owner: ALICE,
-        position: makePosition(
-          "BiDirectional",
-          {
-            token0,
-            token1,
-            scalingFactor: 0,
-            strike: 1,
-            spread: 1,
-          },
-          1,
-        ),
-      }),
-    );
-
-    expect(positionData).toBeTruthy();
-    expect(positionData.balance).toBeGreaterThan(0n);
-  });
-
-  test("get debt", async () => {
-    const positionData = await readAndParse(
-      engineGetPositionDebt(publicClient, {
-        owner: ALICE,
-        position: makePosition(
-          "Debt",
-          {
-            token0,
-            token1,
-            scalingFactor: 0,
-            strike: 1,
-            selectorCollateral: "Token0",
-          },
-          1,
-        ),
-      }),
-    );
-
-    expect(positionData).toBeTruthy();
-    expect(positionData.balance).toBeGreaterThan(0n);
+    expect(strikeData).toBeTruthy();
+    expect(strikeData!.liquidity).toStrictEqual([
+      { swap: parseEther("0.5"), borrowed: parseEther("0.5") },
+      { swap: 0n, borrowed: 0n },
+      { swap: 0n, borrowed: 0n },
+      { swap: 0n, borrowed: 0n },
+      { swap: 0n, borrowed: 0n },
+    ]);
   });
 });
