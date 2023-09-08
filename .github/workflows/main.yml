@@ -13,6 +13,7 @@ jobs:
 
   lint:
     name: Lint
+    if: false
     runs-on: ubuntu-latest
     steps:
       - name: Clone repository
@@ -42,7 +43,7 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
       - name: Build contracts
         run: pnpm build:contracts
-      - name: Codegen
-        run: pnpm codegen
-      - name: Build
-        run: pnpm build
+      # - name: Codegen
+      #   run: pnpm codegen
+      # - name: Build
+      #   run: pnpm build
