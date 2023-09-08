@@ -201,8 +201,6 @@ export const routerRoute = async (
     })),
   );
 
-  console.log(transferDetails);
-
   // sign
   const signature = await permit3SignTransferBatch(walletClient, userAccount, {
     transferDetails,
