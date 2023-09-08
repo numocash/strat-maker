@@ -1,0 +1,24 @@
+{
+  "name": "dry-powder",
+  "version": "0.0.1",
+  "description": "",
+  "files": ["src/**/*.sol", "out/"],
+  "scripts": {
+    "build": "forge build",
+    "test": "forge test",
+    "format": "biome format . --write && forge fmt",
+    "clean": "rm -rf cache out",
+    "lint": "biome check ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "solmate": "^6.2.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.1.2",
+    "husky": "^8.0.3",
+    "solhint": "^3.6.2"
+  }
+}

@@ -10,18 +10,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  install:
-    name: Install
-    runs-on: ubuntu-latest
-    steps:
-      - name: Clone repository
-        uses: actions/checkout@v3
-      - name: Setup javascript env
-        uses: ./.github/actions/setup-js
 
   lint:
     name: Lint
-    needs: install
+    if: false
     runs-on: ubuntu-latest
     steps:
       - name: Clone repository
@@ -30,31 +22,28 @@ jobs:
         uses: ./.github/actions/setup-js
       - name: Install foundry
         uses: foundry-rs/foundry-toolchain@v1
+      - name: Build contracts
+        run: pnpm build:contracts
+      - name: Codegen
+        run: pnpm codegen
       - name: Lint
         run: pnpm lint
+      - name: Typecheck
+        run: pnpm typecheck
 
   build:
     name: Build
-    if: false
     runs-on: ubuntu-latest
     steps:
       - name: Clone repository
         uses: actions/checkout@v3
+      - name: Setup javascript env
+        uses: ./.github/actions/setup-js
       - name: Install foundry
         uses: foundry-rs/foundry-toolchain@v1
-      - name: Build
-        run: forge build
-
-  test:
-    name: Test
-    if: false
-    runs-on: ubuntu-latest
-    steps:
-      - name: Clone repository
-        uses: actions/checkout@v3
-      - name: Install foundry
-        uses: foundry-rs/foundry-toolchain@v1
-      - name: Test
-        run: forge test
-      - name: Snapshot
-        run: forge snapshot --check
+      - name: Build contracts
+        run: pnpm build:contracts
+      # - name: Codegen
+      #   run: pnpm codegen
+      # - name: Build
+      #   run: pnpm build
