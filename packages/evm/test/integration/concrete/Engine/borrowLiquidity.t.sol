@@ -10,7 +10,7 @@ import {
     createCommandInput,
     pushCommandInputs
 } from "../../../utils/Commands.sol";
-import {MockERC20} from "../../../mocks/MockERC20.sol";
+import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
 
 import {Engine} from "src/core/Engine.sol";
 import {Accounts} from "src/core/Accounts.sol";
@@ -32,8 +32,8 @@ contract BorrowLiquidityTest is Test, IExecuteCallback {
 
     function setUp() external {
         engine = new Engine(payable(address(0)));
-        mockERC20_0 = new MockERC20();
-        mockERC20_1 = new MockERC20();
+        mockERC20_0 = new MockERC20("Mock ERC20", "MOCK", 18);
+        mockERC20_1 = new MockERC20("Mock ERC20", "MOCK", 18);
     }
 
     function executeCallback(Accounts.Account calldata, bytes calldata) external {

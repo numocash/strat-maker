@@ -12,11 +12,10 @@ export default defineConfig({
         "Router.sol/**",
         "Pairs.sol/**",
         "Positions.sol/**",
+        "ILRTA.sol/**",
+        "Permit3.sol/**",
+        "MockERC20.sol/**",
       ],
-    }),
-    foundry({
-      project: "node_modules/ilrta/",
-      include: ["ILRTA.sol/**", "Permit3.sol/**", "MockERC20.sol/**"],
     }),
   ],
 });

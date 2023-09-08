@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
 
-import {MockERC20} from "../../../mocks/MockERC20.sol";
+import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
 import {MockPositions} from "../../../mocks/MockPositions.sol";
 
 import {Accounts} from "src/core/Accounts.sol";
@@ -30,7 +30,7 @@ contract ExecuteCallbackTest is Test {
     function setUp() external {
         permit3 = new Permit3();
         router = new Router(payable(address(this)), address(permit3));
-        mockERC20 = new MockERC20();
+        mockERC20 = new MockERC20("Mock ERC20", "MOCK", 18);
         mockPositions = new MockPositions();
     }
 
