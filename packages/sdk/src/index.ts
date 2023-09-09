@@ -63,3 +63,5 @@ export type {
 } from "./types.js";
 
 export { fractionToQ128, q128ToFraction, getPairID } from "./utils.js";
+
+export { routerRoute } from "./writes.js";

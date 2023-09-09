@@ -1,0 +1,1 @@
+anvil --code-size-limit 65535

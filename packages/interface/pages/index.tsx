@@ -15,8 +15,9 @@ export default function Home() {
   }, []);
 
   const { isConnected, address } = useAccount();
-  const { id, token } = useEnvironment();
-  const balanceQuery = useBalance(token, address);
+  const { pair } = useEnvironment();
+  const balance0Query = useBalance(pair?.token0, address);
+  const balance1Query = useBalance(pair?.token1, address);
 
   return (
     <main
@@ -32,7 +33,6 @@ export default function Home() {
             onClick={() => {
               setupMutation.mutateAsync();
             }}
-            disabled={id === undefined}
           >
             R
           </AsyncButton>
@@ -40,8 +40,17 @@ export default function Home() {
         {isConnected && (
           <>
             <div className=" w-full border-b-2 border-gray-200" />
-            {token ? (
-              <TokenAmountRow erc20={token} erc20AmountQuery={balanceQuery} />
+            {pair ? (
+              <div className="w-full flex flex-col gap-2">
+                <TokenAmountRow
+                  erc20={pair.token0}
+                  erc20AmountQuery={balance0Query}
+                />
+                <TokenAmountRow
+                  erc20={pair.token1}
+                  erc20AmountQuery={balance1Query}
+                />
+              </div>
             ) : null}
           </>
         )}

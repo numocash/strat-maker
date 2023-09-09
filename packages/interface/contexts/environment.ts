@@ -1,12 +1,14 @@
-import { type ERC20 } from "@/lib/types";
+import type { Pair } from "dry-powder-sdk";
 import { useState } from "react";
 import { createContainer } from "unstated-next";
-import type { Hex } from "viem";
+import type { Address, Hex } from "viem";
 
 const useEnvironmentInternal = () => {
   const [id, setID] = useState<Hex | undefined>(undefined);
-  const [token, setToken] = useState<ERC20 | undefined>(undefined);
-  return { id, setID, token, setToken };
+  const [pair, setPair] = useState<Pair | undefined>(undefined);
+  const [router, setRouter] = useState<Address | undefined>(undefined);
+  const [permit, setPermit] = useState<Address | undefined>(undefined);
+  return { id, setID, pair, setPair, router, setRouter, permit, setPermit };
 };
 
 export const { Provider: EnvironmentProvider, useContainer: useEnvironment } =
