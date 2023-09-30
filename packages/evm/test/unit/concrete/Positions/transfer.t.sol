@@ -59,11 +59,11 @@ contract TransferTest is Test {
         positions.transfer_oHLEec(cuh, Positions.ILRTATransferDetails(0, 1e18));
         vm.pauseGasMetering();
 
-        Positions.ILRTAData memory data = positions.dataOf_cGJnTo(address(this), 0);
+        Positions.ILRTAData memory data = positions.dataOf(address(this), 0);
 
         assertEq(data.balance, 0);
 
-        data = positions.dataOf_cGJnTo(cuh, 0);
+        data = positions.dataOf(cuh, 0);
 
         assertEq(data.balance, 1e18);
 
@@ -82,11 +82,11 @@ contract TransferTest is Test {
         positions.transfer_oHLEec(cuh, Positions.ILRTATransferDetails(0, 0.5e18));
         vm.pauseGasMetering();
 
-        Positions.ILRTAData memory data = positions.dataOf_cGJnTo(address(this), 0);
+        Positions.ILRTAData memory data = positions.dataOf(address(this), 0);
 
         assertEq(data.balance, 0.5e18);
 
-        data = positions.dataOf_cGJnTo(cuh, 0);
+        data = positions.dataOf(cuh, 0);
 
         assertEq(data.balance, 0.5e18);
 
@@ -106,11 +106,11 @@ contract TransferTest is Test {
         positions.transfer_oHLEec(cuh, Positions.ILRTATransferDetails(0, 0.5e18));
         vm.pauseGasMetering();
 
-        Positions.ILRTAData memory data = positions.dataOf_cGJnTo(address(this), 0);
+        Positions.ILRTAData memory data = positions.dataOf(address(this), 0);
 
         assertEq(data.balance, 0.5e18);
 
-        data = positions.dataOf_cGJnTo(cuh, 0);
+        data = positions.dataOf(cuh, 0);
 
         assertEq(data.balance, 1.5e18);
 

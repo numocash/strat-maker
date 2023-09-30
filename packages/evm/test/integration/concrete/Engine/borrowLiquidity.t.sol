@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
@@ -96,7 +96,7 @@ contract BorrowLiquidityTest is Test, IExecuteCallback {
         assertEq(mockERC20_0.balanceOf(address(engine)), 0.5e18 + 1);
         assertEq(mockERC20_1.balanceOf(address(engine)), 1e18);
 
-        Positions.ILRTAData memory position = engine.dataOf_cGJnTo(
+        Positions.ILRTAData memory position = engine.dataOf(
             address(this),
             debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, uint136(Q128))
         );
@@ -163,7 +163,7 @@ contract BorrowLiquidityTest is Test, IExecuteCallback {
         assertEq(mockERC20_0.balanceOf(address(engine)), 2);
         assertEq(mockERC20_1.balanceOf(address(engine)), 2e18);
 
-        Positions.ILRTAData memory position = engine.dataOf_cGJnTo(
+        Positions.ILRTAData memory position = engine.dataOf(
             address(this),
             debtID(address(mockERC20_0), address(mockERC20_1), 0, 0, Engine.TokenSelector.Token1, 0, uint136(Q128))
         );

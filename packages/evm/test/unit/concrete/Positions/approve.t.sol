@@ -30,7 +30,7 @@ contract ApproveTest is Test {
 
         assertTrue(ret);
 
-        Positions.ILRTAApprovalDetails memory allowance = positions.allowanceOf_QDmnOj(address(this), cuh, bytes32(0));
+        Positions.ILRTAApprovalDetails memory allowance = positions.allowanceOf(address(this), cuh, bytes32(0));
 
         assertTrue(allowance.approved);
 
@@ -48,7 +48,7 @@ contract ApproveTest is Test {
 
         assertTrue(ret);
 
-        Positions.ILRTAApprovalDetails memory allowance = positions.allowanceOf_QDmnOj(address(this), cuh, bytes32(0));
+        Positions.ILRTAApprovalDetails memory allowance = positions.allowanceOf(address(this), cuh, bytes32(0));
 
         assertFalse(allowance.approved);
 

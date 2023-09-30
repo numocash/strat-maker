@@ -20,7 +20,7 @@ contract AllowanceOfTest is Test {
     }
 
     function test_AllowanceOf_Zero() external {
-        Positions.ILRTAApprovalDetails memory allowance = positions.allowanceOf_QDmnOj(address(this), cuh, bytes32(0));
+        Positions.ILRTAApprovalDetails memory allowance = positions.allowanceOf(address(this), cuh, bytes32(0));
 
         vm.pauseGasMetering();
 
@@ -36,7 +36,7 @@ contract AllowanceOfTest is Test {
 
         vm.resumeGasMetering();
 
-        Positions.ILRTAApprovalDetails memory allowance = positions.allowanceOf_QDmnOj(address(this), cuh, bytes32(0));
+        Positions.ILRTAApprovalDetails memory allowance = positions.allowanceOf(address(this), cuh, bytes32(0));
 
         vm.pauseGasMetering();
 
@@ -53,16 +53,12 @@ contract AllowanceOfTest is Test {
 
         vm.resumeGasMetering();
 
-        Positions.ILRTAApprovalDetails memory allowance = positions.allowanceOf_QDmnOj(address(this), cuh, bytes32(0));
+        Positions.ILRTAApprovalDetails memory allowance = positions.allowanceOf(address(this), cuh, bytes32(0));
 
         vm.pauseGasMetering();
 
         assertEq(allowance.approved, false);
 
         vm.resumeGasMetering();
-    }
-
-    function test_AllowanceOf_Selector() external {
-        assertEq(Positions.allowanceOf_QDmnOj.selector, bytes4(keccak256("allowanceOf()")));
     }
 }

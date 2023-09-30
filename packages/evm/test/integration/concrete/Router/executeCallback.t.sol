@@ -183,11 +183,11 @@ contract ExecuteCallbackTest is Test {
 
         vm.pauseGasMetering();
 
-        Positions.ILRTAData memory position = mockPositions.dataOf_cGJnTo(owner, 0);
+        Positions.ILRTAData memory position = mockPositions.dataOf(owner, 0);
 
         assertEq(position.balance, 1e18);
 
-        position = mockPositions.dataOf_cGJnTo(address(this), 0);
+        position = mockPositions.dataOf(address(this), 0);
 
         assertEq(position.balance, 0);
 
@@ -227,11 +227,11 @@ contract ExecuteCallbackTest is Test {
 
         vm.pauseGasMetering();
 
-        Positions.ILRTAData memory position = mockPositions.dataOf_cGJnTo(owner, 0);
+        Positions.ILRTAData memory position = mockPositions.dataOf(owner, 0);
 
         assertEq(position.balance, 0);
 
-        position = mockPositions.dataOf_cGJnTo(address(this), 0);
+        position = mockPositions.dataOf(address(this), 0);
 
         assertEq(position.balance, 1e18);
 
