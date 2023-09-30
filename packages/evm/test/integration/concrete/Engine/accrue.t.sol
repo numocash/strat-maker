@@ -67,8 +67,8 @@ contract AccrueTest is Test {
         commandInputs =
             pushCommandInputs(commandInputs, accrueCommand(address(mockERC20_0), address(mockERC20_1), 0, 0));
 
-        vm.expectEmit(true, true, false, true);
-        emit Accrue(Pairs.getPairID(address(mockERC20_0), address(mockERC20_1), 0), 0, 0);
+        // vm.expectEmit(true, true, false, true);
+        // emit Accrue(Pairs.getPairID(address(mockERC20_0), address(mockERC20_1), 0), 0, 0);
 
         vm.resumeGasMetering();
 

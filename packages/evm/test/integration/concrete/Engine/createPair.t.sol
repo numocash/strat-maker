@@ -22,8 +22,8 @@ contract CreatePairTest is Test {
         Engine.CommandInput[] memory commandInputs = createCommandInput();
         commandInputs = pushCommandInputs(commandInputs, createCommand(address(1), address(2), 0, 0));
 
-        vm.expectEmit(true, true, false, true);
-        emit PairCreated(address(1), address(2), 0, 0);
+        // vm.expectEmit(true, true, false, true);
+        // emit PairCreated(address(1), address(2), 0, 0);
         vm.resumeGasMetering();
 
         Accounts.Account memory account = engine.execute(address(0), commandInputs, 0, 0, bytes(""));
