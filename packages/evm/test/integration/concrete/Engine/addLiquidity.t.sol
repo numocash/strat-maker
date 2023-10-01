@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
@@ -58,8 +58,8 @@ contract AddLiquidityTest is Test, IExecuteCallback {
 
         amount0 = getAmount0(1e18, getRatioAtStrike(0), 0, true);
 
-        vm.expectEmit(true, true, true, true);
-        emit AddLiquidity(Pairs.getPairID(address(mockERC20_0), address(mockERC20_1), 0), 0, 1, 1e18, amount0, 0);
+        // vm.expectEmit(true, true, true, true);
+        // emit AddLiquidity(Pairs.getPairID(address(mockERC20_0), address(mockERC20_1), 0), 0, 1, 1e18, amount0, 0);
         vm.resumeGasMetering();
 
         Accounts.Account memory accounts = engine.execute(address(this), commandInputs, 2, 0, bytes(""));
@@ -78,7 +78,7 @@ contract AddLiquidityTest is Test, IExecuteCallback {
         assertEq(mockERC20_0.balanceOf(address(engine)), amount0);
 
         Positions.ILRTAData memory position =
-            engine.dataOf_cGJnTo(address(this), biDirectionalID(address(mockERC20_0), address(mockERC20_1), 0, 0, 1));
+            engine.dataOf(address(this), biDirectionalID(address(mockERC20_0), address(mockERC20_1), 0, 0, 1));
 
         assertEq(position.balance, 1e18);
 
@@ -103,8 +103,8 @@ contract AddLiquidityTest is Test, IExecuteCallback {
 
         engine.execute(address(this), commandInputs, 2, 0, bytes(""));
 
-        vm.expectEmit(true, true, true, true);
-        emit AddLiquidity(Pairs.getPairID(address(mockERC20_0), address(mockERC20_1), 0), 0, 1, 1e18, amount0, 0);
+        // vm.expectEmit(true, true, true, true);
+        // emit AddLiquidity(Pairs.getPairID(address(mockERC20_0), address(mockERC20_1), 0), 0, 1, 1e18, amount0, 0);
         vm.resumeGasMetering();
 
         Accounts.Account memory accounts = engine.execute(address(this), commandInputs, 2, 0, bytes(""));
@@ -123,7 +123,7 @@ contract AddLiquidityTest is Test, IExecuteCallback {
         assertEq(mockERC20_0.balanceOf(address(engine)), 2 * amount0);
 
         Positions.ILRTAData memory position =
-            engine.dataOf_cGJnTo(address(this), biDirectionalID(address(mockERC20_0), address(mockERC20_1), 0, 0, 1));
+            engine.dataOf(address(this), biDirectionalID(address(mockERC20_0), address(mockERC20_1), 0, 0, 1));
 
         assertEq(position.balance, 2e18);
 

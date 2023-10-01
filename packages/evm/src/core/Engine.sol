@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.19;
 
 import {Accounts} from "./Accounts.sol";
@@ -35,32 +35,6 @@ contract Engine is Positions {
     using Accounts for Accounts.Account;
     using Pairs for Pairs.Pair;
     using Pairs for mapping(bytes32 => Pairs.Pair);
-
-    /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
-                                 EVENTS
-    <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
-
-    event Swap(bytes32 indexed pairID, int256 amount0, int256 amount1);
-    event AddLiquidity(
-        bytes32 indexed pairID,
-        int24 indexed strike,
-        uint8 indexed spread,
-        uint128 liquidity,
-        uint256 amount0,
-        uint256 amount1
-    );
-    event BorrowLiquidity(bytes32 indexed pairID, int24 indexed strike, uint128 liquidity);
-    event RepayLiquidity(bytes32 indexed pairID, int24 indexed strike, uint128 liquidity);
-    event RemoveLiquidity(
-        bytes32 indexed pairID,
-        int24 indexed strike,
-        uint8 indexed spread,
-        uint128 liquidity,
-        uint256 amount0,
-        uint256 amount1
-    );
-    event Accrue(bytes32 indexed pairID, int24 indexed strike, uint136 liquidityAccrued);
-    event PairCreated(address indexed token0, address indexed token1, uint8 scalingFactor, int24 strikeInitial);
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                  ERRORS
@@ -386,8 +360,7 @@ contract Engine is Positions {
     /// @notice Helper swap function
     /// @custom:team Should we emit the `to` address
     function _swap(SwapParams memory params, Accounts.Account memory account) internal {
-        (bytes32 pairID, Pairs.Pair storage pair) =
-            pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
+        (, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
 
         int256 amount0;
         int256 amount1;
@@ -403,8 +376,6 @@ contract Engine is Positions {
 
         account.updateToken(params.token0, amount0);
         account.updateToken(params.token1, amount1);
-
-        emit Swap(pairID, amount0, amount1);
     }
 
     /// @notice Helper wrap weth function
@@ -435,8 +406,7 @@ contract Engine is Positions {
         unchecked {
             if (params.amountDesired == 0) revert InvalidAmountDesired();
 
-            (bytes32 pairID, Pairs.Pair storage pair) =
-                pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
+            (, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
 
             {
                 uint136 liquidityAccrued = pair.accrue(params.strike);
@@ -468,16 +438,13 @@ contract Engine is Positions {
                 biDirectionalID(params.token0, params.token1, params.scalingFactor, params.strike, params.spread),
                 balance
             );
-
-            emit AddLiquidity(pairID, params.strike, params.spread, params.amountDesired, _amount0, _amount1);
         }
     }
 
     /// @notice Helper remove liquidity function
     function _removeLiquidity(RemoveLiquidityParams memory params, Accounts.Account memory account) internal {
         unchecked {
-            (bytes32 pairID, Pairs.Pair storage pair) =
-                pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
+            (, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
 
             {
                 uint136 liquidityAccrued = pair.accrue(params.strike);
@@ -510,8 +477,6 @@ contract Engine is Positions {
                 biDirectionalID(params.token0, params.token1, params.scalingFactor, params.strike, params.spread),
                 params.amountDesired
             );
-
-            emit RemoveLiquidity(pairID, params.strike, params.spread, liquidity, _amount0, _amount1);
         }
     }
 
@@ -525,8 +490,7 @@ contract Engine is Positions {
         internal
     {
         unchecked {
-            (bytes32 pairID, Pairs.Pair storage pair) =
-                pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
+            (, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
 
             {
                 uint136 liquidityAccrued = pair.accrue(params.strike);
@@ -624,16 +588,13 @@ contract Engine is Positions {
                 ),
                 params.amountDesiredDebt
             );
-
-            emit BorrowLiquidity(pairID, params.strike, params.amountDesiredDebt);
         }
     }
 
     /// @notice Helper repay liquidity function
     function _repayLiquidity(RepayLiquidityParams memory params, Accounts.Account memory account) internal {
         unchecked {
-            (bytes32 pairID, Pairs.Pair storage pair) =
-                pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
+            (, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
 
             {
                 uint136 liquidityAccrued = pair.accrue(params.strike);
@@ -736,8 +697,6 @@ contract Engine is Positions {
                 ),
                 params.amountDesired
             );
-
-            emit RepayLiquidity(pairID, params.strike, liquidityDebt);
         }
     }
 
@@ -747,8 +706,6 @@ contract Engine is Positions {
 
         uint136 liquidityAccrued = pair.accrue(params.strike);
         if (liquidityAccrued > 0) pair.removeBorrowedLiquidity(params.strike, liquidityAccrued);
-
-        emit Accrue(params.pairID, params.strike, liquidityAccrued);
     }
 
     /// @notice Helper create pair function
@@ -757,8 +714,6 @@ contract Engine is Positions {
 
         (, Pairs.Pair storage pair) = pairs.getPairAndID(params.token0, params.token1, params.scalingFactor);
         pair.initialize(params.strikeInitial);
-
-        emit PairCreated(params.token0, params.token1, params.scalingFactor, params.strikeInitial);
     }
 
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>

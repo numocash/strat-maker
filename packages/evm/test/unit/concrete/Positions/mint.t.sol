@@ -25,7 +25,7 @@ contract MintTest is Test {
         positions.mint(address(this), 0, 1e18);
         vm.pauseGasMetering();
 
-        Positions.ILRTAData memory data = positions.dataOf_cGJnTo(address(this), 0);
+        Positions.ILRTAData memory data = positions.dataOf(address(this), 0);
 
         assertEq(data.balance, 1e18);
 
@@ -44,7 +44,7 @@ contract MintTest is Test {
         positions.mint(address(this), 0, 1e18);
         vm.pauseGasMetering();
 
-        Positions.ILRTAData memory data = positions.dataOf_cGJnTo(address(this), 0);
+        Positions.ILRTAData memory data = positions.dataOf(address(this), 0);
 
         assertEq(data.balance, 2e18);
 

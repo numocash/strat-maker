@@ -29,7 +29,7 @@ contract BurnTest is Test {
 
         vm.pauseGasMetering();
 
-        Positions.ILRTAData memory data = positions.dataOf_cGJnTo(address(this), 0);
+        Positions.ILRTAData memory data = positions.dataOf(address(this), 0);
 
         assertEq(data.balance, 0);
 
@@ -50,7 +50,7 @@ contract BurnTest is Test {
 
         vm.pauseGasMetering();
 
-        Positions.ILRTAData memory data = positions.dataOf_cGJnTo(address(this), 0);
+        Positions.ILRTAData memory data = positions.dataOf(address(this), 0);
 
         assertEq(data.balance, 0.5e18);
 

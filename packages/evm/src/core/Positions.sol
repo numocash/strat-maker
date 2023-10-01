@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.19;
 
 import {Engine} from "./Engine.sol";
@@ -136,22 +136,12 @@ abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
     <//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>*/
 
     /// @notice Reads and returns the data of the position
-    /// @dev Function selector is keccak("dataOf()"")
-    function dataOf_cGJnTo(address owner, bytes32 id) external view returns (ILRTAData memory) {
+    function dataOf(address owner, bytes32 id) external view returns (ILRTAData memory) {
         return _dataOf[owner][id];
     }
 
     /// @notice Reads and returns the allowance of the position
-    /// @dev Function selector is keccak("allowanceOf()")
-    function allowanceOf_QDmnOj(
-        address owner,
-        address spender,
-        bytes32
-    )
-        external
-        view
-        returns (ILRTAApprovalDetails memory)
-    {
+    function allowanceOf(address owner, address spender, bytes32) external view returns (ILRTAApprovalDetails memory) {
         return _allowanceOf[owner][spender];
     }
 
