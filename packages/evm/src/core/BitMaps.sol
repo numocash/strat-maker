@@ -5,7 +5,7 @@ import {MIN_STRIKE} from "./math/StrikeMath.sol";
 
 /// @title Bit Maps
 /// @notice Manage a bit map where positive bits represent active strikes
-/// @author Robert Leifke and Kyle Scott
+/// @author Kyle Scott and Robert Leifke
 library BitMaps {
     /// @notice Data structure of a three-level bitmap
     struct BitMap {

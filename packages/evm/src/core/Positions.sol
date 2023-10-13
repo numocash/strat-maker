@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.19;
 
 import {Engine} from "./Engine.sol";
@@ -55,7 +55,7 @@ function debtID(
 
 /// @title Positions
 /// @notice Representation of a position on the exchange
-/// @author Robert Leifke and Kyle Scott
+/// @author Kyle Scott and Robert Leifke
 abstract contract Positions is ILRTA("Numoen Dry Powder", "DP") {
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                DATA TYPES
