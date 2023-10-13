@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.19;
 
 import {BitMaps} from "./BitMaps.sol";
@@ -11,7 +11,7 @@ uint8 constant NUM_SPREADS = 5;
 
 /// @title Pairs
 /// @notice Library for managing a series of constant sum automated market makers with impliciting borrowing
-/// @author Robert Leifke and Kyle Scott
+/// @author Kyle Scott and Robert Leifke
 library Pairs {
     using BitMaps for BitMaps.BitMap;
 

@@ -5,7 +5,7 @@ import {ERC20} from "solmate/src/tokens/ERC20.sol";
 
 /// @title Accounts
 /// @notice Library for storing and updating intermediate balance changes in memory
-/// @author Robert Leifke and Kyle Scott
+/// @author Kyle Scott and Robert Leifke
 library Accounts {
     /*<//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\>
                                  ERRORS
