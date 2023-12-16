@@ -1,4 +1,4 @@
-# 💪 PowerMaker [![GitHub Actions][gha-badge]][gha]
+# 🌸 RMMP [![GitHub Actions][gha-badge]][gha]
 
 [gha]: https://github.com/numoen/dry-powder/actions
 [gha-badge]: https://github.com/numoen/dry-powder/actions/workflows/main.yml/badge.svg
