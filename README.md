@@ -3,7 +3,7 @@
 [gha]: https://github.com/numoen/dry-powder/actions
 [gha-badge]: https://github.com/numoen/dry-powder/actions/workflows/main.yml/badge.svg
 
-The most efficient, highest leverage automated market maker protocol for rebalancing options built on Ethereum.
+The most efficient, highest leverage automated market maker protocol for options built on Ethereum.
 
 ## Features
 
