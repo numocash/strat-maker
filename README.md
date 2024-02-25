@@ -1,6 +1,6 @@
 # ⚡ StratMaker [![GitHub Actions][gha-badge]][gha]
 
-The most efficient, highest leverage automated market maker protocol for options built on Ethereum.
+Smart contracts suite of StratMaker, an automated market maker for options. 
 
 ![Group 185 (1)](https://github.com/numo-hq/strat-maker/assets/44106773/51bba6ed-0a01-466e-94f7-1f2bb8300ef8)
 
