@@ -1,5 +1,7 @@
 # 🌸 StratMaker [![GitHub Actions][gha-badge]][gha]
 
+![Group 185 (1)](https://github.com/numo-hq/strat-maker/assets/44106773/51bba6ed-0a01-466e-94f7-1f2bb8300ef8)
+
 [gha]: https://github.com/numoen/dry-powder/actions
 [gha-badge]: https://github.com/numoen/dry-powder/actions/workflows/main.yml/badge.svg
 
